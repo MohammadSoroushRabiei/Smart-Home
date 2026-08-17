@@ -16,7 +16,7 @@
 
 
 
-#define BTN GPIO_NUM_1
+#define BTN GPIO_NUM_4
 #define LED GPIO_NUM_2
 
 bool led_state = false;
@@ -31,6 +31,20 @@ void led_init()
     gpio_set_direction(LED, GPIO_MODE_OUTPUT);
 }
 
+void led_toggle(gpio_num_t led)
+{
+    led_state = !led_state ;
+    gpio_set_level(led,led_state);
+    ESP_LOGI(TAG_LED , "%s" , led_state ? "ON" : "OFF");
+}
+
+
+bool led_is_on(void)
+{
+    return led_state;
+}
+
+
 void btn_init()
 {
     gpio_reset_pin(BTN);
@@ -41,30 +55,165 @@ void btn_init()
 bool btn_is_pressed(gpio_num_t btn)
 {
     bool btn_current_state = gpio_get_level(btn);
-        
-    if (btn_current_state != btn_last_state) {
-        vTaskDelay(pdMS_TO_TICKS(50)); // Debounce
+
+    if (btn_current_state != btn_last_state)
+    {
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+
         btn_current_state = gpio_get_level(btn);
-        btn_last_state = btn_current_state ;
+
+        btn_last_state = btn_current_state;
 
         return btn_current_state;
     }
-    
+
     return false;
 }
 
 
-void led_toggle(gpio_num_t led)
+
+
+// ----------------------------------------------------- //
+//                      HTTP SERVER                      //
+// ----------------------------------------------------- //
+
+
+#include "esp_http_server.h"
+
+static const char *TAG_HTTP = "HTTP";
+
+static esp_err_t led_handler(httpd_req_t *req)
 {
-    led_state = !led_state ;
-    gpio_set_level(led,led_state);
-    ESP_LOGI(TAG_LED , "%s" , led_state ? "ON" : "OFF");
+    ESP_LOGI(TAG_HTTP, "GET /led received");
+
+    const char *response = led_is_on() ? "LED: ON" : "LED: OFF";
+
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;
+}
+
+
+static esp_err_t led_toggle_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG_HTTP, "GET /led/toggle received");
+    
+    led_toggle(LED);
+    
+    const char *response = led_is_on() ? "LED: ON" : "LED: OFF";
+    
+    esp_err_t err =  httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+    ESP_LOGI(TAG_HTTP, "httpd_resp_send result: %s", esp_err_to_name(err));
+
+    return err;
+}
+
+static esp_err_t root_handler(httpd_req_t * req)
+{
+    const char *html =
+        "<!DOCTYPE html>"
+        "<html>"
+        "<head>"
+        "<title>Smart Home head</title>"
+        "</head>"
+
+        "<body>"
+
+        "<h1>Smart Home h1</h1>"
+
+        "<h2 id=\"led-status\">LED:    </h2>"
+
+        "<script>"
+
+        "fetch(\"/led\")"
+        ".then(Response => Response.text())"
+        ".then(data => {"
+        "document.getElementById(\"led-status\").textContent = data;"
+        "});"
+
+        "</script>"
+
+        "<button id=\"led-toggle\">Toggle LED</button>"
+
+        "<script>"
+        "const btn = document.getElementById(\"led-toggle\");"
+
+        "btn.addEventListener('click',function(){"
+            "fetch(\"/led/toggle\")"
+            ".then(Response => Response.text())"
+            ".then(data => {"
+                "document.getElementById(\"led-status\").textContent = data;"
+        
+            "});"
+        "});"
+
+    "</script>"
+
+        "</body>"
+        "</html>";
+
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;
+}
+
+static const httpd_uri_t led_uri = {
+    .uri = "/led" ,
+    .method = HTTP_GET ,
+    .handler = led_handler ,
+    .user_ctx = NULL
+} ;
+
+
+static const httpd_uri_t led_toggle_uri = {
+    .uri = "/led/toggle" ,
+    .method = HTTP_GET ,
+    .handler = led_toggle_handler ,
+    .user_ctx = NULL
+} ;
+
+
+static const httpd_uri_t root_uri = {
+
+    .uri = "/" ,
+    .method = HTTP_GET ,
+    .handler = root_handler ,
+    .user_ctx = NULL
+
+};
+
+static httpd_handle_t http_server_start(void)
+{
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    if (httpd_start(&server,&config) != ESP_OK)
+    {
+        ESP_LOGI(TAG_HTTP,"Failed to start HTTP Server");
+        return NULL;
+    }
+    httpd_register_uri_handler(server , &led_uri);
+    httpd_register_uri_handler(server , &led_toggle_uri);
+    httpd_register_uri_handler(server , &root_uri);
+    ESP_LOGI(TAG_HTTP,"HTTP Server Started");
+
+    return server;
+    
+    
 }
 
 
 
 
 
+
+
+
+
+// ----------------------------------------------------- //
+//                          WIFI                         //
+// ----------------------------------------------------- //
 
 
 
@@ -122,10 +271,6 @@ static void wifi_set_state(wifi_state_t state)
     
 }
 
-wifi_state_t wifi_get_state(void)
-{
-    return wifi_state;
-}
 
 static void event_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
@@ -162,6 +307,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         retry_count = 0 ;
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        http_server_start();
     }
 }
 
@@ -208,6 +354,15 @@ void wifi_init_sta(void)
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 }
 
+wifi_state_t wifi_get_state(void)
+{
+    return wifi_state;
+}
+
+
+
+
+
 
 
 
@@ -230,6 +385,8 @@ void app_main(void)
     
     while (1)
     {
+
+
         if(btn_is_pressed(BTN))
         {
             led_toggle(LED);

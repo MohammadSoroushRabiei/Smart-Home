@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Home head</title>
+</head>
+
+<body>
+
+    <h1>Smart Home h1</h1>
+
+    <h2 id="led-status">LED: UNKNOWN</h2>
+
+
+    <script>
+        
+        fetch("/led")
+            .then(Response => Response.text())
+            .then(data => {
+                document.getElementById("led-status").textContent = data;
+
+            });
+
+    </script>
+
+    <button id="led-toggle">Toggle LED</button>
+
+    <script>
+        const btn = document.getElementById("led-toggle");
+
+        btn.addEventListener('click',function(){
+            fetch("/led/toggle")
+            .then(Response => Response.text())
+            .then(data => {
+                document.getElementById("led-status").textContent = data;
+        
+            });
+        });
+
+    </script>
+
+</body>
+</html>
