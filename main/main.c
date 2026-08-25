@@ -4,6 +4,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 
+#include "led.h"
 
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -17,32 +18,12 @@
 
 
 #define BTN GPIO_NUM_4
-#define LED GPIO_NUM_2
 
-bool led_state = false;
 bool btn_last_state = false;
 
-static const char * TAG_LED = "LED Status";
 
 
-void led_init()
-{
-    gpio_reset_pin(LED);
-    gpio_set_direction(LED, GPIO_MODE_OUTPUT);
-}
 
-void led_toggle(gpio_num_t led)
-{
-    led_state = !led_state ;
-    gpio_set_level(led,led_state);
-    ESP_LOGI(TAG_LED , "%s" , led_state ? "ON" : "OFF");
-}
-
-
-bool led_is_on(void)
-{
-    return led_state;
-}
 
 
 void btn_init()
