@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "driver/gpio.h"
 
-#define LED GPIO_NUM_2
+#define LED GPIO_NUM_13
 
 
 
