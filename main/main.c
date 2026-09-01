@@ -11,6 +11,7 @@
 #include "http_server.h"
 #include "lcd_driver.h"
 #include "touch_driver.h"
+#include "ui_screens.h"
 
 static void test_wifi_cb(wifi_state_t state)
 {
@@ -44,11 +45,11 @@ void app_main(void)
         }
     }
 
-    lcd_driver_lvgl_lock();
-    lv_obj_t *label = lv_label_create(lv_screen_active());
-    lv_label_set_text(label, "Hello Smart Home");
-    lv_obj_center(label);
-    lcd_driver_lvgl_unlock();
+    if (lcd_ok) {
+        lcd_driver_lvgl_lock();
+        ui_screens_init();
+        lcd_driver_lvgl_unlock();
+    }
 
     led_init();
     btn_init();
