@@ -12,7 +12,10 @@
 #include "lcd_driver.h"
 #include "touch_driver.h"
 
-
+static void test_wifi_cb(wifi_state_t state)
+{
+    ESP_LOGI("main", "WiFi state changed to: %d", state);
+}
 
 void app_main(void)
 {
@@ -50,12 +53,15 @@ void app_main(void)
     led_init();
     btn_init();
 
+    wifi_register_state_change_cb(test_wifi_cb);
+
     wifi_init_sta();
     
     while (!wifi_is_connected())
     {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
+
     
     http_server_start();
 

@@ -18,6 +18,8 @@ static const char *TAG = "WIFI";
 
 static wifi_state_t wifi_state = WIFI_STATE_OFFLINE;
 static uint8_t retry_count = 0;
+static wifi_state_change_cb_t s_state_change_cb = NULL;
+
 
 
 bool wifi_is_connected(void)
@@ -29,6 +31,11 @@ bool wifi_is_connected(void)
 wifi_state_t wifi_get_state(void)
 {
     return wifi_state;
+}
+
+void wifi_register_state_change_cb(wifi_state_change_cb_t cb)
+{
+    s_state_change_cb = cb;
 }
 
 
@@ -50,7 +57,6 @@ static const char *wifi_state_to_string(wifi_state_t state)
     }
 }
 
-
 static void wifi_set_state(wifi_state_t state)
 {
     if (wifi_state == state)
@@ -61,7 +67,25 @@ static void wifi_set_state(wifi_state_t state)
     wifi_state = state;
 
     ESP_LOGI(TAG, "Status: %s", wifi_state_to_string(state));
+
+    if (s_state_change_cb != NULL)
+    {
+        s_state_change_cb(state);
+    }
 }
+
+
+void wifi_retry_connect(void)
+{
+    ESP_LOGI(TAG, "Manual retry requested");
+    retry_count = 0;
+    wifi_set_state(WIFI_STATE_CONNECTING);
+    esp_wifi_connect();
+}
+
+
+
+
 
 
 static void event_handler(
