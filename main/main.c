@@ -1,10 +1,7 @@
 #include "nvs_flash.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-
-
 #include "led.h"
 #include "Button.h"
 #include "wifi_manager.h"
@@ -12,8 +9,10 @@
 #include "lcd_driver.h"
 #include "touch_driver.h"
 #include "ui_screens.h"
+#include "face_recognition.h"
 
 static bool s_lcd_ok = false;
+
 static void on_wifi_state_change(wifi_state_t state)
 {
     if (s_lcd_ok) {
@@ -36,12 +35,10 @@ void app_main(void)
 
     ESP_ERROR_CHECK(ret);
 
-
     s_lcd_ok = lcd_driver_init();
     if (!s_lcd_ok) {
         ESP_LOGW("main", "Continuing without LCD");
     }
-    
 
     if (s_lcd_ok) {
         bool touch_ok = touch_driver_init(lcd_driver_get_display());
@@ -62,13 +59,14 @@ void app_main(void)
     wifi_register_state_change_cb(on_wifi_state_change);
 
     wifi_init_sta();
-    
+
     while (!wifi_is_connected())
     {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 
-    
+    ESP_ERROR_CHECK(face_recognition_init());
+
     http_server_start();
 
     while (1)
