@@ -78,11 +78,22 @@ static void wifi_set_state(wifi_state_t state)
 void wifi_retry_connect(void)
 {
     ESP_LOGI(TAG, "Manual retry requested");
+
+    if (wifi_state == WIFI_STATE_CONNECTED)
+    {
+        ESP_LOGI(TAG, "Already connected, nothing to do");
+        return;
+    }
+
     retry_count = 0;
     wifi_set_state(WIFI_STATE_CONNECTING);
-    esp_wifi_connect();
-}
 
+    esp_err_t err = esp_wifi_disconnect();   // اطمینان از پاک شدن وضعیت قبلی
+    ESP_LOGI(TAG, "disconnect result: %s", esp_err_to_name(err));
+
+    err = esp_wifi_connect();
+    ESP_LOGI(TAG, "connect result: %s", esp_err_to_name(err));
+}
 
 
 
