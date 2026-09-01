@@ -7,6 +7,7 @@
 #include "Button.h"
 #include "wifi_manager.h"
 #include "http_server.h"
+#include "face_recognition.h"
 
 
 void app_main(void)
@@ -32,6 +33,8 @@ void app_main(void)
     {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
+
+    ESP_ERROR_CHECK(face_recognition_init());
     
     http_server_start();
 
