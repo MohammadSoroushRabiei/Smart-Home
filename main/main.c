@@ -13,9 +13,14 @@
 #include "touch_driver.h"
 #include "ui_screens.h"
 
-static void test_wifi_cb(wifi_state_t state)
+static bool s_lcd_ok = false;
+static void on_wifi_state_change(wifi_state_t state)
 {
-    ESP_LOGI("main", "WiFi state changed to: %d", state);
+    if (s_lcd_ok) {
+        lcd_driver_lvgl_lock();
+        ui_update_wifi_status(state);
+        lcd_driver_lvgl_unlock();
+    }
 }
 
 void app_main(void)
@@ -32,20 +37,20 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
 
-    bool lcd_ok = lcd_driver_init();
-    if (!lcd_ok) {
+    s_lcd_ok = lcd_driver_init();
+    if (!s_lcd_ok) {
         ESP_LOGW("main", "Continuing without LCD");
     }
     
 
-    if (lcd_ok) {
+    if (s_lcd_ok) {
         bool touch_ok = touch_driver_init(lcd_driver_get_display());
         if (!touch_ok) {
             ESP_LOGW("main", "Continuing without touch input");
         }
     }
 
-    if (lcd_ok) {
+    if (s_lcd_ok) {
         lcd_driver_lvgl_lock();
         ui_screens_init();
         lcd_driver_lvgl_unlock();
@@ -54,7 +59,7 @@ void app_main(void)
     led_init();
     btn_init();
 
-    wifi_register_state_change_cb(test_wifi_cb);
+    wifi_register_state_change_cb(on_wifi_state_change);
 
     wifi_init_sta();
     
