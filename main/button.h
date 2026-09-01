@@ -3,7 +3,7 @@
 #include "driver/gpio.h"
 #include <stdbool.h>
 
-#define BTN GPIO_NUM_4
+#define BTN GPIO_NUM_14
 
 
 void btn_init(void);
