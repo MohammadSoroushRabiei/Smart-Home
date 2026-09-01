@@ -11,8 +11,17 @@
 #include "http_server.h"
 #include "lcd_driver.h"
 #include "touch_driver.h"
+#include "ui_screens.h"
 
-
+static bool s_lcd_ok = false;
+static void on_wifi_state_change(wifi_state_t state)
+{
+    if (s_lcd_ok) {
+        lcd_driver_lvgl_lock();
+        ui_update_wifi_status(state);
+        lcd_driver_lvgl_unlock();
+    }
+}
 
 void app_main(void)
 {
@@ -28,27 +37,29 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
 
-    bool lcd_ok = lcd_driver_init();
-    if (!lcd_ok) {
+    s_lcd_ok = lcd_driver_init();
+    if (!s_lcd_ok) {
         ESP_LOGW("main", "Continuing without LCD");
     }
     
 
-    if (lcd_ok) {
+    if (s_lcd_ok) {
         bool touch_ok = touch_driver_init(lcd_driver_get_display());
         if (!touch_ok) {
             ESP_LOGW("main", "Continuing without touch input");
         }
     }
 
-    lcd_driver_lvgl_lock();
-    lv_obj_t *label = lv_label_create(lv_screen_active());
-    lv_label_set_text(label, "Hello Smart Home");
-    lv_obj_center(label);
-    lcd_driver_lvgl_unlock();
+    if (s_lcd_ok) {
+        lcd_driver_lvgl_lock();
+        ui_screens_init();
+        lcd_driver_lvgl_unlock();
+    }
 
     led_init();
     btn_init();
+
+    wifi_register_state_change_cb(on_wifi_state_change);
 
     wifi_init_sta();
     
@@ -56,6 +67,7 @@ void app_main(void)
     {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
+
     
     http_server_start();
 

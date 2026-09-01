@@ -1,9 +1,9 @@
 #include "lcd_driver.h"
 
-#include <sys/lock.h>
 #include <sys/param.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_timer.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -22,13 +22,13 @@ static const char *TAG = "lcd_driver";
 #define LVGL_TASK_MAX_DELAY_MS  500
 #define LVGL_DRAW_BUF_LINES     60   // بافر در RAM داخلی، نه PSRAM (برای رندر سریع‌تر)
 
-static _lock_t s_lvgl_lock;
+static SemaphoreHandle_t s_lvgl_lock;
 static lv_display_t *s_display = NULL;
 static esp_lcd_panel_io_handle_t s_io_handle = NULL;
 static esp_lcd_panel_handle_t s_panel_handle = NULL;
 
-void lcd_driver_lvgl_lock(void)   { _lock_acquire(&s_lvgl_lock); }
-void lcd_driver_lvgl_unlock(void) { _lock_release(&s_lvgl_lock); }
+void lcd_driver_lvgl_lock(void)   { xSemaphoreTakeRecursive(s_lvgl_lock, portMAX_DELAY); }
+void lcd_driver_lvgl_unlock(void) { xSemaphoreGiveRecursive(s_lvgl_lock);; }
 
 lv_display_t *lcd_driver_get_display(void) { return s_display; }
 
@@ -194,6 +194,7 @@ static void init_lvgl(void)
 
 bool lcd_driver_init(void)
 {
+    s_lvgl_lock = xSemaphoreCreateRecursiveMutex();
     init_backlight_gpio();
 
     if (init_i80_bus_and_panel() != ESP_OK) {

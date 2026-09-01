@@ -114,7 +114,7 @@ bool touch_driver_init(lv_display_t *disp)
         .flags = {
             .swap_xy = 0,
             .mirror_x = 1,
-            .mirror_y = 0,
+            .mirror_y = 1,
         },
         .driver_data = &tp_gt911_config,
     };
