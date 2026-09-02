@@ -147,12 +147,12 @@ dependencies:
       type: idf
     version: 6.0.2
   lvgl/lvgl:
-    component_hash: 17e68bfd21f0edf4c3ee838e2273da840bf3930e5dbc3bfa6c1190c3aed41f9f
+    component_hash: 184e532558c1c45fefed631f3e235423d22582aafb4630f3e8885c35281a49ae
     dependencies: []
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 9.4.0
+    version: 9.5.0
 direct_dependencies:
 - espressif/esp-dl
 - espressif/esp_jpeg
@@ -161,6 +161,6 @@ direct_dependencies:
 - espressif/human_face_detect
 - espressif/human_face_recognition
 - lvgl/lvgl
-manifest_hash: 16759de225d3073fc737c1a05da4dd3bb00069288a89ef71910fb69b89972f87
+manifest_hash: 0c17f50d669ccddfa102dc13a455810459629adfeaf3df0cec9ffea71931037e
 target: esp32s3
 version: 3.0.0

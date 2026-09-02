@@ -43,6 +43,8 @@ void app_main(void)
 
 
     s_lcd_ok = lcd_driver_init();
+    app_state_set_lcd_available(s_lcd_ok);
+    
     if (!s_lcd_ok) {
         ESP_LOGW("main", "Continuing without LCD");
     }

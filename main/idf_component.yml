@@ -1,7 +1,7 @@
 dependencies:
   espressif/esp_lcd_st7796: "^1.4.0"
   espressif/esp_lcd_touch_gt911: "^1.1.1"
-  lvgl/lvgl: "*"
+  lvgl/lvgl: "^9.5"
   espressif/esp-dl: "^3.1.0"
   espressif/human_face_detect: "^0.4.1"
   espressif/human_face_recognition: "^0.3.2"

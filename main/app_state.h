@@ -18,3 +18,5 @@ bool app_state_get_light(void);
  *        فعلاً فقط مقدار داخلی را عوض می‌کند؛ اتصال به LED واقعی در گام بعدی اضافه می‌شود.
  */
 void app_state_set_light(bool on);
+
+void app_state_set_lcd_available(bool available);
