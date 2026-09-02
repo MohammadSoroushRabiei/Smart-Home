@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include "led.h"
 
 static const char *TAG = "app_state";
 
@@ -31,5 +32,6 @@ void app_state_set_light(bool on)
 
     ESP_LOGI(TAG, "Light set to: %s", on ? "ON" : "OFF");
 
-    // در گام‌های بعدی: اتصال به LED واقعی، آپدیت LCD، و غیره اینجا اضافه می‌شود
+    led_set(LED, on);   
+
 }

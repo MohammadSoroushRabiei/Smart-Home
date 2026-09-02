@@ -38,11 +38,7 @@ void app_main(void)
 
     app_state_init();
 
-    app_state_set_light(true);
-    ESP_LOGI("main", "Light state: %d", app_state_get_light());
 
-    app_state_set_light(false);
-    ESP_LOGI("main", "Light state: %d", app_state_get_light());
 
 
 
@@ -84,7 +80,7 @@ void app_main(void)
     {
         if (btn_is_pressed(BTN))
         {
-            led_toggle(LED);
+            app_state_set_light(!app_state_get_light());
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
