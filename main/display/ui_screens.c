@@ -1,5 +1,5 @@
 #include "ui_screens.h"
-
+#include <stdio.h>
 #include "lvgl.h"
 #include "lcd_driver.h"
 #include "wifi_manager.h"
@@ -9,6 +9,8 @@ static lv_obj_t *s_wifi_status_label;
 static lv_obj_t *s_retry_btn;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
+static lv_obj_t *s_sensor_label;
+
 
 static const char *wifi_state_to_display_text(wifi_state_t state)
 {
@@ -57,6 +59,10 @@ void ui_screens_init(void)
     lv_label_set_text(s_light_label, "Light: OFF");
     lv_obj_center(s_light_label);
 
+    s_sensor_label = lv_label_create(scr);
+lv_label_set_text(s_sensor_label, "Sensor: --");
+lv_obj_align(s_sensor_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+
 }
 
 void ui_update_wifi_status(wifi_state_t state)
@@ -73,4 +79,14 @@ void ui_update_light_status(bool on)
         return;
     }
     lv_label_set_text(s_light_label, on ? "Light: ON" : "Light: OFF");
+}
+
+void ui_update_sensor_status(float temp, float hum, float pressure)
+{
+    if (s_sensor_label == NULL) {
+        return;
+    }
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.1f°C | %.0f%%RH | %.0fhPa", temp, hum, pressure);
+    lv_label_set_text(s_sensor_label, buf);
 }

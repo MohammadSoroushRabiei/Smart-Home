@@ -11,6 +11,9 @@
 #include "ui_screens.h"
 #include "face_recognition.h"
 #include "app_state.h"
+#include "i2c_bus.h"
+#include "bme280.h"
+#include "sensor_task.h"
 
 static bool s_lcd_ok = false;
 
@@ -38,9 +41,7 @@ void app_main(void)
 
     app_state_init();
 
-
-
-
+    bool i2c_ok = i2c_bus_init();
 
     s_lcd_ok = lcd_driver_init();
     app_state_set_lcd_available(s_lcd_ok);
@@ -49,8 +50,8 @@ void app_main(void)
         ESP_LOGW("main", "Continuing without LCD");
     }
 
-    if (s_lcd_ok) {
-        bool touch_ok = touch_driver_init(lcd_driver_get_display());
+    if (s_lcd_ok && i2c_ok) {
+        bool touch_ok = touch_driver_init(lcd_driver_get_display(), i2c_bus_get_handle());
         if (!touch_ok) {
             ESP_LOGW("main", "Continuing without touch input");
         }
@@ -75,6 +76,12 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(face_recognition_init());
+
+    if (i2c_ok && bme280_init(i2c_bus_get_handle())) {
+        sensor_task_start();
+    } else {
+        ESP_LOGW("main", "BME280 not found, continuing without sensor data");
+    }
 
     http_server_start();
 
