@@ -6,6 +6,7 @@
 #include "app_state.h"
 
 static lv_obj_t *s_wifi_status_label;
+static lv_obj_t *s_wifi_ip_label;
 static lv_obj_t *s_retry_btn;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
@@ -39,10 +40,15 @@ void ui_screens_init(void)
     s_wifi_status_label = lv_label_create(scr);
     lv_label_set_text(s_wifi_status_label, "WiFi: Offline");
     lv_obj_align(s_wifi_status_label, LV_ALIGN_TOP_MID, 0, 10);
+    
+    s_wifi_ip_label = lv_label_create(scr);
+    lv_label_set_text(s_wifi_ip_label,"");
+    lv_obj_align(s_wifi_ip_label, LV_ALIGN_TOP_MID, 0, 30);
+
 
     s_retry_btn = lv_button_create(scr);
     lv_obj_set_size(s_retry_btn, 120, 50);
-    lv_obj_align(s_retry_btn, LV_ALIGN_TOP_MID, 0, 45);
+    lv_obj_align(s_retry_btn, LV_ALIGN_TOP_MID, 0, 65);
     lv_obj_add_event_cb(s_retry_btn, retry_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *retry_label = lv_label_create(s_retry_btn);
@@ -71,6 +77,18 @@ void ui_update_wifi_status(wifi_state_t state)
         return;
     }
     lv_label_set_text(s_wifi_status_label, wifi_state_to_display_text(state));
+}
+
+void ui_update_wifi_ip(const char *ip_str)
+{
+    if (s_wifi_ip_label == NULL) {
+        return;
+    }
+    if (ip_str == NULL || ip_str[0] == '\0') {
+        lv_label_set_text(s_wifi_ip_label, "");
+    } else {
+        lv_label_set_text(s_wifi_ip_label, ip_str);
+    }
 }
 
 void ui_update_light_status(bool on)
