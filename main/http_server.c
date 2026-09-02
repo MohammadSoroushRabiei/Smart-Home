@@ -67,6 +67,92 @@ static esp_err_t api_status_handler(httpd_req_t *req)
     return httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
 }
 
+
+static const char *capture_html =
+    "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+    "<title>Face Capture</title>"
+    "<style>"
+    "body{font-family:sans-serif;max-width:420px;margin:20px auto;padding:0 16px;text-align:center;}"
+    "video,canvas{width:100%;border-radius:8px;background:#000;}"
+    "canvas{display:none;}"
+    ".btn-row{display:flex;gap:8px;margin:12px 0;}"
+    "button{flex:1;padding:12px;font-size:15px;border-radius:6px;border:none;color:#fff;cursor:pointer;}"
+    "#btn-capture{background:#2196F3;}"
+    "#btn-retake{background:#888;}"
+    "#btn-enroll{background:#4CAF50;}"
+    "#btn-recognize{background:#FF9800;}"
+    "#btn-flip{background:#607D8B;}"
+    "#status{margin-top:10px;font-weight:bold;min-height:24px;}"
+    "</style></head><body>"
+    "<h2>Face Capture</h2>"
+    "<video id=\"video\" autoplay playsinline></video>"
+    "<canvas id=\"canvas\" width=\"320\" height=\"240\"></canvas>"
+    "<div class=\"btn-row\">"
+    "<button id=\"btn-flip\">Flip Camera</button>"
+    "<button id=\"btn-capture\">Capture</button>"
+    "</div>"
+    "<div class=\"btn-row\" id=\"action-row\" style=\"display:none\">"
+    "<button id=\"btn-retake\">Retake</button>"
+    "<button id=\"btn-enroll\">Enroll</button>"
+    "<button id=\"btn-recognize\">Recognize</button>"
+    "</div>"
+    "<div id=\"status\"></div>"
+    "<script>"
+    "let stream=null, facingMode='user';"
+    "const video=document.getElementById('video');"
+    "const canvas=document.getElementById('canvas');"
+    "const statusEl=document.getElementById('status');"
+
+    "async function startCamera(){"
+    "  if(stream){stream.getTracks().forEach(t=>t.stop());}"
+    "  try{"
+    "    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode}});"
+    "    video.srcObject=stream;"
+    "    video.style.display='block';"
+    "    canvas.style.display='none';"
+    "    document.getElementById('action-row').style.display='none';"
+    "    statusEl.textContent='';"
+    "  }catch(err){statusEl.textContent='Camera error: '+err.message;}"
+    "}"
+
+    "document.getElementById('btn-flip').addEventListener('click',()=>{"
+    "  facingMode=(facingMode==='user')?'environment':'user'; startCamera();"
+    "});"
+
+    "document.getElementById('btn-capture').addEventListener('click',()=>{"
+    "  const ctx=canvas.getContext('2d');"
+    "  const tw=320, th=240;"
+    "  ctx.fillStyle='#000'; ctx.fillRect(0,0,tw,th);"
+    "  const vw=video.videoWidth, vh=video.videoHeight;"
+    "  const scale=Math.min(tw/vw, th/vh);"
+    "  const dw=vw*scale, dh=vh*scale;"
+    "  const dx=(tw-dw)/2, dy=(th-dh)/2;"
+    "  ctx.drawImage(video, dx, dy, dw, dh);"
+    "  video.style.display='none';"
+    "  canvas.style.display='block';"
+    "  document.getElementById('action-row').style.display='flex';"
+    "});"
+
+    "document.getElementById('btn-retake').addEventListener('click', startCamera);"
+
+    "function sendImage(action){"
+    "  statusEl.textContent='Sending...';"
+    "  canvas.toBlob((blob)=>{"
+    "    fetch('/api/face/'+action,{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})"
+    "    .then(r=>r.text().then(text=>({status:r.status,text})))"
+    "    .then(({status,text})=>{statusEl.textContent='HTTP '+status+': '+text;})"
+    "    .catch(err=>{statusEl.textContent='Error: '+err.message;});"
+    "  },'image/jpeg',0.85);"
+    "}"
+
+    "document.getElementById('btn-enroll').addEventListener('click',()=>sendImage('enroll'));"
+    "document.getElementById('btn-recognize').addEventListener('click',()=>sendImage('recognize'));"
+
+    "startCamera();"
+    "</script></body></html>";
+
+
 static esp_err_t root_handler(httpd_req_t *req)
 {
     const char *html =
@@ -281,6 +367,13 @@ static esp_err_t face_enroll_handler(httpd_req_t *req)
     return enqueue_face_request(req, FACE_OP_ENROLL);
 }
 
+
+static esp_err_t capture_page_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    return httpd_resp_send(req, capture_html, HTTPD_RESP_USE_STRLEN);
+}
+
 // ---------------------------------------------------------------------
 // ثبت URI ها و راه‌اندازی سرور
 // ---------------------------------------------------------------------
@@ -291,6 +384,10 @@ static const httpd_uri_t led_toggle_uri = { .uri = "/led/toggle", .method = HTTP
 static const httpd_uri_t api_status_uri = { .uri = "/api/status", .method = HTTP_GET, .handler = api_status_handler, .user_ctx = NULL };
 static const httpd_uri_t face_recognize_uri = { .uri = "/api/face/recognize", .method = HTTP_POST, .handler = face_recognize_handler, .user_ctx = NULL };
 static const httpd_uri_t face_enroll_uri = { .uri = "/api/face/enroll", .method = HTTP_POST, .handler = face_enroll_handler, .user_ctx = NULL };
+static const httpd_uri_t capture_page_uri = { .uri = "/capture", .method = HTTP_GET, .handler = capture_page_handler, .user_ctx = NULL };
+
+
+
 
 httpd_handle_t http_server_start(void)
 {
@@ -322,6 +419,8 @@ httpd_handle_t http_server_start(void)
     httpd_register_uri_handler(server, &api_status_uri);
     httpd_register_uri_handler(server, &face_recognize_uri);
     httpd_register_uri_handler(server, &face_enroll_uri);
+    httpd_register_uri_handler(server, &capture_page_uri);
+
 
     ESP_LOGI(TAG, "HTTP server started");
     return server;
