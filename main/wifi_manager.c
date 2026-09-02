@@ -20,7 +20,7 @@ static wifi_state_t wifi_state = WIFI_STATE_OFFLINE;
 static uint8_t retry_count = 0;
 static wifi_state_change_cb_t s_state_change_cb = NULL;
 
-
+static char s_ip_str[16] = "";   // "255.255.255.255" حداکثر ۱۵ کاراکتر + نال
 
 bool wifi_is_connected(void)
 {
@@ -31,6 +31,11 @@ bool wifi_is_connected(void)
 wifi_state_t wifi_get_state(void)
 {
     return wifi_state;
+}
+
+const char *wifi_get_ip_str(void)
+{
+    return s_ip_str;
 }
 
 void wifi_register_state_change_cb(wifi_state_change_cb_t cb)
@@ -86,6 +91,7 @@ void wifi_retry_connect(void)
     }
 
     retry_count = 0;
+    s_ip_str[0] = '\0';
     wifi_set_state(WIFI_STATE_CONNECTING);
 
     esp_err_t err = esp_wifi_disconnect();   // اطمینان از پاک شدن وضعیت قبلی
@@ -108,6 +114,7 @@ static void event_handler(
     if (event_base == WIFI_EVENT &&
         event_id == WIFI_EVENT_STA_START)
     {
+        s_ip_str[0] = '\0';
         wifi_set_state(WIFI_STATE_CONNECTING);
 
         ESP_ERROR_CHECK(esp_wifi_connect());
@@ -136,7 +143,7 @@ static void event_handler(
                 retry_count,
                 WIFI_MAX_RETRY
             );
-
+            s_ip_str[0] = '\0';
             wifi_set_state(WIFI_STATE_CONNECTING);
 
             ESP_ERROR_CHECK(esp_wifi_connect());
@@ -146,7 +153,7 @@ static void event_handler(
             retry_count = 0;
 
             ESP_LOGI(TAG, "Failed to connect to the AP");
-
+            s_ip_str[0] = '\0';
             wifi_set_state(WIFI_STATE_OFFLINE);
         }
     }
@@ -158,7 +165,7 @@ static void event_handler(
             (ip_event_got_ip_t *)event_data;
 
         retry_count = 0;
-
+        snprintf(s_ip_str, sizeof(s_ip_str), IPSTR, IP2STR(&event->ip_info.ip));
         wifi_set_state(WIFI_STATE_CONNECTED);
 
         ESP_LOGI(

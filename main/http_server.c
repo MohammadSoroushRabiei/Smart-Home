@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <string.h>
+#include <stdio.h>
 #include "app_state.h"
 
 static const char *TAG = "HTTP";
@@ -48,8 +49,20 @@ static esp_err_t led_toggle_handler(httpd_req_t *req)
 
 static esp_err_t api_status_handler(httpd_req_t *req)
 {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "{\"light\":%s}", app_state_get_light() ? "true" : "false");
+    sensor_data_t sensor = app_state_get_sensor_data();
+
+    char buf[192];
+    if (sensor.valid) {
+        snprintf(buf, sizeof(buf),
+                 "{\"light\":%s,\"sensor\":{\"valid\":true,\"temperature\":%.1f,\"humidity\":%.1f,\"pressure\":%.1f}}",
+                 app_state_get_light() ? "true" : "false",
+                 sensor.temperature_c, sensor.humidity_percent, sensor.pressure_hpa);
+    } else {
+        snprintf(buf, sizeof(buf),
+                 "{\"light\":%s,\"sensor\":{\"valid\":false}}",
+                 app_state_get_light() ? "true" : "false");
+    }
+
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
 }
@@ -57,13 +70,42 @@ static esp_err_t api_status_handler(httpd_req_t *req)
 static esp_err_t root_handler(httpd_req_t *req)
 {
     const char *html =
-        "<!DOCTYPE html><html><head><title>Smart Home</title></head><body>"
-        "<h1>Smart Home</h1><h2 id=\"led-status\">LED: </h2>"
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Smart Home</title>"
+        "<style>"
+        "body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:0 16px;}"
+        "h1{text-align:center;}"
+        ".card{border:1px solid #ddd;border-radius:8px;padding:16px;margin:12px 0;}"
+        ".sensor-row{display:flex;justify-content:space-between;margin:6px 0;}"
+        "button{width:100%;padding:12px;font-size:16px;border-radius:6px;border:none;background:#2196F3;color:#fff;cursor:pointer;}"
+        "</style>"
+        "</head><body>"
+        "<h1>Smart Home</h1>"
+
+        "<div class=\"card\">"
+        "<h2 id=\"led-status\">LED: </h2>"
         "<button id=\"led-toggle\">Toggle LED</button>"
+        "</div>"
+
+        "<div class=\"card\">"
+        "<h2>Sensor</h2>"
+        "<div class=\"sensor-row\"><span>Temperature</span><span id=\"sensor-temp\">--</span></div>"
+        "<div class=\"sensor-row\"><span>Humidity</span><span id=\"sensor-hum\">--</span></div>"
+        "<div class=\"sensor-row\"><span>Pressure</span><span id=\"sensor-press\">--</span></div>"
+        "</div>"
+
         "<script>"
         "function refreshStatus() {"
         "  fetch(\"/api/status\").then(r => r.json()).then(data => {"
         "    document.getElementById(\"led-status\").textContent = \"LED: \" + (data.light ? \"ON\" : \"OFF\");"
+        "    if (data.sensor && data.sensor.valid) {"
+        "      document.getElementById(\"sensor-temp\").textContent = data.sensor.temperature.toFixed(1) + \" °C\";"
+        "      document.getElementById(\"sensor-hum\").textContent = data.sensor.humidity.toFixed(0) + \" %\";"
+        "      document.getElementById(\"sensor-press\").textContent = data.sensor.pressure.toFixed(0) + \" hPa\";"
+        "    } else {"
+        "      document.getElementById(\"sensor-temp\").textContent = \"N/A\";"
+        "      document.getElementById(\"sensor-hum\").textContent = \"N/A\";"
+        "      document.getElementById(\"sensor-press\").textContent = \"N/A\";"
+        "    }"
         "  });"
         "}"
         "refreshStatus();"
@@ -73,8 +115,7 @@ static esp_err_t root_handler(httpd_req_t *req)
         "  fetch(\"/led/toggle\").then(() => refreshStatus());"
         "});"
         "</script></body></html>";
-    httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
+        httpd_resp_set_type(req, "text/html; charset=utf-8");    return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
 }
 
 // ---------------------------------------------------------------------

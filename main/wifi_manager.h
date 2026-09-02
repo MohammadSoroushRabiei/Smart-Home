@@ -30,3 +30,9 @@ void wifi_register_state_change_cb(wifi_state_change_cb_t cb);
  *        برای استفاده در دکمه‌ی "تلاش مجدد" روی LCD یا وب.
  */
 void wifi_retry_connect(void);
+
+/**
+ * @brief دریافت رشته‌ی IP فعلی (فقط زمانی معتبر است که وضعیت CONNECTED باشد).
+ *        اگر متصل نباشد، رشته‌ی خالی برمی‌گرداند.
+ */
+const char *wifi_get_ip_str(void);

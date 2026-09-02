@@ -22,6 +22,7 @@ static void on_wifi_state_change(wifi_state_t state)
     if (s_lcd_ok) {
         lcd_driver_lvgl_lock();
         ui_update_wifi_status(state);
+        ui_update_wifi_ip(state == WIFI_STATE_CONNECTED ? wifi_get_ip_str() : "");
         lcd_driver_lvgl_unlock();
     }
 }
