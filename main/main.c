@@ -14,6 +14,7 @@
 #include "i2c_bus.h"
 #include "bme280.h"
 #include "sensor_task.h"
+#include <stdio.h>
 
 static bool s_lcd_ok = false;
 
@@ -22,7 +23,19 @@ static void on_wifi_state_change(wifi_state_t state)
     if (s_lcd_ok) {
         lcd_driver_lvgl_lock();
         ui_update_wifi_status(state);
-        ui_update_wifi_ip(state == WIFI_STATE_CONNECTED ? wifi_get_ip_str() : "");
+
+        if (state == WIFI_STATE_CONNECTED) {
+            const char *ip = wifi_get_ip_str();
+            char url[48];
+            snprintf(url, sizeof(url), "http://%s/capture", ip);
+
+            ui_update_wifi_ip(ip);
+            ui_update_capture_qr(url);
+        } else {
+            ui_update_wifi_ip("");
+            ui_update_capture_qr("");
+        }
+
         lcd_driver_lvgl_unlock();
     }
 }

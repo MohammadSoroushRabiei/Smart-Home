@@ -1,5 +1,6 @@
 #include "ui_screens.h"
 #include <stdio.h>
+#include <string.h>
 #include "lvgl.h"
 #include "lcd_driver.h"
 #include "wifi_manager.h"
@@ -11,6 +12,7 @@ static lv_obj_t *s_retry_btn;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
 static lv_obj_t *s_sensor_label;
+static lv_obj_t *s_qr_code;
 
 
 static const char *wifi_state_to_display_text(wifi_state_t state)
@@ -55,7 +57,6 @@ void ui_screens_init(void)
     lv_label_set_text(retry_label, "Retry");
     lv_obj_center(retry_label);
 
-    // ← بخش جدید: دکمه‌ی چراغ
     s_light_btn = lv_button_create(scr);
     lv_obj_set_size(s_light_btn, 160, 70);
     lv_obj_align(s_light_btn, LV_ALIGN_CENTER, 0, 0);
@@ -66,8 +67,19 @@ void ui_screens_init(void)
     lv_obj_center(s_light_label);
 
     s_sensor_label = lv_label_create(scr);
-lv_label_set_text(s_sensor_label, "Sensor: --");
-lv_obj_align(s_sensor_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_label_set_text(s_sensor_label, "Sensor: --");
+    lv_obj_align(s_sensor_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+
+    s_qr_code = lv_qrcode_create(scr);
+lv_qrcode_set_size(s_qr_code, 90);
+lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
+lv_qrcode_set_light_color(s_qr_code, lv_color_white());
+lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
+lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);   // تا وقتی IP مشخص نشده، مخفی بمونه
+
+
+
 
 }
 
@@ -107,4 +119,17 @@ void ui_update_sensor_status(float temp, float hum, float pressure)
     char buf[64];
     snprintf(buf, sizeof(buf), "%.1f°C | %.0f%%RH | %.0fhPa", temp, hum, pressure);
     lv_label_set_text(s_sensor_label, buf);
+}
+
+void ui_update_capture_qr(const char *url)
+{
+    if (s_qr_code == NULL) {
+        return;
+    }
+    if (url == NULL || url[0] == '\0') {
+        lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_qrcode_update(s_qr_code, url, strlen(url));
+    lv_obj_clear_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
 }
