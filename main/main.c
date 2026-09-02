@@ -10,6 +10,7 @@
 #include "touch_driver.h"
 #include "ui_screens.h"
 #include "face_recognition.h"
+#include "app_state.h"
 
 static bool s_lcd_ok = false;
 
@@ -34,6 +35,16 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(ret);
+
+    app_state_init();
+
+    app_state_set_light(true);
+    ESP_LOGI("main", "Light state: %d", app_state_get_light());
+
+    app_state_set_light(false);
+    ESP_LOGI("main", "Light state: %d", app_state_get_light());
+
+
 
     s_lcd_ok = lcd_driver_init();
     if (!s_lcd_ok) {
