@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <string.h>
+#include "app_state.h"
 
 static const char *TAG = "HTTP";
 
@@ -33,16 +34,24 @@ static QueueHandle_t s_face_queue = NULL;
 static esp_err_t led_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "GET /led received");
-    const char *response = led_is_on() ? "LED: ON" : "LED: OFF";
+    const char *response = app_state_get_light() ? "LED: ON" : "LED: OFF";
     return httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
 }
 
 static esp_err_t led_toggle_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "GET /led/toggle received");
-    led_toggle(LED);
-    const char *response = led_is_on() ? "LED: ON" : "LED: OFF";
+    app_state_set_light(!app_state_get_light());
+    const char *response = app_state_get_light() ? "LED: ON" : "LED: OFF";
     return httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t api_status_handler(httpd_req_t *req)
+{
+    char buf[64];
+    snprintf(buf, sizeof(buf), "{\"light\":%s}", app_state_get_light() ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
 }
 
 static esp_err_t root_handler(httpd_req_t *req)
@@ -52,10 +61,16 @@ static esp_err_t root_handler(httpd_req_t *req)
         "<h1>Smart Home</h1><h2 id=\"led-status\">LED: </h2>"
         "<button id=\"led-toggle\">Toggle LED</button>"
         "<script>"
-        "fetch(\"/led\").then(response => response.text()).then(data => {document.getElementById(\"led-status\").textContent = data;});"
+        "function refreshStatus() {"
+        "  fetch(\"/api/status\").then(r => r.json()).then(data => {"
+        "    document.getElementById(\"led-status\").textContent = \"LED: \" + (data.light ? \"ON\" : \"OFF\");"
+        "  });"
+        "}"
+        "refreshStatus();"
+        "setInterval(refreshStatus, 1000);"
         "const btn = document.getElementById(\"led-toggle\");"
         "btn.addEventListener('click', function() {"
-        "fetch(\"/led/toggle\").then(response => response.text()).then(data => {document.getElementById(\"led-status\").textContent = data;});"
+        "  fetch(\"/led/toggle\").then(() => refreshStatus());"
         "});"
         "</script></body></html>";
     httpd_resp_set_type(req, "text/html");
@@ -232,6 +247,7 @@ static esp_err_t face_enroll_handler(httpd_req_t *req)
 static const httpd_uri_t root_uri = { .uri = "/", .method = HTTP_GET, .handler = root_handler, .user_ctx = NULL };
 static const httpd_uri_t led_uri = { .uri = "/led", .method = HTTP_GET, .handler = led_handler, .user_ctx = NULL };
 static const httpd_uri_t led_toggle_uri = { .uri = "/led/toggle", .method = HTTP_GET, .handler = led_toggle_handler, .user_ctx = NULL };
+static const httpd_uri_t api_status_uri = { .uri = "/api/status", .method = HTTP_GET, .handler = api_status_handler, .user_ctx = NULL };
 static const httpd_uri_t face_recognize_uri = { .uri = "/api/face/recognize", .method = HTTP_POST, .handler = face_recognize_handler, .user_ctx = NULL };
 static const httpd_uri_t face_enroll_uri = { .uri = "/api/face/enroll", .method = HTTP_POST, .handler = face_enroll_handler, .user_ctx = NULL };
 
@@ -262,6 +278,7 @@ httpd_handle_t http_server_start(void)
     httpd_register_uri_handler(server, &root_uri);
     httpd_register_uri_handler(server, &led_uri);
     httpd_register_uri_handler(server, &led_toggle_uri);
+    httpd_register_uri_handler(server, &api_status_uri);
     httpd_register_uri_handler(server, &face_recognize_uri);
     httpd_register_uri_handler(server, &face_enroll_uri);
 
