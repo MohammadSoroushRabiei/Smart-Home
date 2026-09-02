@@ -10,6 +10,7 @@
 #include "touch_driver.h"
 #include "ui_screens.h"
 #include "face_recognition.h"
+#include "app_state.h"
 
 static bool s_lcd_ok = false;
 
@@ -35,7 +36,15 @@ void app_main(void)
 
     ESP_ERROR_CHECK(ret);
 
+    app_state_init();
+
+
+
+
+
     s_lcd_ok = lcd_driver_init();
+    app_state_set_lcd_available(s_lcd_ok);
+    
     if (!s_lcd_ok) {
         ESP_LOGW("main", "Continuing without LCD");
     }
@@ -73,7 +82,7 @@ void app_main(void)
     {
         if (btn_is_pressed(BTN))
         {
-            led_toggle(LED);
+            app_state_set_light(!app_state_get_light());
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));

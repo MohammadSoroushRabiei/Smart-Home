@@ -20,6 +20,14 @@ void led_toggle(gpio_num_t led)
 }
 
 
+void led_set(gpio_num_t led, bool on)
+{
+    led_state = on;
+    gpio_set_level(led, led_state);
+    ESP_LOGI(TAG_LED, "%s", led_state ? "ON" : "OFF");
+}
+
+
 bool led_is_on(void)
 {
     return led_state;

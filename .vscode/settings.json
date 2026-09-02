@@ -4,7 +4,7 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.portWin": "COM7",
+  "idf.portWin": "COM8",
   "idf.currentSetup": "C:\\esp\\v6.0.2\\esp-idf",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
@@ -15,5 +15,10 @@
     "--query-driver=**",
     "--compile-commands-dir=d:\\Project\\Smart-Home\\build"
   ],
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "idf.monitorPort": "COM8",
+
+  "idf.ninjaArgs": [
+    "-j12"
+  ]
 }
