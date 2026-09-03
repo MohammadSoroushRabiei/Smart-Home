@@ -39,7 +39,6 @@ static void on_wifi_state_change(wifi_state_t state)
         lcd_driver_lvgl_unlock();
     }
 }
-
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -59,7 +58,7 @@ void app_main(void)
 
     s_lcd_ok = lcd_driver_init();
     app_state_set_lcd_available(s_lcd_ok);
-    
+
     if (!s_lcd_ok) {
         ESP_LOGW("main", "Continuing without LCD");
     }
@@ -81,13 +80,8 @@ void app_main(void)
     btn_init();
 
     wifi_register_state_change_cb(on_wifi_state_change);
+    wifi_init_sta();  
 
-    wifi_init_sta();
-
-    while (!wifi_is_connected())
-    {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
 
     ESP_ERROR_CHECK(face_recognition_init());
 

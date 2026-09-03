@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
 #include "nvs_flash.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -15,6 +19,8 @@
 
 
 static const char *TAG = "WIFI";
+
+static QueueHandle_t s_retry_queue = NULL;
 
 static wifi_state_t wifi_state = WIFI_STATE_OFFLINE;
 static uint8_t retry_count = 0;
@@ -79,8 +85,7 @@ static void wifi_set_state(wifi_state_t state)
     }
 }
 
-
-void wifi_retry_connect(void)
+static void perform_wifi_retry(void)
 {
     ESP_LOGI(TAG, "Manual retry requested");
 
@@ -94,14 +99,30 @@ void wifi_retry_connect(void)
     s_ip_str[0] = '\0';
     wifi_set_state(WIFI_STATE_CONNECTING);
 
-    esp_err_t err = esp_wifi_disconnect();   // اطمینان از پاک شدن وضعیت قبلی
+    esp_err_t err = esp_wifi_disconnect();
     ESP_LOGI(TAG, "disconnect result: %s", esp_err_to_name(err));
 
     err = esp_wifi_connect();
     ESP_LOGI(TAG, "connect result: %s", esp_err_to_name(err));
 }
 
+static void wifi_retry_task(void *arg)
+{
+    uint8_t dummy;
+    while (1) {
+        if (xQueueReceive(s_retry_queue, &dummy, portMAX_DELAY) == pdTRUE) {
+            perform_wifi_retry();
+        }
+    }
+}
 
+void wifi_retry_connect(void)
+{
+    if (s_retry_queue != NULL) {
+        uint8_t dummy = 1;
+        xQueueSend(s_retry_queue, &dummy, 0);
+    }
+}
 
 
 
@@ -243,4 +264,7 @@ void wifi_init_sta(void)
 
 
     ESP_LOGI(TAG, "WiFi initialization finished.");
+
+    s_retry_queue = xQueueCreate(1, sizeof(uint8_t));
+    xTaskCreate(wifi_retry_task, "wifi_retry", 4096, NULL, 3, NULL);
 }
