@@ -14,6 +14,7 @@
 #include "i2c_bus.h"
 #include "bme280.h"
 #include "sensor_task.h"
+#include "password_manager.h"
 #include <stdio.h>
 
 static bool s_lcd_ok = false;
@@ -53,6 +54,7 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     app_state_init();
+    ESP_ERROR_CHECK(password_manager_init());
 
     bool i2c_ok = i2c_bus_init();
 
