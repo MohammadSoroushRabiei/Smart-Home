@@ -27,7 +27,7 @@ static void on_wifi_state_change(wifi_state_t state)
         if (state == WIFI_STATE_CONNECTED) {
             const char *ip = wifi_get_ip_str();
             char url[48];
-            snprintf(url, sizeof(url), "http://%s/capture", ip);
+            snprintf(url, sizeof(url), "https://%s/capture", ip);
 
             ui_update_wifi_ip(ip);
             ui_update_capture_qr(url);
