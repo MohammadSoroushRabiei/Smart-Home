@@ -1,5 +1,6 @@
 #include "http_server.h"
 #include "face_recognition.h"
+#include "password_manager.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "led.h"
@@ -8,6 +9,7 @@
 #include "freertos/queue.h"
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "app_state.h"
 
 
@@ -21,6 +23,8 @@ static const char *TAG = "HTTP";
 #define FACE_IMAGE_MAX_SIZE     (300 * 1024)
 #define FACE_WORKER_STACK_SIZE  16384   // AI decode + inference نیاز به stack نسبتاً بزرگی دارد
 #define FACE_WORKER_PRIORITY    3
+
+#define PASSWORD_FORM_MAX_SIZE  256
 
 typedef enum {
     FACE_OP_RECOGNIZE,
@@ -159,6 +163,54 @@ static const char *capture_html =
     "</script></body></html>";
 
 
+// صفحه‌ی مستقل تغییر رمز - جدا از صفحه‌ی اصلی، هم‌الگو با /capture
+static const char *password_html =
+    "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+    "<title>Change Password</title>"
+    "<style>"
+    "body{font-family:sans-serif;max-width:360px;margin:40px auto;padding:0 16px;}"
+    "h2{text-align:center;}"
+    "label{display:block;margin:14px 0 4px;font-size:14px;color:#333;}"
+    "input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;}"
+    "button{width:100%;margin-top:20px;padding:12px;font-size:16px;border-radius:6px;border:none;background:#2196F3;color:#fff;cursor:pointer;}"
+    "#status{margin-top:14px;font-weight:bold;min-height:24px;text-align:center;}"
+    "</style></head><body>"
+    "<h2>Change Password</h2>"
+    "<form id=\"pw-form\">"
+    "<label for=\"current\">Current password</label>"
+    "<input type=\"password\" id=\"current\" inputmode=\"numeric\">"
+    "<label for=\"new\">New password (4-8 chars, letters/digits only)</label>"
+    "<input type=\"password\" id=\"new\" inputmode=\"numeric\">"
+    "<label for=\"confirm\">Confirm new password</label>"
+    "<input type=\"password\" id=\"confirm\" inputmode=\"numeric\">"
+    "<button type=\"submit\">Change Password</button>"
+    "</form>"
+    "<div id=\"status\"></div>"
+    "<script>"
+    "const alnumRe=/^[A-Za-z0-9]+$/;"
+    "document.getElementById('pw-form').addEventListener('submit', async (ev)=>{"
+    "  ev.preventDefault();"
+    "  const statusEl=document.getElementById('status');"
+    "  const current=document.getElementById('current').value;"
+    "  const newPw=document.getElementById('new').value;"
+    "  const confirm=document.getElementById('confirm').value;"
+    "  if(!alnumRe.test(newPw) || newPw.length<4 || newPw.length>8){"
+    "    statusEl.textContent='New password must be 4-8 letters/digits only'; return;"
+    "  }"
+    "  if(newPw!==confirm){ statusEl.textContent='New passwords do not match'; return; }"
+    "  statusEl.textContent='Sending...';"
+    "  try{"
+    "    const body='current='+encodeURIComponent(current)+'&new='+encodeURIComponent(newPw)+'&confirm='+encodeURIComponent(confirm);"
+    "    const r=await fetch('/api/password',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});"
+    "    const text=await r.text();"
+    "    statusEl.textContent='HTTP '+r.status+': '+text;"
+    "    if(r.status===200){ document.getElementById('pw-form').reset(); }"
+    "  }catch(err){ statusEl.textContent='Error: '+err.message; }"
+    "});"
+    "</script></body></html>";
+
+
 static esp_err_t root_handler(httpd_req_t *req)
 {
     const char *html =
@@ -208,6 +260,117 @@ static esp_err_t root_handler(httpd_req_t *req)
         "});"
         "</script></body></html>";
         httpd_resp_set_type(req, "text/html; charset=utf-8");    return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t password_page_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    return httpd_resp_send(req, password_html, HTTPD_RESP_USE_STRLEN);
+}
+
+// ---------------------------------------------------------------------
+// تغییر رمز از طریق وب
+// ---------------------------------------------------------------------
+
+// استخراج ساده‌ی value مربوط به یک key از بدنه‌ی application/x-www-form-urlencoded
+// عمداً decode نمی‌کند: چون رمز را به alnum محدود کرده‌ایم، کاراکتر خاصی
+// (&, =, %) که نیاز به decode داشته باشد در آن مجاز نیست.
+static bool extract_form_value(const char *body, const char *key, char *out, size_t out_size)
+{
+    size_t key_len = strlen(key);
+    const char *p = body;
+
+    while (p != NULL && *p != '\0') {
+        if (strncmp(p, key, key_len) == 0 && p[key_len] == '=') {
+            const char *val_start = p + key_len + 1;
+            const char *val_end = strchr(val_start, '&');
+            size_t val_len = val_end ? (size_t)(val_end - val_start) : strlen(val_start);
+
+            if (val_len >= out_size) {
+                return false;
+            }
+            memcpy(out, val_start, val_len);
+            out[val_len] = '\0';
+            return true;
+        }
+        p = strchr(p, '&');
+        if (p) {
+            p++;
+        }
+    }
+    return false;
+}
+
+static bool is_alnum_str(const char *s)
+{
+    if (s[0] == '\0') {
+        return false;
+    }
+    for (const char *c = s; *c != '\0'; c++) {
+        if (!isalnum((unsigned char)*c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static esp_err_t api_password_handler(httpd_req_t *req)
+{
+    if (req->content_len == 0 || req->content_len > PASSWORD_FORM_MAX_SIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request size");
+        return ESP_OK;
+    }
+
+    char body[PASSWORD_FORM_MAX_SIZE + 1];
+    size_t to_read = req->content_len;
+    int received = httpd_req_recv(req, body, to_read);
+    if (received <= 0) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read body");
+        return ESP_OK;
+    }
+    body[received] = '\0';
+
+    char current[PASSWORD_MAX_LEN + 1] = {0};
+    char new_pw[PASSWORD_MAX_LEN + 1] = {0};
+    char confirm[PASSWORD_MAX_LEN + 1] = {0};
+
+    if (!extract_form_value(body, "current", current, sizeof(current)) ||
+        !extract_form_value(body, "new", new_pw, sizeof(new_pw)) ||
+        !extract_form_value(body, "confirm", confirm, sizeof(confirm))) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "Missing or too long fields");
+        return ESP_OK;
+    }
+
+    if (!password_manager_verify(current)) {
+        ESP_LOGW(TAG, "Password change rejected: current password incorrect");
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_sendstr(req, "Current password incorrect");
+        return ESP_OK;
+    }
+
+    if (strcmp(new_pw, confirm) != 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "New passwords do not match");
+        return ESP_OK;
+    }
+
+    if (!is_alnum_str(new_pw)) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "Password must contain only letters and digits");
+        return ESP_OK;
+    }
+
+    esp_err_t ret = password_manager_set(new_pw);
+    if (ret != ESP_OK) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "Password must be 4-8 characters");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Password changed successfully via web");
+    httpd_resp_sendstr(req, "Password changed successfully");
+    return ESP_OK;
 }
 
 // ---------------------------------------------------------------------
@@ -391,6 +554,8 @@ static const httpd_uri_t api_status_uri = { .uri = "/api/status", .method = HTTP
 static const httpd_uri_t face_recognize_uri = { .uri = "/api/face/recognize", .method = HTTP_POST, .handler = face_recognize_handler, .user_ctx = NULL };
 static const httpd_uri_t face_enroll_uri = { .uri = "/api/face/enroll", .method = HTTP_POST, .handler = face_enroll_handler, .user_ctx = NULL };
 static const httpd_uri_t capture_page_uri = { .uri = "/capture", .method = HTTP_GET, .handler = capture_page_handler, .user_ctx = NULL };
+static const httpd_uri_t password_page_uri = { .uri = "/password", .method = HTTP_GET, .handler = password_page_handler, .user_ctx = NULL };
+static const httpd_uri_t api_password_uri = { .uri = "/api/password", .method = HTTP_POST, .handler = api_password_handler, .user_ctx = NULL };
 
 
 
@@ -417,6 +582,7 @@ httpd_handle_t http_server_start(void)
     config.httpd.stack_size        = 8192;
     config.httpd.recv_wait_timeout = 10;
     config.httpd.send_wait_timeout = 10;
+    config.httpd.max_uri_handlers  = 12;  // پیش‌فرض ۸ کافی نبود؛ الان ۹ هندلر داریم + کمی فضای رشد
 
     esp_err_t err = httpd_ssl_start(&server, &config);
     if (err != ESP_OK) {
@@ -424,13 +590,23 @@ httpd_handle_t http_server_start(void)
         return NULL;
     }
 
-    httpd_register_uri_handler(server, &root_uri);
-    httpd_register_uri_handler(server, &led_uri);
-    httpd_register_uri_handler(server, &led_toggle_uri);
-    httpd_register_uri_handler(server, &api_status_uri);
-    httpd_register_uri_handler(server, &face_recognize_uri);
-    httpd_register_uri_handler(server, &face_enroll_uri);
-    httpd_register_uri_handler(server, &capture_page_uri);
+    static const struct { const httpd_uri_t *uri; const char *name; } handlers[] = {
+        { &root_uri,            "/" },
+        { &led_uri,              "/led" },
+        { &led_toggle_uri,       "/led/toggle" },
+        { &api_status_uri,       "/api/status" },
+        { &face_recognize_uri,   "/api/face/recognize" },
+        { &face_enroll_uri,      "/api/face/enroll" },
+        { &capture_page_uri,     "/capture" },
+        { &password_page_uri,    "/password" },
+        { &api_password_uri,     "/api/password" },
+    };
+    for (size_t i = 0; i < sizeof(handlers) / sizeof(handlers[0]); i++) {
+        esp_err_t reg_err = httpd_register_uri_handler(server, handlers[i].uri);
+        if (reg_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to register handler for %s: %s", handlers[i].name, esp_err_to_name(reg_err));
+        }
+    }
 
 
     ESP_LOGI(TAG, "HTTPS server started");
