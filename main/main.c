@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -15,7 +16,7 @@
 #include "bme280.h"
 #include "sensor_task.h"
 #include "password_manager.h"
-#include <stdio.h>
+#include "keypad_screen.h"
 
 static bool s_lcd_ok = false;
 
@@ -75,6 +76,7 @@ void app_main(void)
     if (s_lcd_ok) {
         lcd_driver_lvgl_lock();
         ui_screens_init();
+        keypad_screen_init();
         lcd_driver_lvgl_unlock();
     }
 

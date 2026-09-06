@@ -44,6 +44,12 @@ static void show_error(const char *msg)
 
 static void btnm_event_cb(lv_event_t *e)
 {
+    // گارد امنیتی: اگر overlay همین الان مخفی شده (مثلاً به‌خاطر یک رویداد
+    // تاخیری از همون لمس قبلی)، این رویداد را نادیده بگیر
+    if (lv_obj_has_flag(s_overlay, LV_OBJ_FLAG_HIDDEN)) {
+        return;
+    }
+
     lv_obj_t *btnm = lv_event_get_target(e);
     uint32_t id = lv_buttonmatrix_get_selected_button(btnm);
     const char *txt = lv_buttonmatrix_get_button_text(btnm, id);
@@ -121,6 +127,13 @@ void keypad_screen_init(void)
     lv_obj_set_size(s_btnm, 260, 220);
     lv_obj_align(s_btnm, LV_ALIGN_BOTTOM_MID, 0, -20);
     lv_obj_add_event_cb(s_btnm, btnm_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+
+    // برای ورود رمز، رفتار "repeat" هنگام نگه‌داشتن دکمه (که برای کیبورد متنی
+    // مثل Backspace طراحی شده) معنی نداره و باعث ثبت چندباره‌ی یک رقم/OK می‌شود
+    // → برای تمام ۱۲ دکمه (۱-۹, C, ۰, OK) غیرفعالش می‌کنیم.
+    for (uint32_t i = 0; i < 12; i++) {
+        lv_buttonmatrix_set_button_ctrl(s_btnm, i, LV_BUTTONMATRIX_CTRL_NO_REPEAT);
+    }
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 

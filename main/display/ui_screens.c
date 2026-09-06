@@ -5,12 +5,18 @@
 #include "lcd_driver.h"
 #include "wifi_manager.h"
 #include "app_state.h"
+#include "keypad_screen.h"
+#include "esp_log.h"
+
+static const char *TAG = "ui_screens";
 
 static lv_obj_t *s_wifi_status_label;
 static lv_obj_t *s_wifi_ip_label;
 static lv_obj_t *s_retry_btn;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
+static lv_obj_t *s_unlock_btn;
+static lv_obj_t *s_settings_btn;
 static lv_obj_t *s_sensor_label;
 static lv_obj_t *s_qr_code;
 
@@ -35,6 +41,38 @@ static void light_btn_event_cb(lv_event_t *e)
     app_state_set_light(!app_state_get_light());
 }
 
+// نتیجه‌ی ورود رمز - چه از دکمه‌ی Unlock بیاد چه از دکمه‌ی Settings
+static void on_keypad_result(keypad_purpose_t purpose, bool success)
+{
+    if (purpose == KEYPAD_PURPOSE_UNLOCK) {
+        if (success) {
+            // TODO(بخش ۵ - قفل فیزیکی): وقتی رله/MOSFET سلونوئید سیم‌کشی شد،
+            // اینجا باید سیگنال باز کردن قفل واقعی ارسال شود.
+            ESP_LOGI(TAG, "Unlock code correct - ACCESS GRANTED (relay not wired yet)");
+        } else {
+            ESP_LOGW(TAG, "Unlock code incorrect - ACCESS DENIED");
+        }
+    } else { // KEYPAD_PURPOSE_SETTINGS
+        if (success) {
+            // TODO(بخش ۲.۵ - صفحه‌ی تنظیمات): وقتی صفحه‌ی تنظیمات ساخته شد،
+            // اینجا باید آن صفحه نمایش داده شود.
+            ESP_LOGI(TAG, "Settings code correct - settings screen not implemented yet");
+        } else {
+            ESP_LOGW(TAG, "Settings code incorrect - ACCESS DENIED");
+        }
+    }
+}
+
+static void unlock_btn_event_cb(lv_event_t *e)
+{
+    keypad_screen_show(KEYPAD_PURPOSE_UNLOCK, on_keypad_result);
+}
+
+static void settings_btn_event_cb(lv_event_t *e)
+{
+    keypad_screen_show(KEYPAD_PURPOSE_SETTINGS, on_keypad_result);
+}
+
 void ui_screens_init(void)
 {
     lv_obj_t *scr = lv_screen_active();
@@ -57,14 +95,37 @@ void ui_screens_init(void)
     lv_label_set_text(retry_label, "Retry");
     lv_obj_center(retry_label);
 
+    // دکمه‌ی چراغ - جابه‌جا شد به سمت چپ مرکز تا جا برای Unlock باز شود
     s_light_btn = lv_button_create(scr);
-    lv_obj_set_size(s_light_btn, 160, 70);
-    lv_obj_align(s_light_btn, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(s_light_btn, 140, 70);
+    lv_obj_align(s_light_btn, LV_ALIGN_CENTER, -80, 0);
     lv_obj_add_event_cb(s_light_btn, light_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     s_light_label = lv_label_create(s_light_btn);
     lv_label_set_text(s_light_label, "Light: OFF");
     lv_obj_center(s_light_label);
+
+    // دکمه‌ی Unlock - کنار دکمه‌ی چراغ
+    s_unlock_btn = lv_button_create(scr);
+    lv_obj_set_size(s_unlock_btn, 140, 70);
+    lv_obj_align(s_unlock_btn, LV_ALIGN_CENTER, 80, 0);
+    lv_obj_set_style_bg_color(s_unlock_btn, lv_palette_main(LV_PALETTE_ORANGE), 0);
+    lv_obj_add_event_cb(s_unlock_btn, unlock_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *unlock_label = lv_label_create(s_unlock_btn);
+    lv_label_set_text(unlock_label, "Unlock");
+    lv_obj_center(unlock_label);
+
+    // دکمه‌ی کوچک تنظیمات - گوشه‌ی بالا-راست، دور از دسترس تصادفی
+    s_settings_btn = lv_button_create(scr);
+    lv_obj_set_size(s_settings_btn, 36, 36);
+    lv_obj_align(s_settings_btn, LV_ALIGN_TOP_RIGHT, -5, 5);
+    lv_obj_set_style_bg_color(s_settings_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(s_settings_btn, settings_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *settings_label = lv_label_create(s_settings_btn);
+    lv_label_set_text(settings_label, LV_SYMBOL_SETTINGS);
+    lv_obj_center(settings_label);
 
     s_sensor_label = lv_label_create(scr);
     lv_label_set_text(s_sensor_label, "Sensor: --");
@@ -72,15 +133,11 @@ void ui_screens_init(void)
 
 
     s_qr_code = lv_qrcode_create(scr);
-lv_qrcode_set_size(s_qr_code, 90);
-lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
-lv_qrcode_set_light_color(s_qr_code, lv_color_white());
-lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
-lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);   // تا وقتی IP مشخص نشده، مخفی بمونه
-
-
-
-
+    lv_qrcode_set_size(s_qr_code, 90);
+    lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
+    lv_qrcode_set_light_color(s_qr_code, lv_color_white());
+    lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
+    lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);   // تا وقتی IP مشخص نشده، مخفی بمونه
 }
 
 void ui_update_wifi_status(wifi_state_t state)
