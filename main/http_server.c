@@ -10,6 +10,12 @@
 #include <stdio.h>
 #include "app_state.h"
 
+
+extern const uint8_t servercert_start[] asm("_binary_servercert_pem_start");
+extern const uint8_t servercert_end[]   asm("_binary_servercert_pem_end");
+extern const uint8_t prvtkey_pem_start[] asm("_binary_prvtkey_pem_start");
+extern const uint8_t prvtkey_pem_end[]   asm("_binary_prvtkey_pem_end");
+
 static const char *TAG = "HTTP";
 
 #define FACE_IMAGE_MAX_SIZE     (300 * 1024)
@@ -401,15 +407,20 @@ httpd_handle_t http_server_start(void)
                 FACE_WORKER_PRIORITY, NULL);
 
     httpd_handle_t server = NULL;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    httpd_ssl_config_t config = HTTPD_SSL_CONFIG_DEFAULT();
 
-    config.stack_size = 8192;
-    config.recv_wait_timeout = 10;
-    config.send_wait_timeout = 10;
+    config.servercert = servercert_start;
+    config.servercert_len = servercert_end - servercert_start;
+    config.prvtkey_pem = prvtkey_pem_start;
+    config.prvtkey_len = prvtkey_pem_end - prvtkey_pem_start;
 
-    esp_err_t err = httpd_start(&server, &config);
+    config.httpd.stack_size        = 8192;
+    config.httpd.recv_wait_timeout = 10;
+    config.httpd.send_wait_timeout = 10;
+
+    esp_err_t err = httpd_ssl_start(&server, &config);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start HTTP server: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Failed to start HTTPS server: %s", esp_err_to_name(err));
         return NULL;
     }
 
@@ -422,6 +433,6 @@ httpd_handle_t http_server_start(void)
     httpd_register_uri_handler(server, &capture_page_uri);
 
 
-    ESP_LOGI(TAG, "HTTP server started");
+    ESP_LOGI(TAG, "HTTPS server started");
     return server;
 }
