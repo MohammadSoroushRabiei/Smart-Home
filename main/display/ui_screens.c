@@ -46,9 +46,8 @@ static void on_keypad_result(keypad_purpose_t purpose, bool success)
 {
     if (purpose == KEYPAD_PURPOSE_UNLOCK) {
         if (success) {
-            // TODO(بخش ۵ - قفل فیزیکی): وقتی رله/MOSFET سلونوئید سیم‌کشی شد،
-            // اینجا باید سیگنال باز کردن قفل واقعی ارسال شود.
-            ESP_LOGI(TAG, "Unlock code correct - ACCESS GRANTED (relay not wired yet)");
+            ESP_LOGI(TAG, "Unlock code correct - ACCESS GRANTED");
+            app_state_set_lock(true);
         } else {
             ESP_LOGW(TAG, "Unlock code incorrect - ACCESS DENIED");
         }

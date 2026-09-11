@@ -439,7 +439,7 @@ static void handle_recognize(httpd_req_t *req)
         char resp[64];
         snprintf(resp, sizeof(resp), "Access Granted! Welcome User ID: %d", detected_id);
         httpd_resp_sendstr(req, resp);
-        // نکته: اتصال به app_state_set_lock(true) در اینجا اضافه خواهد شد (بخش ۳)
+        app_state_set_lock(true);
     } else {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Access Denied: Unknown Face");
