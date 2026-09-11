@@ -6,11 +6,13 @@
 #include "led.h"
 #include "lcd_driver.h"
 #include "ui_screens.h"
+#include "lock.h" 
 
 static const char *TAG = "app_state";
 
 static SemaphoreHandle_t s_mutex;
 static bool s_light_on = false;
+static bool s_lock_unlocked = false;
 static bool s_lcd_available = false;  
 static sensor_data_t s_sensor_data = { .valid = false };
 
@@ -77,4 +79,24 @@ sensor_data_t app_state_get_sensor_data(void)
     value = s_sensor_data;
     xSemaphoreGive(s_mutex);
     return value;
+}
+
+bool app_state_get_lock(void)
+{
+    bool value;
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    value = s_lock_unlocked;
+    xSemaphoreGive(s_mutex);
+    return value;
+}
+
+void app_state_set_lock(bool unlocked)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    s_lock_unlocked = unlocked;
+    xSemaphoreGive(s_mutex);
+
+    ESP_LOGI(TAG, "Lock set to: %s", unlocked ? "UNLOCKED" : "LOCKED");
+
+    lock_set(unlocked);   // اتصال واقعی به رله؛ تایمر relock خودکار داخل lock_set است
 }
