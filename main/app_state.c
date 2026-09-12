@@ -6,6 +6,7 @@
 #include "led.h"
 #include "lcd_driver.h"
 #include "ui_screens.h"
+#include "mqtt_manager.h"
 
 static const char *TAG = "app_state";
 
@@ -43,6 +44,7 @@ void app_state_set_light(bool on)
     ESP_LOGI(TAG, "Light set to: %s", on ? "ON" : "OFF");
 
     led_set(LED, on);
+    mqtt_manager_publish_light_state(on);
 
     if (s_lcd_available) {
         lcd_driver_lvgl_lock();

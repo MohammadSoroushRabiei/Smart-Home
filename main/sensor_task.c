@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "mqtt_manager.h"
 
 #define SENSOR_READ_PERIOD_MS  5000
 #define SENSOR_TASK_STACK      3072
@@ -17,6 +18,7 @@ static void sensor_task_fn(void *arg)
         bme280_data_t data;
         if (bme280_read(&data)) {
             app_state_set_sensor_data(data.temperature_c, data.humidity_percent, data.pressure_hpa);
+            mqtt_manager_publish_sensor_state(data.temperature_c,data.humidity_percent,data.pressure_hpa);
         } else {
             ESP_LOGW(TAG, "BME280 read failed");
         }

@@ -7,6 +7,7 @@
 #include "app_state.h"
 #include "keypad_screen.h"
 #include "esp_log.h"
+#include "mqtt_manager.h"
 
 static const char *TAG = "ui_screens";
 
@@ -45,6 +46,7 @@ static void light_btn_event_cb(lv_event_t *e)
 static void on_keypad_result(keypad_purpose_t purpose, bool success)
 {
     if (purpose == KEYPAD_PURPOSE_UNLOCK) {
+        mqtt_manager_publish_access_event(success);
         if (success) {
             // TODO(بخش ۵ - قفل فیزیکی): وقتی رله/MOSFET سلونوئید سیم‌کشی شد،
             // اینجا باید سیگنال باز کردن قفل واقعی ارسال شود.
