@@ -6,3 +6,4 @@ dependencies:
   espressif/human_face_detect: "^0.4.1"
   espressif/human_face_recognition: "^0.3.2"
   espressif/esp_jpeg: "^1.3.1" 
+  espressif/mqtt: "^1.1.0"

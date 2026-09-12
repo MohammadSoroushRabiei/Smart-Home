@@ -10,7 +10,7 @@ dependencies:
       type: service
     version: 0.5.3
   espressif/dl_fft:
-    component_hash: a955ca29581de2177ddf25759273bd83f082b3c805e735fe6ee105858643989b
+    component_hash: 3e8f7d34e04bfa6333f289a6d126745bebe0cee9311b81a6a5d106047f63ef65
     dependencies:
     - name: idf
       require: private
@@ -18,9 +18,9 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.6.0
+    version: 0.7.0
   espressif/esp-dl:
-    component_hash: f67408f364f2faa1178a5f0eb2f0fcdf504b68902fa4f3bcd6fa9f797e1ed623
+    component_hash: 233ee8d37dfedeb637fc74713b87bd861ac530cfbcc4c63c57c2e51064cdda31
     dependencies:
     - name: espressif/dl_fft
       registry_url: https://components.espressif.com
@@ -46,7 +46,7 @@ dependencies:
     - esp32s2
     - esp32s3
     - esp32s31
-    version: 3.3.10
+    version: 3.3.11
   espressif/esp_jpeg:
     component_hash: defb83669293cbf86d0fa86b475ba5517aceed04ed70db435388c151ab37b5d7
     dependencies:
@@ -142,6 +142,16 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 0.3.2
+  espressif/mqtt:
+    component_hash: fb18bc3b65aa8c94693a9811ffc322cca8a65d92d5ec84983d3e385080e3969c
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.1.0
   idf:
     source:
       type: idf
@@ -160,7 +170,8 @@ direct_dependencies:
 - espressif/esp_lcd_touch_gt911
 - espressif/human_face_detect
 - espressif/human_face_recognition
+- espressif/mqtt
 - lvgl/lvgl
-manifest_hash: 0c17f50d669ccddfa102dc13a455810459629adfeaf3df0cec9ffea71931037e
+manifest_hash: ff93ae527e4be5d188904150eb5ddbc917a313e0bdc485be19631016c4d45854
 target: esp32s3
 version: 3.0.0

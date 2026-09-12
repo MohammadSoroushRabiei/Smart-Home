@@ -17,6 +17,7 @@
 #include "sensor_task.h"
 #include "password_manager.h"
 #include "keypad_screen.h"
+#include "mqtt_manager.h"
 
 static bool s_lcd_ok = false;
 
@@ -85,6 +86,7 @@ void app_main(void)
 
     wifi_register_state_change_cb(on_wifi_state_change);
     wifi_init_sta();  
+    mqtt_manager_init();
 
 
     ESP_ERROR_CHECK(face_recognition_init());
