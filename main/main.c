@@ -59,7 +59,6 @@ void app_main(void)
     app_state_init();
     ESP_ERROR_CHECK(password_manager_init());
 
-    lock_init();
     
     bool i2c_ok = i2c_bus_init();
 
@@ -86,6 +85,8 @@ void app_main(void)
 
     led_init();
     btn_init();
+    lock_init();
+
 
     wifi_register_state_change_cb(on_wifi_state_change);
     wifi_init_sta();  

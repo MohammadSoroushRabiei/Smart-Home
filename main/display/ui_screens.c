@@ -46,7 +46,7 @@ static void light_btn_event_cb(lv_event_t *e)
 static void on_keypad_result(keypad_purpose_t purpose, bool success)
 {
     if (purpose == KEYPAD_PURPOSE_UNLOCK) {
-        mqtt_manager_publish_access_event(success);
+        mqtt_manager_publish_access_event(success ? ACCESS_EVENT_GRANTED_CODE : ACCESS_EVENT_DENIED_CODE);
         if (success) {
             ESP_LOGI(TAG, "Unlock code correct - ACCESS GRANTED");
             app_state_set_lock(true);

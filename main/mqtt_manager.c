@@ -1,5 +1,4 @@
 #include "mqtt_manager.h"
-
 #include <string.h>
 #include <stdio.h>
 #include "mqtt_client.h"
@@ -20,13 +19,16 @@ static const char *TAG = "mqtt_manager";
 #define TOPIC_LIGHT_SET     "smarthome/light/set"
 #define TOPIC_SENSOR_STATE  "smarthome/sensor/state"
 #define TOPIC_ACCESS_STATE  "smarthome/access/state"
+#define TOPIC_LOCK_STATE   "smarthome/lock/state"
+
 
 // ===== تاپیک‌های Discovery =====
 #define DISC_LIGHT   "homeassistant/light/" DEVICE_ID "/light/config"
 #define DISC_TEMP    "homeassistant/sensor/" DEVICE_ID "/temperature/config"
 #define DISC_HUM     "homeassistant/sensor/" DEVICE_ID "/humidity/config"
 #define DISC_PRESS   "homeassistant/sensor/" DEVICE_ID "/pressure/config"
-#define DISC_ACCESS  "homeassistant/binary_sensor/" DEVICE_ID "/access/config"
+#define DISC_ACCESS  "homeassistant/event/" DEVICE_ID "/access/config"
+#define DISC_LOCK_STATUS   "homeassistant/binary_sensor/" DEVICE_ID "/lock_status/config"
 
 // بلاک مشترک "device" که در همه‌ی پیام‌های discovery تکرار می‌شود
 // تا HA بفهمد همه‌ی entity ها متعلق به یک دستگاه واحد هستند
@@ -103,8 +105,19 @@ static const char *s_access_discovery =
     "\"name\":\"Access Event\","
     "\"unique_id\":\"" DEVICE_ID "_access\","
     "\"state_topic\":\"" TOPIC_ACCESS_STATE "\","
-    "\"payload_on\":\"ON\","
-    "\"payload_off\":\"OFF\","
+    "\"event_types\":[\"access_granted_face\",\"access_denied_face\",\"access_granted_code\",\"access_denied_code\"],"
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+
+static const char *s_lock_status_discovery =
+    "{"
+    "\"name\":\"Door Lock Status\","
+    "\"unique_id\":\"" DEVICE_ID "_lock_status\","
+    "\"state_topic\":\"" TOPIC_LOCK_STATE "\","
+    "\"payload_on\":\"UNLOCKED\","
+    "\"payload_off\":\"LOCKED\","
     "\"device_class\":\"lock\","
     AVAILABILITY_BLOCK ","
     DEVICE_BLOCK
@@ -113,6 +126,17 @@ static const char *s_access_discovery =
 // ---------------------------------------------------------------------
 // توابع داخلی
 // ---------------------------------------------------------------------
+
+static const char *access_event_type_to_str(access_event_type_t type)
+{
+    switch (type) {
+        case ACCESS_EVENT_GRANTED_FACE: return "access_granted_face";
+        case ACCESS_EVENT_DENIED_FACE:  return "access_denied_face";
+        case ACCESS_EVENT_GRANTED_CODE: return "access_granted_code";
+        case ACCESS_EVENT_DENIED_CODE:  return "access_denied_code";
+        default:                       return "unknown";
+    }
+}
 
 static void publish_discovery_configs(void)
 {
@@ -124,8 +148,9 @@ static void publish_discovery_configs(void)
     esp_mqtt_client_publish(s_client, DISC_HUM,    s_humidity_discovery,  0, 1, true);
     esp_mqtt_client_publish(s_client, DISC_PRESS,  s_pressure_discovery,  0, 1, true);
     esp_mqtt_client_publish(s_client, DISC_ACCESS, s_access_discovery,    0, 1, true);
+    esp_mqtt_client_publish(s_client, DISC_LOCK_STATUS, s_lock_status_discovery, 0, 1, true);
 
-    ESP_LOGI(TAG, "Discovery configs published for 5 entities");
+    ESP_LOGI(TAG, "Discovery configs published for 6 entities");
 }
 
 static void handle_light_command(esp_mqtt_event_handle_t event)
@@ -224,10 +249,23 @@ void mqtt_manager_publish_sensor_state(float temp, float hum, float pressure)
     esp_mqtt_client_publish(s_client, TOPIC_SENSOR_STATE, payload, 0, 1, false);
 }
 
-void mqtt_manager_publish_access_event(bool granted)
+void mqtt_manager_publish_access_event(access_event_type_t type)
 {
     if (s_client == NULL) {
         return;
     }
-    esp_mqtt_client_publish(s_client, TOPIC_ACCESS_STATE, granted ? "ON" : "OFF", 0, 0, false);
+
+    char payload[64];
+    snprintf(payload, sizeof(payload), "{\"event_type\":\"%s\"}", access_event_type_to_str(type));
+
+    // qos=0, retain=false: یک رویداد لحظه‌ای است، نیازی به تحویل تضمینی یا حفظ‌شدن ندارد
+    esp_mqtt_client_publish(s_client, TOPIC_ACCESS_STATE, payload, 0, 0, false);
+}
+
+void mqtt_manager_publish_lock_state(bool unlocked)
+{
+    if (s_client == NULL) {
+        return;
+    }
+    esp_mqtt_client_publish(s_client, TOPIC_LOCK_STATE, unlocked ? "UNLOCKED" : "LOCKED", 0, 1, true);
 }

@@ -27,10 +27,30 @@ void mqtt_manager_publish_light_state(bool on);
 void mqtt_manager_publish_sensor_state(float temp, float hum, float pressure);
 
 /**
- * @brief publish کردن رویداد دسترسی (باز شدن موفق/ناموفق قفل از طریق چهره یا رمز).
- *        لحظه‌ای است (retained نیست) - صرفاً یک رویداد را در HA لاگ/تریگر می‌کند.
+ * @brief publish کردن وضعیت واقعی قفل (باز/بسته) به HA - از هر مسیری
+ *        که تغییر کند (دستی یا relock خودکار در app_state) صدا زده می‌شود.
  */
-void mqtt_manager_publish_access_event(bool granted);
+void mqtt_manager_publish_lock_state(bool unlocked);
+
+/**
+ * @brief انواع رویداد دسترسی که به entity از نوع "event" در HA فرستاده می‌شود.
+ *        هر مقدار دقیقاً باید با یکی از رشته‌های "event_types" که در
+ *        mqtt_manager.c برای discovery این entity تعریف شده مطابقت داشته باشد.
+ */
+typedef enum {
+    ACCESS_EVENT_GRANTED_FACE,   // ورود موفق با تشخیص چهره
+    ACCESS_EVENT_DENIED_FACE,    // ورود ناموفق با تشخیص چهره (چهره‌ی ناشناس)
+    ACCESS_EVENT_GRANTED_CODE,   // ورود موفق با رمز از کیبورد LCD
+    ACCESS_EVENT_DENIED_CODE,    // ورود ناموفق با رمز از کیبورد LCD
+} access_event_type_t;
+
+/**
+ * @brief publish کردن یک رویداد دسترسی (لحظه‌ای، stateless) به HA.
+ *        بر خلاف بقیه‌ی publish ها، این یک "event" entity است نه sensor -
+ *        یعنی هر بار یک رویداد جدید با نوع مشخص ثبت می‌شود، نه یک وضعیت
+ *        دائمی ON/OFF.
+ */
+void mqtt_manager_publish_access_event(access_event_type_t type);
 
 #ifdef __cplusplus
 }
