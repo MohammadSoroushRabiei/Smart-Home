@@ -17,6 +17,7 @@
 #include "sensor_task.h"
 #include "password_manager.h"
 #include "keypad_screen.h"
+#include "lock.h"
 #include "mqtt_manager.h"
 
 static bool s_lcd_ok = false;
@@ -58,6 +59,8 @@ void app_main(void)
     app_state_init();
     ESP_ERROR_CHECK(password_manager_init());
 
+    lock_init();
+    
     bool i2c_ok = i2c_bus_init();
 
     s_lcd_ok = lcd_driver_init();

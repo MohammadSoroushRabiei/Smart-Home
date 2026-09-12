@@ -31,3 +31,6 @@ typedef struct {
 
 void app_state_set_sensor_data(float temp, float hum, float pressure);
 sensor_data_t app_state_get_sensor_data(void);
+
+bool app_state_get_lock(void);
+void app_state_set_lock(bool unlocked);
