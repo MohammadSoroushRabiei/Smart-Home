@@ -18,6 +18,7 @@
 #include "password_manager.h"
 #include "keypad_screen.h"
 #include "lock.h"
+#include "mqtt_manager.h"
 
 static bool s_lcd_ok = false;
 
@@ -58,7 +59,6 @@ void app_main(void)
     app_state_init();
     ESP_ERROR_CHECK(password_manager_init());
 
-    lock_init();
     
     bool i2c_ok = i2c_bus_init();
 
@@ -85,9 +85,12 @@ void app_main(void)
 
     led_init();
     btn_init();
+    lock_init();
+
 
     wifi_register_state_change_cb(on_wifi_state_change);
     wifi_init_sta();  
+    mqtt_manager_init();
 
 
     ESP_ERROR_CHECK(face_recognition_init());

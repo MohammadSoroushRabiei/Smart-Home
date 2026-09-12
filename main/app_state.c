@@ -6,7 +6,9 @@
 #include "led.h"
 #include "lcd_driver.h"
 #include "ui_screens.h"
+#include "mqtt_manager.h"
 #include "lock.h" 
+#include "esp_timer.h"
 
 static const char *TAG = "app_state";
 
@@ -15,12 +17,23 @@ static bool s_light_on = false;
 static bool s_lock_unlocked = false;
 static bool s_lcd_available = false;  
 static sensor_data_t s_sensor_data = { .valid = false };
+static esp_timer_handle_t s_relock_timer = NULL;
+
+static void relock_timer_cb(void *arg)
+{
+    app_state_set_lock(false);
+}
 
 void app_state_init(void)
 {
     s_mutex = xSemaphoreCreateMutex();
-}
 
+    const esp_timer_create_args_t timer_args = {
+        .callback = &relock_timer_cb,
+        .name = "app_relock",
+    };
+    esp_timer_create(&timer_args, &s_relock_timer);
+}
 // ← تابع جدید: باید بعد از مشخص شدن نتیجه‌ی lcd_driver_init صدا زده شود
 void app_state_set_lcd_available(bool available)
 {
@@ -45,6 +58,7 @@ void app_state_set_light(bool on)
     ESP_LOGI(TAG, "Light set to: %s", on ? "ON" : "OFF");
 
     led_set(LED, on);
+    mqtt_manager_publish_light_state(on);
 
     if (s_lcd_available) {
         lcd_driver_lvgl_lock();
@@ -90,6 +104,9 @@ bool app_state_get_lock(void)
     return value;
 }
 
+
+#define APP_LOCK_AUTO_RELOCK_MS   5000   // باید کمتر از LOCK_HW_FAILSAFE_MS در lock.h باشد
+
 void app_state_set_lock(bool unlocked)
 {
     xSemaphoreTake(s_mutex, portMAX_DELAY);
@@ -98,5 +115,13 @@ void app_state_set_lock(bool unlocked)
 
     ESP_LOGI(TAG, "Lock set to: %s", unlocked ? "UNLOCKED" : "LOCKED");
 
-    lock_set(unlocked);   // اتصال واقعی به رله؛ تایمر relock خودکار داخل lock_set است
+    lock_set(unlocked);
+    mqtt_manager_publish_lock_state(unlocked);
+
+    if (s_relock_timer) {
+        esp_timer_stop(s_relock_timer);
+        if (unlocked) {
+            esp_timer_start_once(s_relock_timer, (uint64_t)APP_LOCK_AUTO_RELOCK_MS * 1000);
+        }
+    }
 }

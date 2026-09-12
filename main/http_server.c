@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "app_state.h"
+#include "mqtt_manager.h"
 
 
 extern const uint8_t servercert_start[] asm("_binary_servercert_pem_start");
@@ -440,9 +441,12 @@ static void handle_recognize(httpd_req_t *req)
         snprintf(resp, sizeof(resp), "Access Granted! Welcome User ID: %d", detected_id);
         httpd_resp_sendstr(req, resp);
         app_state_set_lock(true);
+        mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_FACE); 
     } else {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Access Denied: Unknown Face");
+        mqtt_manager_publish_access_event(ACCESS_EVENT_DENIED_FACE);    // ← این خط جدید
+
     }
 }
 
