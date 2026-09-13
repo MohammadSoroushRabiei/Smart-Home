@@ -1,11 +1,20 @@
 #include "i2c_bus.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "i2c_bus";
 static i2c_master_bus_handle_t s_bus = NULL;
+static SemaphoreHandle_t s_mutex = NULL;
 
 bool i2c_bus_init(void)
 {
+    s_mutex = xSemaphoreCreateMutex();
+    if (s_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create I2C bus mutex");
+        return false;
+    }
+
     i2c_master_bus_config_t conf = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .sda_io_num = SHARED_I2C_SDA,
@@ -27,4 +36,14 @@ bool i2c_bus_init(void)
 i2c_master_bus_handle_t i2c_bus_get_handle(void)
 {
     return s_bus;
+}
+
+void i2c_bus_lock(void)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+}
+
+void i2c_bus_unlock(void)
+{
+    xSemaphoreGive(s_mutex);
 }

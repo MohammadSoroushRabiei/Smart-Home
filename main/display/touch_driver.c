@@ -1,6 +1,6 @@
 #include "touch_driver.h"
 #include "lcd_driver.h"
-
+#include "i2c_bus.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -28,8 +28,10 @@ static void touch_poll_task(void *arg)
     uint8_t consecutive_errors = 0;
 
     while (1) {
-        esp_err_t ret = esp_lcd_touch_read_data(s_tp_handle);
 
+        i2c_bus_lock();
+        esp_err_t ret = esp_lcd_touch_read_data(s_tp_handle);
+        i2c_bus_unlock();
         if (ret == ESP_OK) {
             consecutive_errors = 0;
 

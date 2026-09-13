@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "i2c_bus.h"
 
 static const char *TAG = "bme280";
 
@@ -113,6 +114,9 @@ bool bme280_read(bme280_data_t *out)
         return false;
     }
 
+    i2c_bus_lock();
+    bool success = true;
+
     reg_write(BME280_REG_CTRL_MEAS, 0x25);  // osrs_t=1, osrs_p=1, mode=forced
 
     for (int i = 0; i < 20; i++) {
@@ -130,44 +134,50 @@ bool bme280_read(bme280_data_t *out)
         return false;
     }
 
-    int32_t adc_P = (int32_t)((raw[0] << 12) | (raw[1] << 4) | (raw[2] >> 4));
-    int32_t adc_T = (int32_t)((raw[3] << 12) | (raw[4] << 4) | (raw[5] >> 4));
-    int32_t adc_H = (int32_t)((raw[6] << 8) | raw[7]);
+    if (success)
+    {       
+        int32_t adc_P = (int32_t)((raw[0] << 12) | (raw[1] << 4) | (raw[2] >> 4));
+        int32_t adc_T = (int32_t)((raw[3] << 12) | (raw[4] << 4) | (raw[5] >> 4));
+        int32_t adc_H = (int32_t)((raw[6] << 8) | raw[7]);
 
-    // فرمول‌های کمپانزیشن double-precision (طبق دیتاشیت Bosch BME280)
-    double var1, var2, T, P = 0, H;
-    int32_t t_fine;
+        // فرمول‌های کمپانزیشن double-precision (طبق دیتاشیت Bosch BME280)
+        double var1, var2, T, P = 0, H;
+        int32_t t_fine;
 
-    var1 = (((double)adc_T) / 16384.0 - ((double)s_calib.dig_T1) / 1024.0) * ((double)s_calib.dig_T2);
-    var2 = ((((double)adc_T) / 131072.0 - ((double)s_calib.dig_T1) / 8192.0) *
-            (((double)adc_T) / 131072.0 - ((double)s_calib.dig_T1) / 8192.0)) * ((double)s_calib.dig_T3);
-    t_fine = (int32_t)(var1 + var2);
-    T = (var1 + var2) / 5120.0;
+        var1 = (((double)adc_T) / 16384.0 - ((double)s_calib.dig_T1) / 1024.0) * ((double)s_calib.dig_T2);
+        var2 = ((((double)adc_T) / 131072.0 - ((double)s_calib.dig_T1) / 8192.0) *
+                (((double)adc_T) / 131072.0 - ((double)s_calib.dig_T1) / 8192.0)) * ((double)s_calib.dig_T3);
+        t_fine = (int32_t)(var1 + var2);
+        T = (var1 + var2) / 5120.0;
 
-    var1 = ((double)t_fine / 2.0) - 64000.0;
-    var2 = var1 * var1 * ((double)s_calib.dig_P6) / 32768.0;
-    var2 = var2 + var1 * ((double)s_calib.dig_P5) * 2.0;
-    var2 = (var2 / 4.0) + (((double)s_calib.dig_P4) * 65536.0);
-    var1 = (((double)s_calib.dig_P3) * var1 * var1 / 524288.0 + ((double)s_calib.dig_P2) * var1) / 524288.0;
-    var1 = (1.0 + var1 / 32768.0) * ((double)s_calib.dig_P1);
-    if (var1 != 0.0) {
-        P = 1048576.0 - (double)adc_P;
-        P = (P - (var2 / 4096.0)) * 6250.0 / var1;
-        var1 = ((double)s_calib.dig_P9) * P * P / 2147483648.0;
-        var2 = P * ((double)s_calib.dig_P8) / 32768.0;
-        P = P + (var1 + var2 + ((double)s_calib.dig_P7)) / 16.0;
+        var1 = ((double)t_fine / 2.0) - 64000.0;
+        var2 = var1 * var1 * ((double)s_calib.dig_P6) / 32768.0;
+        var2 = var2 + var1 * ((double)s_calib.dig_P5) * 2.0;
+        var2 = (var2 / 4.0) + (((double)s_calib.dig_P4) * 65536.0);
+        var1 = (((double)s_calib.dig_P3) * var1 * var1 / 524288.0 + ((double)s_calib.dig_P2) * var1) / 524288.0;
+        var1 = (1.0 + var1 / 32768.0) * ((double)s_calib.dig_P1);
+        if (var1 != 0.0) {
+            P = 1048576.0 - (double)adc_P;
+            P = (P - (var2 / 4096.0)) * 6250.0 / var1;
+            var1 = ((double)s_calib.dig_P9) * P * P / 2147483648.0;
+            var2 = P * ((double)s_calib.dig_P8) / 32768.0;
+            P = P + (var1 + var2 + ((double)s_calib.dig_P7)) / 16.0;
+        }
+
+        H = ((double)t_fine) - 76800.0;
+        H = (adc_H - (((double)s_calib.dig_H4) * 64.0 + ((double)s_calib.dig_H5) / 16384.0 * H)) *
+            (((double)s_calib.dig_H2) / 65536.0 * (1.0 + ((double)s_calib.dig_H6) / 67108864.0 * H *
+            (1.0 + ((double)s_calib.dig_H3) / 67108864.0 * H)));
+        H = H * (1.0 - ((double)s_calib.dig_H1) * H / 524288.0);
+        if (H > 100.0) H = 100.0;
+        if (H < 0.0)   H = 0.0;
+
+        out->temperature_c    = (float)T;
+        out->pressure_hpa     = (float)(P / 100.0);
+        out->humidity_percent = (float)H;
     }
 
-    H = ((double)t_fine) - 76800.0;
-    H = (adc_H - (((double)s_calib.dig_H4) * 64.0 + ((double)s_calib.dig_H5) / 16384.0 * H)) *
-        (((double)s_calib.dig_H2) / 65536.0 * (1.0 + ((double)s_calib.dig_H6) / 67108864.0 * H *
-        (1.0 + ((double)s_calib.dig_H3) / 67108864.0 * H)));
-    H = H * (1.0 - ((double)s_calib.dig_H1) * H / 524288.0);
-    if (H > 100.0) H = 100.0;
-    if (H < 0.0)   H = 0.0;
+    i2c_bus_unlock();
 
-    out->temperature_c    = (float)T;
-    out->pressure_hpa     = (float)(P / 100.0);
-    out->humidity_percent = (float)H;
-    return true;
+    return success;
 }
