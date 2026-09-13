@@ -3,9 +3,10 @@
 #include <stdbool.h>
 #include "wifi_manager.h"
 
+
 void ui_screens_init(void);
 void ui_update_wifi_status(wifi_state_t state);
-
+void ui_update_lock_status(bool unlocked);
 /**
  * @brief به‌روزرسانی نمایش وضعیت چراغ روی LCD.
  *        باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.

@@ -118,6 +118,12 @@ void app_state_set_lock(bool unlocked)
     lock_set(unlocked);
     mqtt_manager_publish_lock_state(unlocked);
 
+    if (s_lcd_available) {                          // ← بلوک جدید
+        lcd_driver_lvgl_lock();
+        ui_update_lock_status(unlocked);
+        lcd_driver_lvgl_unlock();
+    }
+
     if (s_relock_timer) {
         esp_timer_stop(s_relock_timer);
         if (unlocked) {
