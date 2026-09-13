@@ -13,3 +13,10 @@
 bool i2c_bus_init(void);
 
 i2c_master_bus_handle_t i2c_bus_get_handle(void);
+
+/**
+ * @brief قفل کردن دسترسی انحصاری به باس I2C مشترک قبل از یک تراکنش.
+ *        باید همیشه با i2c_bus_unlock جفت شود (حتی در مسیرهای خطا/return زودهنگام).
+ */
+void i2c_bus_lock(void);
+void i2c_bus_unlock(void);
