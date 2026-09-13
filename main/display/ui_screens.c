@@ -97,17 +97,16 @@ void ui_screens_init(void)
     lv_label_set_text(retry_label, "Retry");
     lv_obj_center(retry_label);
 
-    // دکمه‌ی چراغ - جابه‌جا شد به سمت چپ مرکز تا جا برای Unlock باز شود
     s_light_btn = lv_button_create(scr);
     lv_obj_set_size(s_light_btn, 140, 70);
     lv_obj_align(s_light_btn, LV_ALIGN_CENTER, -80, 0);
+    lv_obj_set_style_bg_color(s_light_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_light_btn, light_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     s_light_label = lv_label_create(s_light_btn);
     lv_label_set_text(s_light_label, "Light: OFF");
     lv_obj_center(s_light_label);
 
-    // دکمه‌ی Unlock - کنار دکمه‌ی چراغ
     s_unlock_btn = lv_button_create(scr);
     lv_obj_set_size(s_unlock_btn, 140, 70);
     lv_obj_align(s_unlock_btn, LV_ALIGN_CENTER, 80, 0);
@@ -164,9 +163,11 @@ void ui_update_wifi_ip(const char *ip_str)
 
 void ui_update_light_status(bool on)
 {
-    if (s_light_label == NULL) {
+    if (s_light_label == NULL || s_light_btn == NULL) {
         return;
     }
+    lv_obj_set_style_bg_color(s_light_btn,
+        on ? lv_palette_main(LV_PALETTE_ORANGE) : lv_palette_main(LV_PALETTE_GREY), 0);
     lv_label_set_text(s_light_label, on ? "Light: ON" : "Light: OFF");
 }
 
