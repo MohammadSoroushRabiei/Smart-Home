@@ -48,6 +48,12 @@ static const char *TAG = "mqtt_manager";
 
 static esp_mqtt_client_handle_t s_client = NULL;
 
+// وضعیت واقعی اتصال - همه‌ی توابع publish قبل از هر کاری این را چک می‌کنند
+// تا وقتی broker در دسترس نیست، اصلاً چیزی صف نشود (نه فقط بلاک نشود).
+// این هم از رشد بی‌رویه‌ی outbox داخلی esp-mqtt جلوگیری می‌کند، هم از
+// سناریوی نادر «enqueue برای مدت کوتاه بلاک می‌شود اگر outbox پر باشد».
+static volatile bool s_mqtt_connected = false;
+
 // ---------------------------------------------------------------------
 // Payload های ثابت Discovery (رشته‌های ادغام‌شده در زمان کامپایل)
 // ---------------------------------------------------------------------
@@ -138,19 +144,31 @@ static const char *access_event_type_to_str(access_event_type_t type)
     }
 }
 
+// ⚠️ نکته‌ی حیاتی: از esp_mqtt_client_enqueue به‌جای esp_mqtt_client_publish
+// استفاده می‌کنیم. تابع _publish سینکرون است و write واقعی روی سوکت TCP/TLS
+// را مستقیماً از همان تسکی که آن را صدا زده انجام می‌دهد؛ اگر broker در
+// دسترس نباشد، این write می‌تواند تا زمان timeout سوکت (چند ثانیه) بلاک
+// بماند. چون این توابع از داخل callback دکمه‌های LVGL (در حالی که قفل
+// LVGL گرفته شده) هم صدا زده می‌شوند، آن بلاک‌شدن یعنی کل تاچ/LCD فریز
+// می‌شود. تابع _enqueue فقط پیام را در outbox داخلی می‌گذارد و فوراً
+// برمی‌گردد؛ ارسال واقعی توسط تسک داخلی خود کتابخانه‌ی esp-mqtt انجام
+// می‌شود، نه تسک تماس‌گیرنده.
 static void publish_discovery_configs(void)
 {
+    // این تابع فقط از داخل case MQTT_EVENT_CONNECTED صدا زده می‌شود، پس
+    // اتصال قطعاً برقرار است؛ گارد جداگانه لازم نیست.
     // qos=1 چون گم‌شدن پیام معرفی یعنی entity اصلاً در HA ساخته نمی‌شود
     // retain=true چون HA ممکن است دیرتر از ESP32 بالا بیاید و باید بتواند
     // پیام را بعداً هم از broker بخواند
-    esp_mqtt_client_publish(s_client, DISC_LIGHT,  s_light_discovery,     0, 1, true);
-    esp_mqtt_client_publish(s_client, DISC_TEMP,   s_temperature_discovery, 0, 1, true);
-    esp_mqtt_client_publish(s_client, DISC_HUM,    s_humidity_discovery,  0, 1, true);
-    esp_mqtt_client_publish(s_client, DISC_PRESS,  s_pressure_discovery,  0, 1, true);
-    esp_mqtt_client_publish(s_client, DISC_ACCESS, s_access_discovery,    0, 1, true);
-    esp_mqtt_client_publish(s_client, DISC_LOCK_STATUS, s_lock_status_discovery, 0, 1, true);
+    // store=true تا در outbox بماند و بعد از وصل‌شدن مجدد ارسال شود
+    esp_mqtt_client_enqueue(s_client, DISC_LIGHT,  s_light_discovery,     0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_TEMP,   s_temperature_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_HUM,    s_humidity_discovery,  0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_PRESS,  s_pressure_discovery,  0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_ACCESS, s_access_discovery,    0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_LOCK_STATUS, s_lock_status_discovery, 0, 1, true, true);
 
-    ESP_LOGI(TAG, "Discovery configs published for 6 entities");
+    ESP_LOGI(TAG, "Discovery configs enqueued for 6 entities");
 }
 
 static void handle_light_command(esp_mqtt_event_handle_t event)
@@ -170,16 +188,18 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "Connected to broker");
+        s_mqtt_connected = true;
         publish_discovery_configs();
 
         // Birth message - به HA اعلام می‌کند که دستگاه آنلاین است
-        esp_mqtt_client_publish(s_client, TOPIC_STATUS, "online", 0, 1, true);
+        esp_mqtt_client_enqueue(s_client, TOPIC_STATUS, "online", 0, 1, true, true);
 
         esp_mqtt_client_subscribe(s_client, TOPIC_LIGHT_SET, 1);
         break;
 
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "Disconnected from broker");
+        s_mqtt_connected = false;
         break;
 
     case MQTT_EVENT_DATA:
@@ -191,6 +211,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 
     case MQTT_EVENT_ERROR:
         ESP_LOGE(TAG, "MQTT error event");
+        s_mqtt_connected = false;
         break;
 
     default:
@@ -229,15 +250,15 @@ void mqtt_manager_init(void)
 
 void mqtt_manager_publish_light_state(bool on)
 {
-    if (s_client == NULL) {
+    if (s_client == NULL || !s_mqtt_connected) {
         return;
     }
-    esp_mqtt_client_publish(s_client, TOPIC_LIGHT_STATE, on ? "ON" : "OFF", 0, 1, true);
+    esp_mqtt_client_enqueue(s_client, TOPIC_LIGHT_STATE, on ? "ON" : "OFF", 0, 1, true, true);
 }
 
 void mqtt_manager_publish_sensor_state(float temp, float hum, float pressure)
 {
-    if (s_client == NULL) {
+    if (s_client == NULL || !s_mqtt_connected) {
         return;
     }
 
@@ -246,26 +267,27 @@ void mqtt_manager_publish_sensor_state(float temp, float hum, float pressure)
              "{\"temperature\":%.1f,\"humidity\":%.1f,\"pressure\":%.1f}",
              temp, hum, pressure);
 
-    esp_mqtt_client_publish(s_client, TOPIC_SENSOR_STATE, payload, 0, 1, false);
+    esp_mqtt_client_enqueue(s_client, TOPIC_SENSOR_STATE, payload, 0, 1, false, true);
 }
 
 void mqtt_manager_publish_access_event(access_event_type_t type)
 {
-    if (s_client == NULL) {
+    if (s_client == NULL || !s_mqtt_connected) {
         return;
     }
 
     char payload[64];
     snprintf(payload, sizeof(payload), "{\"event_type\":\"%s\"}", access_event_type_to_str(type));
 
-    // qos=0, retain=false: یک رویداد لحظه‌ای است، نیازی به تحویل تضمینی یا حفظ‌شدن ندارد
-    esp_mqtt_client_publish(s_client, TOPIC_ACCESS_STATE, payload, 0, 0, false);
+    // qos=0, retain=false, store=false: یک رویداد لحظه‌ای است - نه نیاز به
+    // تحویل تضمینی دارد و نه ارزش نگه‌داشتن در outbox حین قطعی را دارد
+    esp_mqtt_client_enqueue(s_client, TOPIC_ACCESS_STATE, payload, 0, 0, false, false);
 }
 
 void mqtt_manager_publish_lock_state(bool unlocked)
 {
-    if (s_client == NULL) {
+    if (s_client == NULL || !s_mqtt_connected) {
         return;
     }
-    esp_mqtt_client_publish(s_client, TOPIC_LOCK_STATE, unlocked ? "UNLOCKED" : "LOCKED", 0, 1, true);
+    esp_mqtt_client_enqueue(s_client, TOPIC_LOCK_STATE, unlocked ? "UNLOCKED" : "LOCKED", 0, 1, true, true);
 }
