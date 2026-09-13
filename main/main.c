@@ -20,6 +20,7 @@
 #include "lock.h"
 #include "mqtt_manager.h"
 #include "enroll_token.h"
+#include "setting_screen.h"
 
 static bool s_lcd_ok = false;
 
@@ -82,6 +83,7 @@ void app_main(void)
         lcd_driver_lvgl_lock();
         ui_screens_init();
         keypad_screen_init();
+        settings_screen_init();
         lcd_driver_lvgl_unlock();
     }
 
