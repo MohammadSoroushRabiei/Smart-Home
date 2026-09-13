@@ -17,6 +17,7 @@ static lv_obj_t *s_retry_btn;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
 static lv_obj_t *s_unlock_btn;
+static lv_obj_t *s_unlock_label;
 static lv_obj_t *s_settings_btn;
 static lv_obj_t *s_sensor_label;
 static lv_obj_t *s_qr_code;
@@ -110,12 +111,12 @@ void ui_screens_init(void)
     s_unlock_btn = lv_button_create(scr);
     lv_obj_set_size(s_unlock_btn, 140, 70);
     lv_obj_align(s_unlock_btn, LV_ALIGN_CENTER, 80, 0);
-    lv_obj_set_style_bg_color(s_unlock_btn, lv_palette_main(LV_PALETTE_ORANGE), 0);
+    lv_obj_set_style_bg_color(s_unlock_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_unlock_btn, unlock_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *unlock_label = lv_label_create(s_unlock_btn);
-    lv_label_set_text(unlock_label, "Unlock");
-    lv_obj_center(unlock_label);
+    s_unlock_label = lv_label_create(s_unlock_btn);
+    lv_label_set_text(s_unlock_label, "Locked");
+    lv_obj_center(s_unlock_label);
 
     // دکمه‌ی کوچک تنظیمات - گوشه‌ی بالا-راست، دور از دسترس تصادفی
     s_settings_btn = lv_button_create(scr);
@@ -167,6 +168,16 @@ void ui_update_light_status(bool on)
         return;
     }
     lv_label_set_text(s_light_label, on ? "Light: ON" : "Light: OFF");
+}
+
+void ui_update_lock_status(bool unlocked)
+{
+    if (s_unlock_btn == NULL || s_unlock_label == NULL) {
+        return;
+    }
+    lv_obj_set_style_bg_color(s_unlock_btn,
+        unlocked ? lv_palette_main(LV_PALETTE_GREEN) : lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_label_set_text(s_unlock_label, unlocked ? "Unlocked" : "Locked");
 }
 
 void ui_update_sensor_status(float temp, float hum, float pressure)

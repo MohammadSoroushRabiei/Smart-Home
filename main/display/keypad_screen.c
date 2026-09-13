@@ -21,6 +21,9 @@ static lv_obj_t *s_title_label;
 static lv_obj_t *s_textarea;
 static lv_obj_t *s_error_label;
 static lv_obj_t *s_btnm;
+static lv_obj_t *s_back_btn;
+static lv_obj_t *s_success_label;
+static lv_timer_t *s_success_timer = NULL;
 
 static char s_input_buf[PASSWORD_MAX_LEN + 1];
 static size_t s_input_len;
@@ -34,6 +37,20 @@ static void reset_input(void)
     s_input_buf[0] = '\0';
     lv_textarea_set_text(s_textarea, "");
     lv_obj_add_flag(s_error_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_success_label,LV_OBJ_FLAG_HIDDEN);
+}
+
+static void show_success(const char *msg)
+{
+    lv_label_set_text(s_success_label, msg);
+    lv_obj_clear_flag(s_success_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_error_label, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void success_timer_cb(lv_timer_t *timer)
+{
+    s_success_timer = NULL;
+    keypad_screen_hide();
 }
 
 static void show_error(const char *msg)
@@ -68,14 +85,18 @@ static void btnm_event_cb(lv_event_t *e)
         keypad_result_cb_t cb = s_current_cb;
 
         if (ok) {
-            keypad_screen_hide();
+            ESP_LOGI(TAG, "Correct password entered");
+            show_success("Access Granted");
+
             if (cb) {
                 cb(purpose, true);
             }
+            s_success_timer = lv_timer_create(success_timer_cb,1200,NULL);
+            lv_timer_set_repeat_count(s_success_timer,1);
         } else {
             ESP_LOGW(TAG, "Wrong password entered");
-            show_error("Wrong code, try again");
             reset_input();
+            show_error("Wrong code, try again");
             if (cb) {
                 cb(purpose, false);
             }
@@ -91,6 +112,14 @@ static void btnm_event_cb(lv_event_t *e)
     }
 }
 
+
+static void back_btn_event_cb(lv_event_t *e)
+{
+    // انصراف بی‌سروصدا - بدون فراخوانی cb، پس هیچ رویداد "رمز غلط"
+    // یا هر منطق دیگری ثبت نمی‌شود؛ فقط از این صفحه خارج می‌شویم
+    keypad_screen_hide();
+}
+
 void keypad_screen_init(void)
 {
     // overlay روی بالاترین لایه، مستقل از screen فعال - همیشه در دسترس است
@@ -103,12 +132,24 @@ void keypad_screen_init(void)
     // overlay باید جلوی لمس صفحه‌ی پشت را هم بگیرد
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_CLICKABLE);
 
+    s_back_btn = lv_button_create(s_overlay);
+    lv_obj_set_size(s_back_btn, 36, 36);
+    lv_obj_align(s_back_btn, LV_ALIGN_TOP_LEFT, 5, 5);
+    lv_obj_set_style_bg_color(s_back_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(s_back_btn, back_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *back_label = lv_label_create(s_back_btn);
+    lv_label_set_text(back_label, LV_SYMBOL_LEFT);
+    lv_obj_center(back_label);
+
+
     s_title_label = lv_label_create(s_overlay);
     lv_obj_set_style_text_color(s_title_label, lv_color_white(), 0);
     lv_label_set_text(s_title_label, "Enter Code");
     lv_obj_align(s_title_label, LV_ALIGN_TOP_MID, 0, 20);
 
     s_textarea = lv_textarea_create(s_overlay);
+    lv_obj_set_style_text_font(s_textarea, &lv_font_montserrat_28, 0);
     lv_textarea_set_password_mode(s_textarea, true);
     lv_textarea_set_one_line(s_textarea, true);
     lv_textarea_set_max_length(s_textarea, PASSWORD_MAX_LEN);
@@ -118,9 +159,21 @@ void keypad_screen_init(void)
 
     s_error_label = lv_label_create(s_overlay);
     lv_obj_set_style_text_color(s_error_label, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_width(s_error_label, 220);        
+    lv_obj_set_style_text_align(s_error_label,LV_TEXT_ALIGN_CENTER,0);                    
     lv_label_set_text(s_error_label, "");
-    lv_obj_align(s_error_label, LV_ALIGN_TOP_MID, 0, 90);
+    lv_obj_align_to(s_error_label, s_textarea,LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_add_flag(s_error_label, LV_OBJ_FLAG_HIDDEN);
+
+
+    s_success_label = lv_label_create(s_overlay);
+    lv_obj_set_style_text_color(s_success_label, lv_palette_main(LV_PALETTE_GREEN), 0);
+    lv_obj_set_width(s_success_label, 220);        
+    lv_obj_set_style_text_align(s_success_label,LV_TEXT_ALIGN_CENTER,0); 
+    lv_label_set_text(s_success_label, "");
+    lv_obj_align_to(s_success_label, s_textarea,LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+    lv_obj_add_flag(s_success_label, LV_OBJ_FLAG_HIDDEN);
+
 
     s_btnm = lv_buttonmatrix_create(s_overlay);
     lv_buttonmatrix_set_map(s_btnm, s_btnm_map);
@@ -154,6 +207,12 @@ void keypad_screen_show(keypad_purpose_t purpose, keypad_result_cb_t on_result)
 
 void keypad_screen_hide(void)
 {
+    if (s_success_timer)
+    {
+        lv_timer_del(s_success_timer);
+        s_success_timer = NULL;
+    }
+    
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
     reset_input();
 }
