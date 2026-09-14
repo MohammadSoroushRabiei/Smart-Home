@@ -166,10 +166,10 @@ void settings_screen_init(void)
 
     s_countdown_label = lv_label_create(s_enroll_view);
     lv_obj_set_style_text_color(s_countdown_label, lv_color_white(), 0);
-    lv_label_set_text(s_countdown_label, "");
+    lv_obj_set_width(s_countdown_label, 220);        
     lv_obj_set_style_text_align(s_countdown_label,LV_TEXT_ALIGN_CENTER,0); 
-    lv_obj_align_to(s_countdown_label, s_qr_code, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
-
+    lv_label_set_text(s_countdown_label, "");
+    lv_obj_align_to(s_countdown_label, s_qr_code, LV_ALIGN_OUT_BOTTOM_MID, 0,15);
     lv_obj_add_flag(s_enroll_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 

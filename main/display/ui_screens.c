@@ -139,7 +139,7 @@ void ui_screens_init(void)
     lv_qrcode_set_size(s_qr_code, 90);
     lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
     lv_qrcode_set_light_color(s_qr_code, lv_color_white());
-    lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
+    lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_MID, 0, -30);
     lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);   // تا وقتی IP مشخص نشده، مخفی بمونه
 }
 
