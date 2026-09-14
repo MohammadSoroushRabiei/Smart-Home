@@ -9,10 +9,12 @@
 #include "freertos/queue.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include "app_state.h"
 #include "mqtt_manager.h"
 #include "enroll_token.h"
+#include "face_db.h"
 
 extern const uint8_t servercert_start[] asm("_binary_servercert_pem_start");
 extern const uint8_t servercert_end[]   asm("_binary_servercert_pem_end");
@@ -35,6 +37,7 @@ typedef enum {
 typedef struct {
     httpd_req_t *req;
     face_op_t op;
+    char name[FACE_DB_NAME_MAX_LEN + 1];
 } face_work_item_t;
 
 static QueueHandle_t s_face_queue = NULL;
@@ -176,8 +179,11 @@ static const char *enroll_html =
     "#btn-enroll{background:#4CAF50;}"
     "#btn-flip{background:#607D8B;}"
     "#status{margin-top:10px;font-weight:bold;min-height:24px;}"
+    "button:disabled{opacity:0.5;cursor:not-allowed;}"
+    "#name-input{width:100%;padding:10px;margin-bottom:10px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;font-size:15px;}"
     "</style></head><body>"
     "<h2>Face Enrollment</h2>"
+    "<input type=\"text\" id=\"name-input\" placeholder=\"Full name\" maxlength=\"22\">"
     "<video id=\"video\" autoplay playsinline></video>"
     "<canvas id=\"canvas\" width=\"320\" height=\"240\"></canvas>"
     "<div class=\"btn-row\">"
@@ -196,6 +202,17 @@ static const char *enroll_html =
     "const statusEl=document.getElementById('status');"
     "const params=new URLSearchParams(window.location.search);"
     "const token=params.get('token')||'';"
+    
+    "const nameInput=document.getElementById('name-input');"
+    "const btnEnroll=document.getElementById('btn-enroll');"
+    
+    "function updateEnrollState(){"
+    "  const hasName = nameInput.value.trim().length>0;"
+    "  const hasCapture = canvas.style.display==='block';"
+    "  btnEnroll.disabled = !(hasName && hasCapture);"
+    "}"
+    
+    "nameInput.addEventListener('input', updateEnrollState);"
 
     "async function startCamera(){"
     "  if(stream){stream.getTracks().forEach(t=>t.stop());}"
@@ -206,6 +223,7 @@ static const char *enroll_html =
     "    canvas.style.display='none';"
     "    document.getElementById('action-row').style.display='none';"
     "    statusEl.textContent='';"
+    "    updateEnrollState();"
     "  }catch(err){statusEl.textContent='Camera error: '+err.message;}"
     "}"
 
@@ -225,14 +243,17 @@ static const char *enroll_html =
     "  video.style.display='none';"
     "  canvas.style.display='block';"
     "  document.getElementById('action-row').style.display='flex';"
+    "  updateEnrollState();" 
     "});"
 
     "document.getElementById('btn-retake').addEventListener('click', startCamera);"
 
     "document.getElementById('btn-enroll').addEventListener('click',()=>{"
+    "  if(btnEnroll.disabled) return;"
     "  statusEl.textContent='Sending...';"
     "  canvas.toBlob((blob)=>{"
-    "    fetch('/api/face/enroll?token='+encodeURIComponent(token),{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})"
+    "    const name=encodeURIComponent(nameInput.value.trim());"
+    "    fetch('/api/face/enroll?token='+encodeURIComponent(token)+'&name='+name,{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})"
     "    .then(r=>r.text().then(text=>({status:r.status,text})))"
     "    .then(({status,text})=>{statusEl.textContent='HTTP '+status+': '+text;})"
     "    .catch(err=>{statusEl.textContent='Error: '+err.message;});"
@@ -351,6 +372,25 @@ static esp_err_t password_page_handler(httpd_req_t *req)
 // ---------------------------------------------------------------------
 // تغییر رمز از طریق وب
 // ---------------------------------------------------------------------
+
+static void url_decode(char *dst, const char *src, size_t dst_size)
+{
+    size_t di = 0;
+    while (*src != '\0' && di + 1 < dst_size) {
+        if (*src == '%' && src[1] != '\0' && src[2] != '\0') {
+            char hex[3] = { src[1], src[2], '\0' };
+            dst[di++] = (char)strtol(hex, NULL, 16);
+            src += 3;
+        } else if (*src == '+') {
+            dst[di++] = ' ';
+            src++;
+        } else {
+            dst[di++] = *src++;
+        }
+    }
+    dst[di] = '\0';
+}
+
 
 // استخراج ساده‌ی value مربوط به یک key از بدنه‌ی application/x-www-form-urlencoded
 // عمداً decode نمی‌کند: چون رمز را به alnum محدود کرده‌ایم، کاراکتر خاصی
@@ -516,20 +556,25 @@ static void handle_recognize(httpd_req_t *req)
     }
 
     if (is_unlocked) {
-        char resp[64];
-        snprintf(resp, sizeof(resp), "Access Granted! Welcome User ID: %d", detected_id);
+        char name[FACE_DB_NAME_MAX_LEN + 1];
+        char resp[96];
+        if (face_db_get_name((uint16_t)detected_id, name, sizeof(name))) {
+            snprintf(resp, sizeof(resp), "Access Granted! Welcome, %s", name);
+        } else {
+            snprintf(resp, sizeof(resp), "Access Granted! Welcome User ID: %d", detected_id);
+        }
         httpd_resp_sendstr(req, resp);
         app_state_set_lock(true);
-        mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_FACE); 
+        mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_FACE);
     } else {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Access Denied: Unknown Face");
-        mqtt_manager_publish_access_event(ACCESS_EVENT_DENIED_FACE);    // ← این خط جدید
+        mqtt_manager_publish_access_event(ACCESS_EVENT_DENIED_FACE); 
 
     }
 }
 
-static void handle_enroll(httpd_req_t *req)
+static void handle_enroll(httpd_req_t *req, const char *name)
 {
     uint8_t *jpeg_buf = NULL;
     size_t len = 0;
@@ -552,8 +597,13 @@ static void handle_enroll(httpd_req_t *req)
         return;
     }
 
-    char resp[64];
-    snprintf(resp, sizeof(resp), "Face enrolled successfully with ID: %d", new_id);
+    esp_err_t db_ret = face_db_add((uint16_t)new_id, name);
+    if (db_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Face enrolled (ID %d) but failed to save name: %s", new_id, esp_err_to_name(db_ret));
+    }
+
+    char resp[96];
+    snprintf(resp, sizeof(resp), "Face enrolled successfully: %s (ID: %d)", name, new_id);
     httpd_resp_sendstr(req, resp);
 }
 
@@ -573,7 +623,7 @@ static void face_worker_task(void *arg)
             if (item.op == FACE_OP_RECOGNIZE) {
                 handle_recognize(item.req);
             } else {
-                handle_enroll(item.req);
+                handle_enroll(item.req,item.name);
             }
 
             httpd_req_async_handler_complete(item.req);
@@ -615,13 +665,17 @@ static esp_err_t face_recognize_handler(httpd_req_t *req)
 
 static esp_err_t face_enroll_handler(httpd_req_t *req)
 {
-    char query[64] = {0};
+    char query[128] = {0};
     char token[ENROLL_TOKEN_LEN + 1] = {0};
+    char name_raw[FACE_DB_NAME_MAX_LEN * 3 + 1] = {0};   // فضای اضافه برای %XX encoding
+    char name[FACE_DB_NAME_MAX_LEN + 1] = {0};
 
     if (httpd_req_get_url_query_len(req) > 0 &&
         httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
         httpd_query_key_value(query, "token", token, sizeof(token));
+        httpd_query_key_value(query, "name", name_raw, sizeof(name_raw));
     }
+    url_decode(name, name_raw, sizeof(name));
 
     if (!enroll_token_validate(token)) {
         ESP_LOGW(TAG, "Enroll rejected: invalid or missing token");
@@ -630,8 +684,33 @@ static esp_err_t face_enroll_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "POST /api/face/enroll received (token valid, enqueueing)");
-    return enqueue_face_request(req, FACE_OP_ENROLL);
+    if (name[0] == '\0') {
+        ESP_LOGW(TAG, "Enroll rejected: missing name");
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "Name is required");
+        return ESP_OK;
+    }
+
+    httpd_req_t *copy = NULL;
+    esp_err_t err = httpd_req_async_handler_begin(req, &copy);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start async request");
+        return ESP_FAIL;
+    }
+
+    face_work_item_t item = { .req = copy, .op = FACE_OP_ENROLL };
+    strncpy(item.name, name, FACE_DB_NAME_MAX_LEN);
+    item.name[FACE_DB_NAME_MAX_LEN] = '\0';
+
+    if (xQueueSend(s_face_queue, &item, 0) != pdTRUE) {
+        httpd_resp_set_status(copy, "503 Server Busy");
+        httpd_resp_sendstr(copy, "Face recognition is busy processing another request, try again shortly");
+        httpd_req_async_handler_complete(copy);
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "POST /api/face/enroll received (token valid, name=\"%s\", enqueueing)", name);
+    return ESP_OK;
 }
 
 static esp_err_t recognize_page_handler(httpd_req_t *req)

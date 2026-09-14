@@ -21,6 +21,7 @@
 #include "mqtt_manager.h"
 #include "enroll_token.h"
 #include "setting_screen.h"
+#include "face_db.h"
 
 static bool s_lcd_ok = false;
 
@@ -61,6 +62,7 @@ void app_main(void)
     app_state_init();
     ESP_ERROR_CHECK(password_manager_init());
     ESP_ERROR_CHECK(enroll_token_init());
+    ESP_ERROR_CHECK(face_db_init());
 
     
     bool i2c_ok = i2c_bus_init();

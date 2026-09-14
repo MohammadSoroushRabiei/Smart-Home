@@ -34,6 +34,11 @@ esp_err_t face_recognition_process(const uint8_t *jpeg_data, size_t len, bool *i
  */
 esp_err_t face_recognition_enroll(const uint8_t *jpeg_data, size_t len, int *new_id);
 
+/**
+ * @brief حذف یک چهره از دیتابیس بر اساس ID واقعی
+ */
+esp_err_t face_recognition_delete(uint16_t id);
+
 #ifdef __cplusplus
 }
 #endif
