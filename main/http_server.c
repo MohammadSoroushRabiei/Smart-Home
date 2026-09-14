@@ -721,6 +721,25 @@ static esp_err_t recognize_page_handler(httpd_req_t *req)
 
 static esp_err_t enroll_page_handler(httpd_req_t *req)
 {
+    char query[64] = {0};
+    char token[ENROLL_TOKEN_LEN + 1] = {0};
+
+    if (httpd_req_get_url_query_len(req) > 0 &&
+        httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        httpd_query_key_value(query, "token", token, sizeof(token));
+    }
+
+    if (!enroll_token_validate(token)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        httpd_resp_sendstr(req,
+            "<html><body style=\"font-family:sans-serif;text-align:center;margin-top:60px;\">"
+            "<h2>Link expired or invalid</h2>"
+            "<p>Please generate a new QR code from the device's Settings screen.</p>"
+            "</body></html>");
+        return ESP_OK;
+    }
+
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     return httpd_resp_send(req, enroll_html, HTTPD_RESP_USE_STRLEN);
 }
@@ -780,7 +799,7 @@ httpd_handle_t http_server_start(void)
         { &face_recognize_uri,   "/api/face/recognize" },
         { &face_enroll_uri,      "/api/face/enroll" },
         { &recognize_page_uri,   "/recognize" },
-{ &enroll_page_uri,      "/enroll" },
+        { &enroll_page_uri,      "/enroll" },
         { &password_page_uri,    "/password" },
         { &api_password_uri,     "/api/password" },
     };
