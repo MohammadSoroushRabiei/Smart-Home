@@ -19,6 +19,7 @@
 #include "keypad_screen.h"
 #include "lock.h"
 #include "mqtt_manager.h"
+#include "wifi_config.h"
 
 static bool s_lcd_ok = false;
 
@@ -57,6 +58,9 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     app_state_init();
+
+    wifi_config_init();
+    
     ESP_ERROR_CHECK(password_manager_init());
 
     
