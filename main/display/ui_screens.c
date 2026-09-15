@@ -8,6 +8,7 @@
 #include "keypad_screen.h"
 #include "esp_log.h"
 #include "mqtt_manager.h"
+#include "wifi_setup_screen.h"
 
 static const char *TAG = "ui_screens";
 
@@ -56,9 +57,7 @@ static void on_keypad_result(keypad_purpose_t purpose, bool success)
         }
     } else { // KEYPAD_PURPOSE_SETTINGS
         if (success) {
-            // TODO(بخش ۲.۵ - صفحه‌ی تنظیمات): وقتی صفحه‌ی تنظیمات ساخته شد،
-            // اینجا باید آن صفحه نمایش داده شود.
-            ESP_LOGI(TAG, "Settings code correct - settings screen not implemented yet");
+            wifi_setup_screen_show();   // ⚠️ موقت - در گام ۴ به هولد دکمه‌ی WiFi منتقل می‌شود
         } else {
             ESP_LOGW(TAG, "Settings code incorrect - ACCESS DENIED");
         }
