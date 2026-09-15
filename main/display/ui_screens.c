@@ -35,7 +35,7 @@ static const char *wifi_state_to_display_text(wifi_state_t state)
 
 static void retry_btn_event_cb(lv_event_t *e)
 {
-    wifi_retry_connect();
+    wifi_manager_enable();
 }
 
 static void light_btn_event_cb(lv_event_t *e)

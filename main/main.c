@@ -60,6 +60,9 @@ void app_main(void)
     app_state_init();
 
     wifi_config_init();
+
+    wifi_manager_init_radio();
+    
     
     ESP_ERROR_CHECK(password_manager_init());
 
@@ -93,7 +96,7 @@ void app_main(void)
 
 
     wifi_register_state_change_cb(on_wifi_state_change);
-    wifi_init_sta();  
+    wifi_manager_enable();
     mqtt_manager_init();
 
 
