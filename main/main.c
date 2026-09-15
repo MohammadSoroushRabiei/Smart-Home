@@ -19,6 +19,9 @@
 #include "keypad_screen.h"
 #include "lock.h"
 #include "mqtt_manager.h"
+#include "enroll_token.h"
+#include "setting_screen.h"
+#include "face_db.h"
 
 static bool s_lcd_ok = false;
 
@@ -31,8 +34,8 @@ static void on_wifi_state_change(wifi_state_t state)
         if (state == WIFI_STATE_CONNECTED) {
             const char *ip = wifi_get_ip_str();
             char url[48];
-            snprintf(url, sizeof(url), "https://%s/capture", ip);
-
+            snprintf(url, sizeof(url), "https://%s/recognize", ip);
+            
             ui_update_wifi_ip(ip);
             ui_update_capture_qr(url);
         } else {
@@ -58,6 +61,8 @@ void app_main(void)
 
     app_state_init();
     ESP_ERROR_CHECK(password_manager_init());
+    ESP_ERROR_CHECK(enroll_token_init());
+    ESP_ERROR_CHECK(face_db_init());
 
     
     bool i2c_ok = i2c_bus_init();
@@ -80,6 +85,7 @@ void app_main(void)
         lcd_driver_lvgl_lock();
         ui_screens_init();
         keypad_screen_init();
+        settings_screen_init();
         lcd_driver_lvgl_unlock();
     }
 

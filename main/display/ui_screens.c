@@ -8,6 +8,7 @@
 #include "keypad_screen.h"
 #include "esp_log.h"
 #include "mqtt_manager.h"
+#include "setting_screen.h"
 
 static const char *TAG = "ui_screens";
 
@@ -54,11 +55,12 @@ static void on_keypad_result(keypad_purpose_t purpose, bool success)
         } else {
             ESP_LOGW(TAG, "Unlock code incorrect - ACCESS DENIED");
         }
-    } else { // KEYPAD_PURPOSE_SETTINGS
+    } else if (purpose == KEYPAD_PURPOSE_SETTINGS) { // KEYPAD_PURPOSE_SETTINGS
         if (success) {
-            // TODO(بخش ۲.۵ - صفحه‌ی تنظیمات): وقتی صفحه‌ی تنظیمات ساخته شد،
-            // اینجا باید آن صفحه نمایش داده شود.
+ 
             ESP_LOGI(TAG, "Settings code correct - settings screen not implemented yet");
+            settings_screen_show();
+
         } else {
             ESP_LOGW(TAG, "Settings code incorrect - ACCESS DENIED");
         }
@@ -137,7 +139,7 @@ void ui_screens_init(void)
     lv_qrcode_set_size(s_qr_code, 90);
     lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
     lv_qrcode_set_light_color(s_qr_code, lv_color_white());
-    lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
+    lv_obj_align(s_qr_code, LV_ALIGN_BOTTOM_MID, 0, -30);
     lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);   // تا وقتی IP مشخص نشده، مخفی بمونه
 }
 

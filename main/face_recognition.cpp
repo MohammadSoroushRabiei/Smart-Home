@@ -102,9 +102,21 @@ static esp_err_t process_image_internal(const uint8_t *jpeg_data, size_t len, bo
 
     // ۳. عملیات شناسایی یا ثبت
     if (is_enroll) {
-        face_recognizer->enroll(img, detect_results);
-        *out_id = 1; // در این PoC شناسه را به صورت ساده ۱ در نظر می‌گیریم
-        ESP_LOGI(TAG, "Face enrolled successfully");
+        esp_err_t enroll_ret = face_recognizer->enroll(img, detect_results);
+        if (enroll_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Enroll failed: %s", esp_err_to_name(enroll_ret));
+            heap_caps_free(out_buf);
+            return ESP_FAIL;
+        }
+        auto verify_results = face_recognizer->recognize(img, detect_results);
+        if (verify_results.empty()) {
+            ESP_LOGE(TAG, "Enrolled but could not read back the assigned ID");
+            heap_caps_free(out_buf);
+            return ESP_FAIL;
+        }
+        *out_id = verify_results[0].id;
+        ESP_LOGI(TAG, "Face enrolled successfully, ID: %d", *out_id);
     } else {
         auto rec_results = face_recognizer->recognize(img, detect_results);
         if (!rec_results.empty() && rec_results[0].similarity > 0.70f) {
@@ -130,4 +142,12 @@ extern "C" esp_err_t face_recognition_process(const uint8_t *jpeg_data, size_t l
 extern "C" esp_err_t face_recognition_enroll(const uint8_t *jpeg_data, size_t len, int *new_id)
 {
     return process_image_internal(jpeg_data, len, true, nullptr, new_id);
+}
+
+extern "C" esp_err_t face_recognition_delete(uint16_t id)
+{
+    if (!face_recognizer) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return face_recognizer->delete_feat(id);
 }
