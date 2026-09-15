@@ -140,7 +140,7 @@ static void connect_task(void *arg)
         lv_timer_set_repeat_count(t, 1);
     } else {
         lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_RED), 0);
-        lv_label_set_text(s_pass_status_label, "اتصال ناموفق - رمز یا شبکه را بررسی کنید");
+        lv_label_set_text(s_pass_status_label, "Failed to connect. wrong password or network problem");
     }
     lv_obj_clear_flag(s_pass_keyboard, LV_OBJ_FLAG_HIDDEN);
     lcd_driver_lvgl_unlock();

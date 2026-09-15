@@ -4,17 +4,17 @@
 #include "lvgl.h"
 #include "lcd_driver.h"
 #include "wifi_manager.h"
+#include "wifi_setup_screen.h"
 #include "app_state.h"
 #include "keypad_screen.h"
 #include "esp_log.h"
 #include "mqtt_manager.h"
-#include "wifi_setup_screen.h"
 
 static const char *TAG = "ui_screens";
 
-static lv_obj_t *s_wifi_status_label;
+static lv_obj_t *s_wifi_btn;
+static lv_obj_t *s_wifi_label;
 static lv_obj_t *s_wifi_ip_label;
-static lv_obj_t *s_retry_btn;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
 static lv_obj_t *s_unlock_btn;
@@ -23,21 +23,10 @@ static lv_obj_t *s_settings_btn;
 static lv_obj_t *s_sensor_label;
 static lv_obj_t *s_qr_code;
 
+// بعد از یک هولد روی دکمه‌ی WiFi، LVGL معمولاً یک CLICKED اضافه هم موقع
+// رهاکردن انگشت می‌فرستد - این فلگ از اجرای اشتباه منطق تپ جلوگیری می‌کند.
+static bool s_wifi_long_press_handled = false;
 
-static const char *wifi_state_to_display_text(wifi_state_t state)
-{
-    switch (state) {
-        case WIFI_STATE_OFFLINE:    return "WiFi: Offline";
-        case WIFI_STATE_CONNECTING: return "WiFi: Connecting...";
-        case WIFI_STATE_CONNECTED:  return "WiFi: Connected";
-        default:                    return "WiFi: Unknown";
-    }
-}
-
-static void retry_btn_event_cb(lv_event_t *e)
-{
-    wifi_manager_enable();
-}
 
 static void light_btn_event_cb(lv_event_t *e)
 {
@@ -57,7 +46,10 @@ static void on_keypad_result(keypad_purpose_t purpose, bool success)
         }
     } else { // KEYPAD_PURPOSE_SETTINGS
         if (success) {
-            wifi_setup_screen_show();   // ⚠️ موقت - در گام ۴ به هولد دکمه‌ی WiFi منتقل می‌شود
+            // TODO(بخش ۲.۵ - صفحه‌ی تنظیمات): وقتی صفحه‌ی تنظیمات ساخته شد،
+            // اینجا باید آن صفحه نمایش داده شود. تنظیمات وای‌فای دیگر از این
+            // مسیر نیست - با هولد روی دکمه‌ی WiFi باز می‌شود.
+            ESP_LOGI(TAG, "Settings code correct - settings screen not implemented yet");
         } else {
             ESP_LOGW(TAG, "Settings code incorrect - ACCESS DENIED");
         }
@@ -74,38 +66,58 @@ static void settings_btn_event_cb(lv_event_t *e)
     keypad_screen_show(KEYPAD_PURPOSE_SETTINGS, on_keypad_result);
 }
 
+static void wifi_btn_click_cb(lv_event_t *e)
+{
+    if (s_wifi_long_press_handled) {
+        s_wifi_long_press_handled = false;
+        return;
+    }
+
+    wifi_state_t state = wifi_get_state();
+    if (state == WIFI_STATE_CONNECTED) {
+        wifi_manager_disable();
+    } else if (state == WIFI_STATE_OFFLINE) {
+        wifi_manager_enable();
+    }
+    // در حالت CONNECTING تپ نادیده گرفته می‌شود - یک تلاش از قبل در جریان است
+}
+
+static void wifi_btn_hold_cb(lv_event_t *e)
+{
+    s_wifi_long_press_handled = true;
+    wifi_setup_screen_show();
+}
+
 void ui_screens_init(void)
 {
     lv_obj_t *scr = lv_screen_active();
 
-    s_wifi_status_label = lv_label_create(scr);
-    lv_label_set_text(s_wifi_status_label, "WiFi: Offline");
-    lv_obj_align(s_wifi_status_label, LV_ALIGN_TOP_MID, 0, 10);
-    
+    s_wifi_btn = lv_button_create(scr);
+    lv_obj_set_size(s_wifi_btn, 130, 45);
+    lv_obj_align(s_wifi_btn, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_set_style_bg_color(s_wifi_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(s_wifi_btn, wifi_btn_click_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_wifi_btn, wifi_btn_hold_cb, LV_EVENT_LONG_PRESSED, NULL);
+
+    s_wifi_label = lv_label_create(s_wifi_btn);
+    lv_label_set_text(s_wifi_label, LV_SYMBOL_WIFI " WiFi");
+    lv_obj_center(s_wifi_label);
+
     s_wifi_ip_label = lv_label_create(scr);
-    lv_label_set_text(s_wifi_ip_label,"");
-    lv_obj_align(s_wifi_ip_label, LV_ALIGN_TOP_MID, 0, 30);
+    lv_label_set_text(s_wifi_ip_label, "");
+    lv_obj_align(s_wifi_ip_label, LV_ALIGN_TOP_MID, 0, 62);
 
-
-    s_retry_btn = lv_button_create(scr);
-    lv_obj_set_size(s_retry_btn, 120, 50);
-    lv_obj_align(s_retry_btn, LV_ALIGN_TOP_MID, 0, 65);
-    lv_obj_add_event_cb(s_retry_btn, retry_btn_event_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *retry_label = lv_label_create(s_retry_btn);
-    lv_label_set_text(retry_label, "Retry");
-    lv_obj_center(retry_label);
-
+    // دکمه‌ی چراغ - جابه‌جا شد به سمت چپ مرکز تا جا برای Unlock باز شود
     s_light_btn = lv_button_create(scr);
     lv_obj_set_size(s_light_btn, 140, 70);
     lv_obj_align(s_light_btn, LV_ALIGN_CENTER, -80, 0);
-    lv_obj_set_style_bg_color(s_light_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_light_btn, light_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     s_light_label = lv_label_create(s_light_btn);
     lv_label_set_text(s_light_label, "Light: OFF");
     lv_obj_center(s_light_label);
 
+    // دکمه‌ی Unlock - کنار دکمه‌ی چراغ
     s_unlock_btn = lv_button_create(scr);
     lv_obj_set_size(s_unlock_btn, 140, 70);
     lv_obj_align(s_unlock_btn, LV_ALIGN_CENTER, 80, 0);
@@ -142,10 +154,24 @@ void ui_screens_init(void)
 
 void ui_update_wifi_status(wifi_state_t state)
 {
-    if (s_wifi_status_label == NULL) {
+    if (s_wifi_btn == NULL || s_wifi_label == NULL) {
         return;
     }
-    lv_label_set_text(s_wifi_status_label, wifi_state_to_display_text(state));
+
+    lv_color_t color;
+    switch (state) {
+        case WIFI_STATE_CONNECTED:
+            color = lv_palette_main(LV_PALETTE_BLUE);
+            break;
+        case WIFI_STATE_CONNECTING:
+            color = lv_palette_main(LV_PALETTE_ORANGE);
+            break;
+        case WIFI_STATE_OFFLINE:
+        default:
+            color = lv_palette_main(LV_PALETTE_GREY);
+            break;
+    }
+    lv_obj_set_style_bg_color(s_wifi_btn, color, 0);
 }
 
 void ui_update_wifi_ip(const char *ip_str)
@@ -162,11 +188,9 @@ void ui_update_wifi_ip(const char *ip_str)
 
 void ui_update_light_status(bool on)
 {
-    if (s_light_label == NULL || s_light_btn == NULL) {
+    if (s_light_label == NULL) {
         return;
     }
-    lv_obj_set_style_bg_color(s_light_btn,
-        on ? lv_palette_main(LV_PALETTE_ORANGE) : lv_palette_main(LV_PALETTE_GREY), 0);
     lv_label_set_text(s_light_label, on ? "Light: ON" : "Light: OFF");
 }
 
