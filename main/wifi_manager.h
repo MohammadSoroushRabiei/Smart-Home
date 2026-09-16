@@ -82,3 +82,9 @@ esp_err_t wifi_manager_connect_and_save(const char *ssid, const char *password);
  *        اگر متصل نباشد، رشته‌ی خالی برمی‌گرداند.
  */
 const char *wifi_get_ip_str(void);
+
+/**
+ * @brief دریافت SSID شبکه‌ای که هم‌اکنون به آن متصلیم.
+ *        فقط زمانی معتبر است که wifi_is_connected() برابر true باشد.
+ */
+const char *wifi_get_connected_ssid(void);

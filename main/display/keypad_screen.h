@@ -36,6 +36,15 @@ void keypad_screen_show(keypad_purpose_t purpose, keypad_result_cb_t on_result);
  */
 void keypad_screen_hide(void);
 
+/**
+ * @brief به‌روزرسانی QR کد باز کردن قفل با تشخیص چهره (فقط زمانی نشان داده
+ *        می‌شود که این overlay با KEYPAD_PURPOSE_UNLOCK باز باشد و url خالی
+ *        نباشد). باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.
+ * @param url آدرس کامل صفحه‌ی /capture (مثلاً "https://<ip>/capture")، یا
+ *            رشته‌ی خالی برای مخفی‌کردن (وقتی وای‌فای قطع است).
+ */
+void keypad_screen_update_capture_qr(const char *url);
+
 #ifdef __cplusplus
 }
 #endif

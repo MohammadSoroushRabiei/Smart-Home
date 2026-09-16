@@ -35,12 +35,9 @@ static void on_wifi_state_change(wifi_state_t state)
             const char *ip = wifi_get_ip_str();
             char url[48];
             snprintf(url, sizeof(url), "https://%s/capture", ip);
-
-            ui_update_wifi_ip(ip);
-            ui_update_capture_qr(url);
+            keypad_screen_update_capture_qr(url);
         } else {
-            ui_update_wifi_ip("");
-            ui_update_capture_qr("");
+            keypad_screen_update_capture_qr("");
         }
 
         lcd_driver_lvgl_unlock();

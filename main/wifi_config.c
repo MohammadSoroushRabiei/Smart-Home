@@ -160,6 +160,63 @@ esp_err_t wifi_config_promote(const char *ssid, const char *password)
     return ret;
 }
 
+esp_err_t wifi_config_remove(const char *ssid)
+{
+    if (ssid == NULL || ssid[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK) {
+        xSemaphoreGive(s_mutex);
+        ESP_LOGE(TAG, "Failed to open NVS for remove: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    wifi_known_network_t stored[WIFI_CONFIG_MAX_NETWORKS];
+    size_t required_size = sizeof(stored);
+    ret = nvs_get_blob(handle, NVS_KEY_NETS, stored, &required_size);
+    if (ret != ESP_OK) {
+        nvs_close(handle);
+        xSemaphoreGive(s_mutex);
+        return ret;
+    }
+
+    int idx = -1;
+    for (int i = 0; i < WIFI_CONFIG_MAX_NETWORKS; i++) {
+        if (strcmp(stored[i].ssid, ssid) == 0) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0) {
+        nvs_close(handle);
+        xSemaphoreGive(s_mutex);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    for (int i = idx; i < WIFI_CONFIG_MAX_NETWORKS - 1; i++) {
+        stored[i] = stored[i + 1];
+    }
+    memset(&stored[WIFI_CONFIG_MAX_NETWORKS - 1], 0, sizeof(stored[0]));
+
+    ret = nvs_set_blob(handle, NVS_KEY_NETS, stored, sizeof(stored));
+    if (ret == ESP_OK) {
+        ret = nvs_commit(handle);
+    }
+    nvs_close(handle);
+
+    xSemaphoreGive(s_mutex);
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Removed network '%s' from known list (stale password)", ssid);
+    }
+    return ret;
+}
+
 esp_err_t wifi_config_clear_all(void)
 {
     xSemaphoreTake(s_mutex, portMAX_DELAY);

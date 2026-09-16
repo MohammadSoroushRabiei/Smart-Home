@@ -13,5 +13,3 @@ void ui_update_lock_status(bool unlocked);
  */
 void ui_update_light_status(bool on);
 void ui_update_sensor_status(float temp, float hum, float pressure);
-void ui_update_wifi_ip(const char *ip_str);
-void ui_update_capture_qr(const char *url);

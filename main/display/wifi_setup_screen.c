@@ -1,5 +1,6 @@
 #include "wifi_setup_screen.h"
 #include "wifi_manager.h"
+#include "wifi_config.h"
 #include "lcd_driver.h"
 
 #include <stdio.h>
@@ -20,7 +21,7 @@ static lv_obj_t *s_overlay;
 static lv_obj_t *s_list_view;
 static lv_obj_t *s_list_back_btn;
 static lv_obj_t *s_list_title;
-static lv_obj_t *s_list_status_label;   // "در حال اسکن..." / "شبکه‌ای پیدا نشد"
+static lv_obj_t *s_list_status_label;   // "Scanning..." / "No networks found" / نتیجه‌ی اتصال
 static lv_obj_t *s_list;
 static lv_obj_t *s_rescan_btn;
 
@@ -29,17 +30,174 @@ static lv_obj_t *s_pass_view;
 static lv_obj_t *s_pass_back_btn;
 static lv_obj_t *s_pass_title;
 static lv_obj_t *s_pass_textarea;
+static lv_obj_t *s_pass_eye_btn;
+static bool s_pass_visible = false;
 static lv_obj_t *s_pass_status_label;
 static lv_obj_t *s_pass_keyboard;
 
 static wifi_scan_result_t s_scan_results[WIFI_SETUP_SCAN_MAX];
+static bool s_scan_is_known[WIFI_SETUP_SCAN_MAX];
+static char s_scan_known_password[WIFI_SETUP_SCAN_MAX][65];
 static int s_scan_count = 0;
 static char s_selected_ssid[33];
+
+// بعد از یک هولد روی یک آیتم لیست، LVGL معمولاً یک CLICKED اضافه هم موقع
+// رهاکردن انگشت می‌فرستد - این فلگ از اجرای اشتباه منطق تپ جلوگیری می‌کند.
+static bool s_list_long_press_handled = false;
+
+// --- منوی Forget/Connect/Cancel برای شبکه‌های شناخته‌شده ---
+static lv_obj_t *s_ssid_action_msgbox = NULL;
+static char s_context_ssid[33];
+static char s_context_password[65];
+
+typedef enum {
+    SSID_ACTION_CONNECT,
+    SSID_ACTION_FORGET,
+    SSID_ACTION_CANCEL,
+} ssid_action_t;
+
+typedef enum {
+    CONNECT_SOURCE_OPEN,        // شبکه‌ی بدون رمز
+    CONNECT_SOURCE_AUTO_KNOWN,  // تلاش خودکار با رمز از قبل ذخیره‌شده
+    CONNECT_SOURCE_MANUAL,      // رمز تازه از صفحه‌ی کیبورد وارد شده
+} connect_source_t;
+
+typedef struct {
+    char ssid[33];
+    char password[65];
+    connect_source_t source;
+} connect_task_arg_t;
 
 static void show_list_view(void);
 static void show_password_view(const char *ssid);
 static void start_scan(void);
+static void populate_list(void);
 static void ssid_btn_event_cb(lv_event_t *e);
+static void ssid_btn_long_press_cb(lv_event_t *e);
+static void start_connect(const char *ssid, const char *password, connect_source_t source);
+
+// ---------------------------------------------------------------------
+// ساخت یک آیتم لیست برای یک نتیجه‌ی اسکن (با ایندکس idx در s_scan_results)
+// ---------------------------------------------------------------------
+static void ssid_action_btn_cb(lv_event_t *e)
+{
+    ssid_action_t action = (ssid_action_t)(uintptr_t)lv_event_get_user_data(e);
+
+    switch (action) {
+        case SSID_ACTION_CONNECT:
+            lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+            lv_label_set_text(s_list_status_label, "Connecting...");
+            start_connect(s_context_ssid, s_context_password, CONNECT_SOURCE_AUTO_KNOWN);
+            break;
+
+        case SSID_ACTION_FORGET:
+            wifi_config_remove(s_context_ssid);
+            for (int i = 0; i < s_scan_count; i++) {
+                if (strcmp(s_scan_results[i].ssid, s_context_ssid) == 0) {
+                    s_scan_is_known[i] = false;
+                    break;
+                }
+            }
+            populate_list();
+            break;
+
+        case SSID_ACTION_CANCEL:
+        default:
+            break;
+    }
+
+    if (s_ssid_action_msgbox != NULL) {
+        lv_msgbox_close(s_ssid_action_msgbox);
+        s_ssid_action_msgbox = NULL;
+    }
+}
+
+static void ssid_btn_long_press_cb(lv_event_t *e)
+{
+    // این فلگ را همیشه ست کن، حتی اگر شبکه شناخته‌شده نبود - تا CLICKED
+    // اضافه‌ای که بعد از رهاکردن انگشت می‌آید نادیده گرفته شود.
+    s_list_long_press_handled = true;
+
+    int idx = (int)(uintptr_t)lv_event_get_user_data(e);
+    if (idx < 0 || idx >= s_scan_count || !s_scan_is_known[idx]) {
+        return;   // فقط برای شبکه‌های از قبل ذخیره‌شده منو نشان بده
+    }
+
+    strncpy(s_context_ssid, s_scan_results[idx].ssid, sizeof(s_context_ssid) - 1);
+    s_context_ssid[sizeof(s_context_ssid) - 1] = '\0';
+    strncpy(s_context_password, s_scan_known_password[idx], sizeof(s_context_password) - 1);
+    s_context_password[sizeof(s_context_password) - 1] = '\0';
+
+    s_ssid_action_msgbox = lv_msgbox_create(NULL);
+    lv_msgbox_add_title(s_ssid_action_msgbox, s_context_ssid);
+    lv_msgbox_add_text(s_ssid_action_msgbox, "This network is already saved.");
+
+    lv_obj_t *btn_connect = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Connect");
+    lv_obj_add_event_cb(btn_connect, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_CONNECT);
+
+    lv_obj_t *btn_forget = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Forget");
+    lv_obj_add_event_cb(btn_forget, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_FORGET);
+
+    lv_obj_t *btn_cancel = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Cancel");
+    lv_obj_add_event_cb(btn_cancel, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_CANCEL);
+}
+
+static void add_list_item(int idx, bool highlight_connected)
+{
+    char buf[48];
+    const char *lock_mark = (s_scan_results[idx].authmode == WIFI_AUTH_OPEN) ? "" : LV_SYMBOL_SETTINGS " ";
+    snprintf(buf, sizeof(buf), "%s%s (%d dBm)", lock_mark, s_scan_results[idx].ssid, s_scan_results[idx].rssi);
+
+    lv_obj_t *btn = lv_list_add_button(s_list, LV_SYMBOL_WIFI, buf);
+    lv_obj_add_event_cb(btn, ssid_btn_event_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)idx);
+    lv_obj_add_event_cb(btn, ssid_btn_long_press_cb, LV_EVENT_LONG_PRESSED, (void *)(uintptr_t)idx);
+
+    if (highlight_connected) {
+        lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_BLUE), 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    }
+}
+
+// ---------------------------------------------------------------------
+// بازسازی کامل لیست از روی s_scan_results فعلی (بدون نیاز به اسکن مجدد) -
+// شبکه‌ای که هم‌اکنون به آن وصلیم (در صورت وجود بین نتایج) آبی و در ابتدای
+// لیست نشان داده می‌شود.
+// ---------------------------------------------------------------------
+static void populate_list(void)
+{
+    lv_obj_clean(s_list);
+
+    if (s_scan_count == 0) {
+        lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+        lv_label_set_text(s_list_status_label, "No networks found");
+        return;
+    }
+
+    bool is_connected = wifi_is_connected();
+    const char *connected_ssid = wifi_get_connected_ssid();
+
+    int connected_idx = -1;
+    if (is_connected) {
+        for (int i = 0; i < s_scan_count; i++) {
+            if (strcmp(s_scan_results[i].ssid, connected_ssid) == 0) {
+                connected_idx = i;
+                break;
+            }
+        }
+    }
+
+    if (connected_idx >= 0) {
+        add_list_item(connected_idx, true);
+    }
+    for (int i = 0; i < s_scan_count; i++) {
+        if (i == connected_idx) {
+            continue;
+        }
+        add_list_item(i, false);
+    }
+}
 
 // ---------------------------------------------------------------------
 // تسک پس‌زمینه‌ی اسکن - چون wifi_manager_scan بلاک‌کننده است، هرگز از
@@ -49,54 +207,34 @@ static void scan_task(void *arg)
 {
     int n = wifi_manager_scan(s_scan_results, WIFI_SETUP_SCAN_MAX);
 
-    lcd_driver_lvgl_lock();
-    s_scan_count = n;
+    wifi_known_network_t known[WIFI_CONFIG_MAX_NETWORKS];
+    int known_count = wifi_config_get_all(known, WIFI_CONFIG_MAX_NETWORKS);
 
-    lv_obj_clean(s_list);
-    if (n == 0) {
-        lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(s_list_status_label, "No Network");
-    } else {
-        lv_obj_add_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
-        for (int i = 0; i < n; i++) {
-            char buf[48];
-            const char *lock_mark = (s_scan_results[i].authmode == WIFI_AUTH_OPEN) ? "" : LV_SYMBOL_SETTINGS " ";
-            snprintf(buf, sizeof(buf), "%s%s (%d dBm)", lock_mark, s_scan_results[i].ssid, s_scan_results[i].rssi);
-
-            lv_obj_t *btn = lv_list_add_button(s_list, LV_SYMBOL_WIFI, buf);
-            lv_obj_add_event_cb(btn, ssid_btn_event_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+    for (int i = 0; i < n; i++) {
+        s_scan_is_known[i] = false;
+        for (int k = 0; k < known_count; k++) {
+            if (strcmp(s_scan_results[i].ssid, known[k].ssid) == 0) {
+                s_scan_is_known[i] = true;
+                strncpy(s_scan_known_password[i], known[k].password, sizeof(s_scan_known_password[i]) - 1);
+                s_scan_known_password[i][sizeof(s_scan_known_password[i]) - 1] = '\0';
+                break;
+            }
         }
     }
 
+    lcd_driver_lvgl_lock();
+    s_scan_count = n;
+    populate_list();
     lcd_driver_lvgl_unlock();
     vTaskDelete(NULL);
-}
-
-static void ssid_btn_event_cb(lv_event_t *e)
-{
-    int idx = (int)(uintptr_t)lv_event_get_user_data(e);
-    if (idx < 0 || idx >= s_scan_count) {
-        return;
-    }
-
-    if (s_scan_results[idx].authmode == WIFI_AUTH_OPEN) {
-        // شبکه‌ی باز - نیازی به رمز نیست، مستقیم تلاش برای اتصال
-        strncpy(s_selected_ssid, s_scan_results[idx].ssid, sizeof(s_selected_ssid) - 1);
-        show_password_view(s_selected_ssid);
-        lv_textarea_set_text(s_pass_textarea, "");
-        // مستقیم submit کن چون رمزی لازم نیست
-        lv_obj_send_event(s_pass_keyboard, LV_EVENT_READY, NULL);
-    } else {
-        strncpy(s_selected_ssid, s_scan_results[idx].ssid, sizeof(s_selected_ssid) - 1);
-        show_password_view(s_selected_ssid);
-    }
 }
 
 static void start_scan(void)
 {
     lv_obj_clean(s_list);
     lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(s_list_status_label, "Scanning ...");
+    lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+    lv_label_set_text(s_list_status_label, "Scanning networks...");
 
     xTaskCreate(scan_task, "wifi_scan_task", 4096, NULL, 3, NULL);
 }
@@ -116,37 +254,104 @@ static void list_back_btn_event_cb(lv_event_t *e)
 // تسک پس‌زمینه‌ی اتصال - چون wifi_manager_connect_and_save بلاک‌کننده
 // است (تا ۱۵ ثانیه)، هرگز از تسک LVGL صدا زده نمی‌شود.
 // ---------------------------------------------------------------------
-typedef struct {
-    char ssid[33];
-    char password[65];
-} connect_task_arg_t;
-
-static void hide_screen_timer_cb(lv_timer_t *t)
-{
-    wifi_setup_screen_hide();
-}
-
 static void connect_task(void *arg)
 {
     connect_task_arg_t *a = (connect_task_arg_t *)arg;
     esp_err_t ret = wifi_manager_connect_and_save(a->ssid, a->password);
 
     lcd_driver_lvgl_lock();
+
     if (ret == ESP_OK) {
-        lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_GREEN), 0);
-        lv_label_set_text(s_pass_status_label, "Connected!");
-        // یه تایمر کوتاه برای بستن خودکار صفحه بعد از موفقیت
-        lv_timer_t *t = lv_timer_create(hide_screen_timer_cb, 1000, NULL);
-        lv_timer_set_repeat_count(t, 1);
+        // ⚠️ طبق درخواست: بعد از اتصال موفق، از صفحه‌ی تنظیمات خارج نمی‌شویم -
+        // فقط به لیست برمی‌گردیم و هایلایت آبی/بالای‌لیست را به‌روز می‌کنیم.
+        show_list_view();
+        populate_list();
+        lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(s_list_status_label, lv_palette_main(LV_PALETTE_GREEN), 0);
+        char msg[48];
+        snprintf(msg, sizeof(msg), "Connected to %s", a->ssid);
+        lv_label_set_text(s_list_status_label, msg);
     } else {
-        lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_RED), 0);
-        lv_label_set_text(s_pass_status_label, "Failed to connect. wrong password or network problem");
+        switch (a->source) {
+            case CONNECT_SOURCE_AUTO_KNOWN:
+                // رمز ذخیره‌شده دیگر معتبر نیست (مثلاً کاربر رمز روتر را عوض کرده) -
+                // از NVS حذفش کن و دوباره از کاربر رمز تازه بخواه.
+                wifi_config_remove(a->ssid);
+                for (int i = 0; i < s_scan_count; i++) {
+                    if (strcmp(s_scan_results[i].ssid, a->ssid) == 0) {
+                        s_scan_is_known[i] = false;
+                        break;
+                    }
+                }
+                show_password_view(a->ssid);
+                lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_RED), 0);
+                lv_label_set_text(s_pass_status_label, "Old password no longer valid - enter new password");
+                break;
+
+            case CONNECT_SOURCE_MANUAL:
+                // در همون صفحه‌ی کیبورد بمون، اجازه بده کاربر دوباره امتحان کند
+                lv_obj_clear_flag(s_pass_keyboard, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_RED), 0);
+                lv_label_set_text(s_pass_status_label, "Connection failed - check password");
+                break;
+
+            case CONNECT_SOURCE_OPEN:
+            default:
+                show_list_view();
+                lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_style_text_color(s_list_status_label, lv_palette_main(LV_PALETTE_RED), 0);
+                lv_label_set_text(s_list_status_label, "Connection failed");
+                break;
+        }
     }
-    lv_obj_clear_flag(s_pass_keyboard, LV_OBJ_FLAG_HIDDEN);
+
     lcd_driver_lvgl_unlock();
 
     free(a);
     vTaskDelete(NULL);
+}
+
+static void start_connect(const char *ssid, const char *password, connect_source_t source)
+{
+    connect_task_arg_t *arg = malloc(sizeof(connect_task_arg_t));
+    if (arg == NULL) {
+        return;
+    }
+    strncpy(arg->ssid, ssid, sizeof(arg->ssid) - 1);
+    arg->ssid[sizeof(arg->ssid) - 1] = '\0';
+    strncpy(arg->password, password, sizeof(arg->password) - 1);
+    arg->password[sizeof(arg->password) - 1] = '\0';
+    arg->source = source;
+
+    xTaskCreate(connect_task, "wifi_connect_task", 4096, arg, 3, NULL);
+}
+
+static void ssid_btn_event_cb(lv_event_t *e)
+{
+    if (s_list_long_press_handled) {
+        s_list_long_press_handled = false;
+        return;
+    }
+
+    int idx = (int)(uintptr_t)lv_event_get_user_data(e);
+    if (idx < 0 || idx >= s_scan_count) {
+        return;
+    }
+
+    strncpy(s_selected_ssid, s_scan_results[idx].ssid, sizeof(s_selected_ssid) - 1);
+    s_selected_ssid[sizeof(s_selected_ssid) - 1] = '\0';
+
+    if (s_scan_results[idx].authmode == WIFI_AUTH_OPEN) {
+        start_connect(s_selected_ssid, "", CONNECT_SOURCE_OPEN);
+    } else if (s_scan_is_known[idx]) {
+        // این شبکه قبلاً وصل شده - با رمز ذخیره‌شده، بدون نمایش صفحه‌ی کیبورد، مستقیم تلاش کن
+        lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+        lv_label_set_text(s_list_status_label, "Connecting...");
+        start_connect(s_selected_ssid, s_scan_known_password[idx], CONNECT_SOURCE_AUTO_KNOWN);
+    } else {
+        show_password_view(s_selected_ssid);
+    }
 }
 
 static void keyboard_event_cb(lv_event_t *e)
@@ -157,21 +362,19 @@ static void keyboard_event_cb(lv_event_t *e)
     }
 
     const char *password = lv_textarea_get_text(s_pass_textarea);
-
-    connect_task_arg_t *arg = malloc(sizeof(connect_task_arg_t));
-    if (arg == NULL) {
-        return;
-    }
-    strncpy(arg->ssid, s_selected_ssid, sizeof(arg->ssid) - 1);
-    arg->ssid[sizeof(arg->ssid) - 1] = '\0';
-    strncpy(arg->password, password, sizeof(arg->password) - 1);
-    arg->password[sizeof(arg->password) - 1] = '\0';
+    start_connect(s_selected_ssid, password, CONNECT_SOURCE_MANUAL);
 
     lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_GREY), 0);
-    lv_label_set_text(s_pass_status_label, "Connecting ...");
+    lv_label_set_text(s_pass_status_label, "Connecting...");
     lv_obj_add_flag(s_pass_keyboard, LV_OBJ_FLAG_HIDDEN);   // تا پایان تلاش، اجازه‌ی ورود دوباره نده
+}
 
-    xTaskCreate(connect_task, "wifi_connect_task", 4096, arg, 3, NULL);
+static void pass_eye_btn_event_cb(lv_event_t *e)
+{
+    s_pass_visible = !s_pass_visible;
+    lv_textarea_set_password_mode(s_pass_textarea, !s_pass_visible);
+    lv_obj_t *icon = lv_obj_get_child(s_pass_eye_btn, 0);
+    lv_label_set_text(icon, s_pass_visible ? LV_SYMBOL_EYE_CLOSE : LV_SYMBOL_EYE_OPEN);
 }
 
 static void pass_back_btn_event_cb(lv_event_t *e)
@@ -192,11 +395,16 @@ static void show_password_view(const char *ssid)
     lv_obj_clear_flag(s_pass_keyboard, LV_OBJ_FLAG_HIDDEN);
 
     char title[48];
-    snprintf(title, sizeof(title), "password of %s", ssid);
+    snprintf(title, sizeof(title), "Password for %s", ssid);
     lv_label_set_text(s_pass_title, title);
 
     lv_textarea_set_text(s_pass_textarea, "");
     lv_label_set_text(s_pass_status_label, "");
+
+    // هر بار که صفحه‌ی رمز از نو باز می‌شود، رمز مخفی شروع شود
+    s_pass_visible = false;
+    lv_textarea_set_password_mode(s_pass_textarea, true);
+    lv_label_set_text(lv_obj_get_child(s_pass_eye_btn, 0), LV_SYMBOL_EYE_OPEN);
 }
 
 void wifi_setup_screen_init(void)
@@ -235,7 +443,7 @@ void wifi_setup_screen_init(void)
 
     s_list_title = lv_label_create(s_list_view);
     lv_obj_set_style_text_color(s_list_title, lv_color_white(), 0);
-    lv_label_set_text(s_list_title, "select wifi network");
+    lv_label_set_text(s_list_title, "Select WiFi Network");
     lv_obj_align(s_list_title, LV_ALIGN_TOP_MID, 0, 15);
 
     s_list_status_label = lv_label_create(s_list_view);
@@ -266,15 +474,23 @@ void wifi_setup_screen_init(void)
 
     s_pass_title = lv_label_create(s_pass_view);
     lv_obj_set_style_text_color(s_pass_title, lv_color_white(), 0);
-    lv_label_set_text(s_pass_title, "network password");
+    lv_label_set_text(s_pass_title, "Network Password");
     lv_obj_align(s_pass_title, LV_ALIGN_TOP_MID, 0, 15);
 
     s_pass_textarea = lv_textarea_create(s_pass_view);
     lv_textarea_set_password_mode(s_pass_textarea, true);
     lv_textarea_set_one_line(s_pass_textarea, true);
     lv_textarea_set_max_length(s_pass_textarea, 64);
-    lv_obj_set_width(s_pass_textarea, LV_PCT(85));
-    lv_obj_align(s_pass_textarea, LV_ALIGN_TOP_MID, 0, 55);
+    lv_obj_set_width(s_pass_textarea, 200);
+    lv_obj_align(s_pass_textarea, LV_ALIGN_TOP_MID, -22, 55);
+
+    s_pass_eye_btn = lv_button_create(s_pass_view);
+    lv_obj_set_size(s_pass_eye_btn, 40, 40);
+    lv_obj_align_to(s_pass_eye_btn, s_pass_textarea, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
+    lv_obj_add_event_cb(s_pass_eye_btn, pass_eye_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *eye_icon = lv_label_create(s_pass_eye_btn);
+    lv_label_set_text(eye_icon, LV_SYMBOL_EYE_OPEN);
+    lv_obj_center(eye_icon);
 
     s_pass_status_label = lv_label_create(s_pass_view);
     lv_obj_set_width(s_pass_status_label, LV_PCT(90));
@@ -287,6 +503,11 @@ void wifi_setup_screen_init(void)
     lv_obj_set_size(s_pass_keyboard, LV_PCT(100), 240);
     lv_obj_align(s_pass_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_event_cb(s_pass_keyboard, keyboard_event_cb, LV_EVENT_READY, NULL);
+    // ⚠️ بدون این خط، نگه‌داشتن انگشت روی یک کلید (حتی کمی بیشتر از حد معمول،
+    // که با توجه به وضعیت فعلی باس I2C تاچ محتمله) باعث ثبت مکرر همون کاراکتر
+    // می‌شود - همون رفتار پیش‌فرض LVGL برای کلید Backspace که این‌جا برای
+    // همه‌ی کلیدها غیرفعالش می‌کنیم.
+    lv_buttonmatrix_set_button_ctrl_all(s_pass_keyboard, LV_BUTTONMATRIX_CTRL_NO_REPEAT);
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 

@@ -44,6 +44,12 @@ esp_err_t wifi_config_promote(const char *ssid, const char *password);
  */
 esp_err_t wifi_config_clear_all(void);
 
+/**
+ * @brief حذف یک شبکه‌ی مشخص از لیست شناخته‌شده (مثلاً وقتی رمز ذخیره‌شده دیگر
+ *        معتبر نیست). اگر SSID در لیست نباشد، ESP_ERR_NOT_FOUND برمی‌گرداند.
+ */
+esp_err_t wifi_config_remove(const char *ssid);
+
 #ifdef __cplusplus
 }
 #endif

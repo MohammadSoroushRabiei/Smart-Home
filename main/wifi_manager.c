@@ -26,6 +26,7 @@ static wifi_state_t wifi_state = WIFI_STATE_OFFLINE;
 static wifi_state_change_cb_t s_state_change_cb = NULL;
 
 static char s_ip_str[16] = "";   // "255.255.255.255" حداکثر ۱۵ کاراکتر + نال
+static char s_connected_ssid[33] = "";
 
 static bool s_radio_started = false;
 static bool s_user_disabled = false;
@@ -63,6 +64,11 @@ wifi_state_t wifi_get_state(void)
 const char *wifi_get_ip_str(void)
 {
     return s_ip_str;
+}
+
+const char *wifi_get_connected_ssid(void)
+{
+    return s_connected_ssid;
 }
 
 void wifi_register_state_change_cb(wifi_state_change_cb_t cb)
@@ -167,6 +173,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
 
         if (s_manual_mode) {
+            strncpy(s_connected_ssid, s_manual_ssid, sizeof(s_connected_ssid) - 1);
             s_manual_connect_success = true;
             wifi_set_state(WIFI_STATE_CONNECTED);
             xSemaphoreGive(s_manual_connect_sem);
@@ -174,6 +181,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
             // اتصال از طریق لیست MRU موفق شد - این شبکه را (دوباره) بالای لیست ببر
             // تا اگر از ایندکس ۱ یا ۲ وصل شده باشیم، رتبه‌اش به‌روز شود.
             if (s_trying_index < s_try_count) {
+                strncpy(s_connected_ssid, s_try_list[s_trying_index].ssid, sizeof(s_connected_ssid) - 1);
                 wifi_config_promote(s_try_list[s_trying_index].ssid, s_try_list[s_trying_index].password);
             }
             wifi_set_state(WIFI_STATE_CONNECTED);
