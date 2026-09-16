@@ -51,11 +51,24 @@ void wifi_register_state_change_cb(wifi_state_change_cb_t cb);
 void wifi_manager_enable(void);
 
 /**
+ * @brief دقیقاً مثل wifi_manager_enable، با این تفاوت که حتی اگر همین الان به
+ *        یک شبکه وصل باشیم هم اجرا می‌شود (آن اتصال را قطع کرده و از ابتدای
+ *        لیست شناخته‌شده تلاش می‌کند). برای سناریوی «کاربر شبکه‌ای را که هم‌اکنون
+ *        به آن وصلیم فراموش کرد» استفاده می‌شود.
+ */
+void wifi_manager_reconnect_from_list(void);
+
+/**
  * @brief قطع دستی توسط کاربر: قطع اتصال فعلی (اگر بود) و خاموش کردن کامل
  *        رادیو. هیچ تلاش خودکاری تا فراخوانی بعدی wifi_manager_enable
  *        انجام نمی‌شود.
  */
 void wifi_manager_disable(void);
+
+/**
+@brief قطع اتصال فعلی بدون خاموش کردن رادیو (برای استفاده در منوی Disconnect).
+*/
+void wifi_manager_disconnect(void);
 
 /**
  * @brief اسکن شبکه‌های اطراف.

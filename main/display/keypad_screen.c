@@ -165,30 +165,16 @@ void keypad_screen_init(void)
     s_title_label = lv_label_create(s_overlay);
     lv_obj_set_style_text_color(s_title_label, lv_color_white(), 0);
     lv_label_set_text(s_title_label, "Enter Code");
-    lv_obj_align(s_title_label, LV_ALIGN_TOP_MID, 0, 15);
+    lv_obj_align(s_title_label, LV_ALIGN_TOP_MID, 0, 12);
 
-    // ===== QR کد باز کردن قفل با چهره - فقط برای KEYPAD_PURPOSE_UNLOCK =====
-    s_qr_code = lv_qrcode_create(s_overlay);
-    lv_qrcode_set_size(s_qr_code, 80);
-    lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
-    lv_qrcode_set_light_color(s_qr_code, lv_color_white());
-    lv_obj_align(s_qr_code, LV_ALIGN_TOP_MID, 0, 45);
-    lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
-
-    s_qr_label = lv_label_create(s_overlay);
-    lv_obj_set_style_text_color(s_qr_label, lv_color_white(), 0);
-    lv_obj_set_style_text_align(s_qr_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(s_qr_label, "Scan to open with your face");
-    lv_obj_align_to(s_qr_label, s_qr_code, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
-    lv_obj_add_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
-
+    // ===== تکست‌باکس رمز - بلافاصله بعد از عنوان =====
     s_textarea = lv_textarea_create(s_overlay);
     lv_obj_set_style_text_font(s_textarea, &lv_font_montserrat_28, 0);
     lv_textarea_set_password_mode(s_textarea, true);
     lv_textarea_set_one_line(s_textarea, true);
     lv_textarea_set_max_length(s_textarea, PASSWORD_MAX_LEN);
     lv_obj_set_width(s_textarea, 160);
-    lv_obj_align(s_textarea, LV_ALIGN_TOP_MID, -20, 165);
+    lv_obj_align(s_textarea, LV_ALIGN_TOP_MID, 0, 45);
     lv_obj_clear_flag(s_textarea, LV_OBJ_FLAG_CLICKABLE); // فقط نمایش؛ ورودی واقعی از button matrix می‌آید
 
     s_eye_btn = lv_button_create(s_overlay);
@@ -213,8 +199,24 @@ void keypad_screen_init(void)
     lv_obj_set_width(s_success_label, 220);        
     lv_obj_set_style_text_align(s_success_label,LV_TEXT_ALIGN_CENTER,0); 
     lv_label_set_text(s_success_label, "");
-    lv_obj_align_to(s_success_label, s_textarea,LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+    lv_obj_align_to(s_success_label, s_textarea,LV_ALIGN_OUT_BOTTOM_MID, 0, 3);
     lv_obj_add_flag(s_success_label, LV_OBJ_FLAG_HIDDEN);
+
+    // ===== QR کد باز کردن قفل با چهره - بعد از textbox، قبل از کیبورد -
+    // فقط برای KEYPAD_PURPOSE_UNLOCK نشان داده می‌شود =====
+    s_qr_code = lv_qrcode_create(s_overlay);
+    lv_qrcode_set_size(s_qr_code, 80);
+    lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
+    lv_qrcode_set_light_color(s_qr_code, lv_color_white());
+    lv_obj_align(s_qr_code, LV_ALIGN_TOP_MID, 0, 120);
+    lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+
+    s_qr_label = lv_label_create(s_overlay);
+    lv_obj_set_style_text_color(s_qr_label, lv_color_white(), 0);
+    lv_obj_set_style_text_align(s_qr_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(s_qr_label, "Scan to open with your face");
+    lv_obj_align_to(s_qr_label, s_qr_code, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+    lv_obj_add_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
 
 
     s_btnm = lv_buttonmatrix_create(s_overlay);

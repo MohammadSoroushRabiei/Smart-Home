@@ -129,8 +129,8 @@ void ui_screens_init(void)
 
     // دکمه‌ی کوچک تنظیمات - گوشه‌ی بالا-راست، دور از دسترس تصادفی
     s_settings_btn = lv_button_create(scr);
-    lv_obj_set_size(s_settings_btn, 36, 36);
-    lv_obj_align(s_settings_btn, LV_ALIGN_TOP_RIGHT, -5, 5);
+    lv_obj_set_size(s_settings_btn, 40, 40);
+    lv_obj_align(s_settings_btn, LV_ALIGN_TOP_RIGHT, -10, 10);
     lv_obj_set_style_bg_color(s_settings_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_settings_btn, settings_btn_event_cb, LV_EVENT_CLICKED, NULL);
 

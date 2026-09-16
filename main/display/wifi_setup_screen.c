@@ -53,8 +53,14 @@ static char s_context_password[65];
 typedef enum {
     SSID_ACTION_CONNECT,
     SSID_ACTION_FORGET,
+    SSID_ACTION_DISCONNECT,
     SSID_ACTION_CANCEL,
 } ssid_action_t;
+
+static bool is_already_connected_to(const char *ssid)
+{
+    return wifi_is_connected() && strcmp(wifi_get_connected_ssid(), ssid) == 0;
+}
 
 typedef enum {
     CONNECT_SOURCE_OPEN,        // شبکه‌ی بدون رمز
@@ -85,13 +91,30 @@ static void ssid_action_btn_cb(lv_event_t *e)
 
     switch (action) {
         case SSID_ACTION_CONNECT:
-            lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
-            lv_label_set_text(s_list_status_label, "Connecting...");
-            start_connect(s_context_ssid, s_context_password, CONNECT_SOURCE_AUTO_KNOWN);
+            if (is_already_connected_to(s_context_ssid)) {
+                lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+                lv_label_set_text(s_list_status_label, "Already connected");
+            } else {
+                lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+                lv_label_set_text(s_list_status_label, "Connecting...");
+                start_connect(s_context_ssid, s_context_password, CONNECT_SOURCE_AUTO_KNOWN);
+            }
             break;
 
-        case SSID_ACTION_FORGET:
+        case SSID_ACTION_DISCONNECT :
+            wifi_manager_disconnect();
+            lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+            lv_label_set_text(s_list_status_label, "Disconnected");
+            populate_list(); // به‌روزرسانی لیست برای حذف هایلایت آبی
+            break;
+
+
+        case SSID_ACTION_FORGET: {
+            bool was_connected_to_this = is_already_connected_to(s_context_ssid);
+
             wifi_config_remove(s_context_ssid);
             for (int i = 0; i < s_scan_count; i++) {
                 if (strcmp(s_scan_results[i].ssid, s_context_ssid) == 0) {
@@ -99,8 +122,16 @@ static void ssid_action_btn_cb(lv_event_t *e)
                     break;
                 }
             }
+
+            if (was_connected_to_this) {
+                // این شبکه دیگر معتبر نیست - قطعش کن و سعی کن به بهترین گزینه‌ی
+                // باقی‌مانده در لیست شناخته‌شده وصل شو
+                wifi_manager_reconnect_from_list();
+            }
+
             populate_list();
             break;
+        }
 
         case SSID_ACTION_CANCEL:
         default:
@@ -115,30 +146,57 @@ static void ssid_action_btn_cb(lv_event_t *e)
 
 static void ssid_btn_long_press_cb(lv_event_t *e)
 {
-    // این فلگ را همیشه ست کن، حتی اگر شبکه شناخته‌شده نبود - تا CLICKED
-    // اضافه‌ای که بعد از رهاکردن انگشت می‌آید نادیده گرفته شود.
     s_list_long_press_handled = true;
-
     int idx = (int)(uintptr_t)lv_event_get_user_data(e);
-    if (idx < 0 || idx >= s_scan_count || !s_scan_is_known[idx]) {
-        return;   // فقط برای شبکه‌های از قبل ذخیره‌شده منو نشان بده
+    if (idx < 0 || idx >= s_scan_count) {
+        return;
     }
 
     strncpy(s_context_ssid, s_scan_results[idx].ssid, sizeof(s_context_ssid) - 1);
     s_context_ssid[sizeof(s_context_ssid) - 1] = '\0';
-    strncpy(s_context_password, s_scan_known_password[idx], sizeof(s_context_password) - 1);
-    s_context_password[sizeof(s_context_password) - 1] = '\0';
+    
+    if (s_scan_is_known[idx]) {
+        strncpy(s_context_password, s_scan_known_password[idx], sizeof(s_context_password) - 1);
+        s_context_password[sizeof(s_context_password) - 1] = '\0';
+    } else {
+        s_context_password[0] = '\0';
+    }
+
+    bool is_connected = is_already_connected_to(s_context_ssid);
+    bool is_known = s_scan_is_known[idx];
 
     s_ssid_action_msgbox = lv_msgbox_create(NULL);
+    lv_obj_t *backdrop = lv_obj_get_parent(s_ssid_action_msgbox);
+    lv_obj_set_style_bg_color(backdrop, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(backdrop, LV_OPA_80, 0);
+
     lv_msgbox_add_title(s_ssid_action_msgbox, s_context_ssid);
-    lv_msgbox_add_text(s_ssid_action_msgbox, "This network is already saved.");
 
-    lv_obj_t *btn_connect = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Connect");
-    lv_obj_add_event_cb(btn_connect, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_CONNECT);
+    // --- منطق نمایش دکمه‌ها بر اساس وضعیت ---
+    if (is_connected) {
+        lv_msgbox_add_text(s_ssid_action_msgbox, "Currently connected to this network.");
+        
+        lv_obj_t *btn_disconnect = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Disconnect");
+        lv_obj_add_event_cb(btn_disconnect, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_DISCONNECT);
+    } else if (is_known) {
+        lv_msgbox_add_text(s_ssid_action_msgbox, "This network is saved.");
+        
+        lv_obj_t *btn_connect = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Connect");
+        lv_obj_add_event_cb(btn_connect, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_CONNECT);
+    } else {
+        lv_msgbox_add_text(s_ssid_action_msgbox, "New network.");
+        
+        lv_obj_t *btn_connect = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Connect");
+        lv_obj_add_event_cb(btn_connect, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_CONNECT);
+    }
 
-    lv_obj_t *btn_forget = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Forget");
-    lv_obj_add_event_cb(btn_forget, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_FORGET);
+    // دکمه Forget فقط اگر متصل باشیم یا شبکه ذخیره شده باشد نمایش داده می‌شود
+    if (is_connected || is_known) {
+        lv_obj_t *btn_forget = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Forget");
+        lv_obj_add_event_cb(btn_forget, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_FORGET);
+    }
 
+    // دکمه Cancel همیشه نمایش داده می‌شود
     lv_obj_t *btn_cancel = lv_msgbox_add_footer_button(s_ssid_action_msgbox, "Cancel");
     lv_obj_add_event_cb(btn_cancel, ssid_action_btn_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)SSID_ACTION_CANCEL);
 }
@@ -262,6 +320,16 @@ static void connect_task(void *arg)
     lcd_driver_lvgl_lock();
 
     if (ret == ESP_OK) {
+
+        // ✅ به‌روزرسانی آرایه‌های محلی تا بدون اسکن مجدد، شبکه "شناخته‌شده" محسوب شود
+        for (int i = 0; i < s_scan_count; i++) {
+            if (strcmp(s_scan_results[i].ssid, a->ssid) == 0) {
+                s_scan_is_known[i] = true;
+                strncpy(s_scan_known_password[i], a->password, sizeof(s_scan_known_password[i]) - 1);
+                s_scan_known_password[i][sizeof(s_scan_known_password[i]) - 1] = '\0';
+                break;
+            }
+        }
         // ⚠️ طبق درخواست: بعد از اتصال موفق، از صفحه‌ی تنظیمات خارج نمی‌شویم -
         // فقط به لیست برمی‌گردیم و هایلایت آبی/بالای‌لیست را به‌روز می‌کنیم.
         show_list_view();
@@ -285,14 +353,14 @@ static void connect_task(void *arg)
                 }
                 show_password_view(a->ssid);
                 lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_RED), 0);
-                lv_label_set_text(s_pass_status_label, "Old password no longer valid - enter new password");
+                lv_label_set_text(s_pass_status_label, "Old password no longer valid\nenter new password");
                 break;
 
             case CONNECT_SOURCE_MANUAL:
                 // در همون صفحه‌ی کیبورد بمون، اجازه بده کاربر دوباره امتحان کند
                 lv_obj_clear_flag(s_pass_keyboard, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_set_style_text_color(s_pass_status_label, lv_palette_main(LV_PALETTE_RED), 0);
-                lv_label_set_text(s_pass_status_label, "Connection failed - check password");
+                lv_label_set_text(s_pass_status_label, "Connection failed\ncheck password");
                 break;
 
             case CONNECT_SOURCE_OPEN:
@@ -340,6 +408,13 @@ static void ssid_btn_event_cb(lv_event_t *e)
 
     strncpy(s_selected_ssid, s_scan_results[idx].ssid, sizeof(s_selected_ssid) - 1);
     s_selected_ssid[sizeof(s_selected_ssid) - 1] = '\0';
+
+    if (is_already_connected_to(s_selected_ssid)) {
+        lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
+        lv_label_set_text(s_list_status_label, "Already connected");
+        return;
+    }
 
     if (s_scan_results[idx].authmode == WIFI_AUTH_OPEN) {
         start_connect(s_selected_ssid, "", CONNECT_SOURCE_OPEN);
@@ -481,8 +556,8 @@ void wifi_setup_screen_init(void)
     lv_textarea_set_password_mode(s_pass_textarea, true);
     lv_textarea_set_one_line(s_pass_textarea, true);
     lv_textarea_set_max_length(s_pass_textarea, 64);
-    lv_obj_set_width(s_pass_textarea, 200);
-    lv_obj_align(s_pass_textarea, LV_ALIGN_TOP_MID, -22, 55);
+    lv_obj_set_width(s_pass_textarea, 180);
+    lv_obj_align(s_pass_textarea, LV_ALIGN_TOP_MID, 0, 55);
 
     s_pass_eye_btn = lv_button_create(s_pass_view);
     lv_obj_set_size(s_pass_eye_btn, 40, 40);
@@ -496,7 +571,7 @@ void wifi_setup_screen_init(void)
     lv_obj_set_width(s_pass_status_label, LV_PCT(90));
     lv_obj_set_style_text_align(s_pass_status_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(s_pass_status_label, "");
-    lv_obj_align_to(s_pass_status_label, s_pass_textarea, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
+    lv_obj_align_to(s_pass_status_label, s_pass_textarea, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
     s_pass_keyboard = lv_keyboard_create(s_pass_view);
     lv_keyboard_set_textarea(s_pass_keyboard, s_pass_textarea);
@@ -525,4 +600,17 @@ void wifi_setup_screen_show(void)
 void wifi_setup_screen_hide(void)
 {
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
+}
+
+void wifi_setup_screen_notify_state_change(void)
+{
+    if (lv_obj_has_flag(s_overlay, LV_OBJ_FLAG_HIDDEN)) {
+        return;   // صفحه اصلاً باز نیست
+    }
+    if (lv_obj_has_flag(s_list_view, LV_OBJ_FLAG_HIDDEN)) {
+        return;   // کاربر روی صفحه‌ی کیبورد رمزه، دست نزن
+    }
+    // هایلایت آبی/بالای‌لیست را با وضعیت واقعی به‌روز کن - بدون نیاز به
+    // خروج و ورود دوباره به این صفحه
+    populate_list();
 }

@@ -22,6 +22,14 @@ void wifi_setup_screen_show(void);
  */
 void wifi_setup_screen_hide(void);
 
+/**
+ * @brief باید هر بار وضعیت وای‌فای تغییر می‌کند صدا زده شود (از همون callback
+ *        سراسری wifi_register_state_change_cb در main.c). اگر این صفحه هم‌اکنون
+ *        باز و روی زیرصفحه‌ی لیست است، هایلایت شبکه‌ی متصل را زنده به‌روز می‌کند -
+ *        بدون نیاز کاربر به خروج و ورود دوباره.
+ */
+void wifi_setup_screen_notify_state_change(void);
+
 #ifdef __cplusplus
 }
 #endif

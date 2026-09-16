@@ -240,6 +240,34 @@ void wifi_manager_enable(void)
     connect_to_index(0);
 }
 
+void wifi_manager_reconnect_from_list(void)
+{
+    s_user_disabled = false;
+
+    if (!s_radio_started) {
+        ESP_ERROR_CHECK(esp_wifi_start());
+        s_radio_started = true;
+    } else if (wifi_is_connected()) {
+        // برخلاف wifi_manager_enable، اینجا حتی اگر متصل باشیم هم قطع می‌کنیم -
+        // چون این تابع دقیقاً برای سناریویی است که شبکه‌ی فعلی دیگر معتبر نیست
+        // (مثلاً کاربر آن را از لیست شناخته‌شده فراموش کرده).
+        s_expect_disconnect = true;
+        esp_wifi_disconnect();
+    }
+
+    s_try_count = wifi_config_get_all(s_try_list, WIFI_CONFIG_MAX_NETWORKS);
+    s_trying_index = 0;
+
+    if (s_try_count == 0) {
+        ESP_LOGI(TAG, "No known networks left, staying offline");
+        wifi_set_state(WIFI_STATE_OFFLINE);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Reconnecting from known-networks list (%d saved)", s_try_count);
+    connect_to_index(0);
+}
+
 void wifi_manager_disable(void)
 {
     s_user_disabled = true;
@@ -254,6 +282,18 @@ void wifi_manager_disable(void)
     s_ip_str[0] = '\0';
     wifi_set_state(WIFI_STATE_OFFLINE);
     ESP_LOGI(TAG, "WiFi disabled by user");
+}
+
+void wifi_manager_disconnect(void)
+{
+    if (wifi_is_connected()) {
+        s_expect_disconnect = true;
+        esp_wifi_disconnect();
+        s_ip_str[0] = '\0';
+        s_connected_ssid[0] = '\0';
+        wifi_set_state(WIFI_STATE_OFFLINE);
+        ESP_LOGI(TAG, "WiFi disconnected by user (radio kept on for scanning)");
+    }
 }
 
 int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
