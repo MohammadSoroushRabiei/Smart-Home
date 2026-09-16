@@ -37,6 +37,14 @@ void keypad_screen_show(keypad_purpose_t purpose, keypad_result_cb_t on_result);
 void keypad_screen_hide(void);
 
 /**
+@brief اگر کیبورد با هدف KEYPAD_PURPOSE_UNLOCK باز باشد، پیام "Access Granted"
+   را نمایش داده و پس از ۱.۲ ثانیه آن را می‌بندد (برای زمانی که قفل از طریق
+   تشخیص چهره یا روش دیگری باز می‌شود).
+   باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.
+*/
+void keypad_screen_grant_access(void);
+
+/**
  * @brief به‌روزرسانی QR کد باز کردن قفل با تشخیص چهره (فقط زمانی نشان داده
  *        می‌شود که این overlay با KEYPAD_PURPOSE_UNLOCK باز باشد و url خالی
  *        نباشد). باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.

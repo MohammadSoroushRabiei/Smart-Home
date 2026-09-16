@@ -268,6 +268,31 @@ void keypad_screen_hide(void)
     reset_input();
 }
 
+void keypad_screen_grant_access(void)
+{
+    // اگر کیبورد اصلاً باز نیست، کاری نکن
+    if (s_overlay == NULL || lv_obj_has_flag(s_overlay, LV_OBJ_FLAG_HIDDEN)) {
+        return;
+    }
+    // فقط زمانی که کاربر در حال تلاش برای باز کردن قفل است (نه ورود به تنظیمات)
+    if (s_current_purpose != KEYPAD_PURPOSE_UNLOCK) {
+        return;
+    }
+
+    // نمایش پیام موفقیت (دقیقاً همون لیبلی که موقع رمز درست نمایش داده می‌شد)
+    show_success("Access Granted");
+
+    // اگر تایمر از قبل وجود داره (مثلاً کاربر همزمان رمز رو هم درست زده بود)، پاکش کن
+    if (s_success_timer) {
+        lv_timer_del(s_success_timer);
+        s_success_timer = NULL;
+    }
+    
+    // راه‌اندازی تایمر برای بستن خودکار صفحه بعد از ۱.۲ ثانیه
+    s_success_timer = lv_timer_create(success_timer_cb, 1200, NULL);
+    lv_timer_set_repeat_count(s_success_timer, 1);
+}
+
 void keypad_screen_update_capture_qr(const char *url)
 {
     if (s_qr_code == NULL) {

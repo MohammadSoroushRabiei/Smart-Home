@@ -1,5 +1,4 @@
 #include "app_state.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
@@ -9,6 +8,7 @@
 #include "mqtt_manager.h"
 #include "lock.h" 
 #include "esp_timer.h"
+#include "keypad_screen.h"
 
 static const char *TAG = "app_state";
 
@@ -121,6 +121,9 @@ void app_state_set_lock(bool unlocked)
     if (s_lcd_available) {                          // ← بلوک جدید
         lcd_driver_lvgl_lock();
         ui_update_lock_status(unlocked);
+        if (unlocked) {
+            keypad_screen_grant_access();
+        }
         lcd_driver_lvgl_unlock();
     }
 

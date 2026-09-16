@@ -21,7 +21,6 @@
 #include "mqtt_manager.h"
 #include "wifi_config.h"
 #include "wifi_setup_screen.h"
-
 #include "enroll_token.h"
 #include "setting_screen.h"
 #include "face_db.h"
@@ -40,8 +39,6 @@ static void on_wifi_state_change(wifi_state_t state)
             const char *ip = wifi_get_ip_str();
             char url[48];
             snprintf(url, sizeof(url), "https://%s/recognize", ip);
-            
-            ui_update_wifi_ip(ip);
             keypad_screen_update_capture_qr(url);
         } else {
             keypad_screen_update_capture_qr("");
