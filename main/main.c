@@ -19,6 +19,9 @@
 #include "keypad_screen.h"
 #include "lock.h"
 #include "mqtt_manager.h"
+#include "wifi_config.h"
+#include "wifi_setup_screen.h"
+
 #include "enroll_token.h"
 #include "setting_screen.h"
 #include "face_db.h"
@@ -30,6 +33,8 @@ static void on_wifi_state_change(wifi_state_t state)
     if (s_lcd_ok) {
         lcd_driver_lvgl_lock();
         ui_update_wifi_status(state);
+        wifi_setup_screen_notify_state_change();
+
 
         if (state == WIFI_STATE_CONNECTED) {
             const char *ip = wifi_get_ip_str();
@@ -37,10 +42,9 @@ static void on_wifi_state_change(wifi_state_t state)
             snprintf(url, sizeof(url), "https://%s/recognize", ip);
             
             ui_update_wifi_ip(ip);
-            ui_update_capture_qr(url);
+            keypad_screen_update_capture_qr(url);
         } else {
-            ui_update_wifi_ip("");
-            ui_update_capture_qr("");
+            keypad_screen_update_capture_qr("");
         }
 
         lcd_driver_lvgl_unlock();
@@ -60,6 +64,12 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     app_state_init();
+
+    wifi_config_init();
+
+    wifi_manager_init_radio();
+    
+    
     ESP_ERROR_CHECK(password_manager_init());
     ESP_ERROR_CHECK(enroll_token_init());
     ESP_ERROR_CHECK(face_db_init());
@@ -85,6 +95,7 @@ void app_main(void)
         lcd_driver_lvgl_lock();
         ui_screens_init();
         keypad_screen_init();
+        wifi_setup_screen_init();
         settings_screen_init();
         lcd_driver_lvgl_unlock();
     }
@@ -95,7 +106,7 @@ void app_main(void)
 
 
     wifi_register_state_change_cb(on_wifi_state_change);
-    wifi_init_sta();  
+    wifi_manager_enable();
     mqtt_manager_init();
 
 

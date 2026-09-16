@@ -18,12 +18,18 @@ static const char *s_btnm_map[] = {
 
 static lv_obj_t *s_overlay;
 static lv_obj_t *s_title_label;
+static lv_obj_t *s_qr_code;
+static lv_obj_t *s_qr_label;
 static lv_obj_t *s_textarea;
+static lv_obj_t *s_eye_btn;
 static lv_obj_t *s_error_label;
 static lv_obj_t *s_btnm;
 static lv_obj_t *s_back_btn;
 static lv_obj_t *s_success_label;
 static lv_timer_t *s_success_timer = NULL;
+
+static bool s_pass_visible = false;
+static bool s_qr_has_content = false;
 
 static char s_input_buf[PASSWORD_MAX_LEN + 1];
 static size_t s_input_len;
@@ -38,6 +44,11 @@ static void reset_input(void)
     lv_textarea_set_text(s_textarea, "");
     lv_obj_add_flag(s_error_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_success_label,LV_OBJ_FLAG_HIDDEN);
+
+    // رمز بعد از هر بار باز شدن دوباره، مخفی شروع شود
+    s_pass_visible = false;
+    lv_textarea_set_password_mode(s_textarea, true);
+    lv_label_set_text(lv_obj_get_child(s_eye_btn, 0), LV_SYMBOL_EYE_OPEN);
 }
 
 static void show_success(const char *msg)
@@ -57,6 +68,14 @@ static void show_error(const char *msg)
 {
     lv_label_set_text(s_error_label, msg);
     lv_obj_clear_flag(s_error_label, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void eye_btn_event_cb(lv_event_t *e)
+{
+    s_pass_visible = !s_pass_visible;
+    lv_textarea_set_password_mode(s_textarea, !s_pass_visible);
+    lv_obj_t *icon = lv_obj_get_child(s_eye_btn, 0);
+    lv_label_set_text(icon, s_pass_visible ? LV_SYMBOL_EYE_CLOSE : LV_SYMBOL_EYE_OPEN);
 }
 
 static void btnm_event_cb(lv_event_t *e)
@@ -146,16 +165,25 @@ void keypad_screen_init(void)
     s_title_label = lv_label_create(s_overlay);
     lv_obj_set_style_text_color(s_title_label, lv_color_white(), 0);
     lv_label_set_text(s_title_label, "Enter Code");
-    lv_obj_align(s_title_label, LV_ALIGN_TOP_MID, 0, 20);
+    lv_obj_align(s_title_label, LV_ALIGN_TOP_MID, 0, 12);
 
+    // ===== تکست‌باکس رمز - بلافاصله بعد از عنوان =====
     s_textarea = lv_textarea_create(s_overlay);
     lv_obj_set_style_text_font(s_textarea, &lv_font_montserrat_28, 0);
     lv_textarea_set_password_mode(s_textarea, true);
     lv_textarea_set_one_line(s_textarea, true);
     lv_textarea_set_max_length(s_textarea, PASSWORD_MAX_LEN);
-    lv_obj_set_width(s_textarea, 200);
-    lv_obj_align(s_textarea, LV_ALIGN_TOP_MID, 0, 55);
+    lv_obj_set_width(s_textarea, 160);
+    lv_obj_align(s_textarea, LV_ALIGN_TOP_MID, 0, 45);
     lv_obj_clear_flag(s_textarea, LV_OBJ_FLAG_CLICKABLE); // فقط نمایش؛ ورودی واقعی از button matrix می‌آید
+
+    s_eye_btn = lv_button_create(s_overlay);
+    lv_obj_set_size(s_eye_btn, 36, 36);
+    lv_obj_align_to(s_eye_btn, s_textarea, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
+    lv_obj_add_event_cb(s_eye_btn, eye_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *eye_icon = lv_label_create(s_eye_btn);
+    lv_label_set_text(eye_icon, LV_SYMBOL_EYE_OPEN);
+    lv_obj_center(eye_icon);
 
     s_error_label = lv_label_create(s_overlay);
     lv_obj_set_style_text_color(s_error_label, lv_palette_main(LV_PALETTE_RED), 0);
@@ -171,8 +199,24 @@ void keypad_screen_init(void)
     lv_obj_set_width(s_success_label, 220);        
     lv_obj_set_style_text_align(s_success_label,LV_TEXT_ALIGN_CENTER,0); 
     lv_label_set_text(s_success_label, "");
-    lv_obj_align_to(s_success_label, s_textarea,LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+    lv_obj_align_to(s_success_label, s_textarea,LV_ALIGN_OUT_BOTTOM_MID, 0, 3);
     lv_obj_add_flag(s_success_label, LV_OBJ_FLAG_HIDDEN);
+
+    // ===== QR کد باز کردن قفل با چهره - بعد از textbox، قبل از کیبورد -
+    // فقط برای KEYPAD_PURPOSE_UNLOCK نشان داده می‌شود =====
+    s_qr_code = lv_qrcode_create(s_overlay);
+    lv_qrcode_set_size(s_qr_code, 80);
+    lv_qrcode_set_dark_color(s_qr_code, lv_color_black());
+    lv_qrcode_set_light_color(s_qr_code, lv_color_white());
+    lv_obj_align(s_qr_code, LV_ALIGN_TOP_MID, 0, 120);
+    lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+
+    s_qr_label = lv_label_create(s_overlay);
+    lv_obj_set_style_text_color(s_qr_label, lv_color_white(), 0);
+    lv_obj_set_style_text_align(s_qr_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(s_qr_label, "Scan to open with your face");
+    lv_obj_align_to(s_qr_label, s_qr_code, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+    lv_obj_add_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
 
 
     s_btnm = lv_buttonmatrix_create(s_overlay);
@@ -184,9 +228,7 @@ void keypad_screen_init(void)
     // برای ورود رمز، رفتار "repeat" هنگام نگه‌داشتن دکمه (که برای کیبورد متنی
     // مثل Backspace طراحی شده) معنی نداره و باعث ثبت چندباره‌ی یک رقم/OK می‌شود
     // → برای تمام ۱۲ دکمه (۱-۹, C, ۰, OK) غیرفعالش می‌کنیم.
-    for (uint32_t i = 0; i < 12; i++) {
-        lv_buttonmatrix_set_button_ctrl(s_btnm, i, LV_BUTTONMATRIX_CTRL_NO_REPEAT);
-    }
+    lv_buttonmatrix_set_button_ctrl_all(s_btnm, LV_BUTTONMATRIX_CTRL_NO_REPEAT);
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 
@@ -200,6 +242,15 @@ void keypad_screen_show(keypad_purpose_t purpose, keypad_result_cb_t on_result)
 
     lv_label_set_text(s_title_label,
         purpose == KEYPAD_PURPOSE_UNLOCK ? "Enter Code to Unlock" : "Enter Code for Settings");
+
+    // QR باز کردن با چهره فقط برای Unlock و فقط اگر وای‌فای وصله (محتوای معتبر دارد)
+    if (purpose == KEYPAD_PURPOSE_UNLOCK && s_qr_has_content) {
+        lv_obj_clear_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
+    }
 
     reset_input();
     lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
@@ -215,4 +266,27 @@ void keypad_screen_hide(void)
     
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
     reset_input();
+}
+
+void keypad_screen_update_capture_qr(const char *url)
+{
+    if (s_qr_code == NULL) {
+        return;
+    }
+
+    if (url == NULL || url[0] == '\0') {
+        s_qr_has_content = false;
+        lv_obj_add_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    lv_qrcode_update(s_qr_code, url, strlen(url));
+    s_qr_has_content = true;
+
+    // اگر overlay همین الان با هدف Unlock باز است، فوراً نشانش بده
+    if (!lv_obj_has_flag(s_overlay, LV_OBJ_FLAG_HIDDEN) && s_current_purpose == KEYPAD_PURPOSE_UNLOCK) {
+        lv_obj_clear_flag(s_qr_code, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(s_qr_label, LV_OBJ_FLAG_HIDDEN);
+    }
 }
