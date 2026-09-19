@@ -1,0 +1,5 @@
+# تور نجات در برابر گیر کردن سخت‌افزاری/نرم‌افزاری (مثلاً قفل شدن باس I2C روی GT911):
+# Task Watchdog با panic دستگاه را ریبوت می‌کند تا touch_driver_init در بوت، GT911 را ریست کند
+CONFIG_ESP_TASK_WDT_PANIC=y
+# بزرگ‌تر از recv_wait_timeout وب‌سرور (10s) تا آپلود کندِ کاربر panic کاذب نسازد
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=15

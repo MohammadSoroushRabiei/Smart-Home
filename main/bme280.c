@@ -36,15 +36,25 @@ static i2c_master_dev_handle_t s_dev = NULL;
 static bme280_calib_t s_calib;
 static bool s_ready = false;
 
+// قفل باس فقط دور هر تراکنش I2C گرفته می‌شود، نه دور کل توالی خواندن:
+// قبلاً کل bme280_read زیر قفل بود که هم با vTaskDelay باس را تا ~۱۰۰ms
+// بلاک می‌کرد (گرسنگی تاچ) و هم مسیر خطای خواندن burst بدون unlock
+// خارج می‌شد - نشت mutex و مرگ دائمی تاچ روی باس تا ریبوت
 static esp_err_t reg_write(uint8_t reg, uint8_t val)
 {
     uint8_t buf[2] = { reg, val };
-    return i2c_master_transmit(s_dev, buf, sizeof(buf), 100);
+    i2c_bus_lock();
+    esp_err_t ret = i2c_master_transmit(s_dev, buf, sizeof(buf), 100);
+    i2c_bus_unlock();
+    return ret;
 }
 
 static esp_err_t reg_read(uint8_t reg, uint8_t *data, size_t len)
 {
-    return i2c_master_transmit_receive(s_dev, &reg, 1, data, len, 100);
+    i2c_bus_lock();
+    esp_err_t ret = i2c_master_transmit_receive(s_dev, &reg, 1, data, len, 100);
+    i2c_bus_unlock();
+    return ret;
 }
 
 static void read_calibration(void)
@@ -114,9 +124,6 @@ bool bme280_read(bme280_data_t *out)
         return false;
     }
 
-    i2c_bus_lock();
-    bool success = true;
-
     reg_write(BME280_REG_CTRL_MEAS, 0x25);  // osrs_t=1, osrs_p=1, mode=forced
 
     for (int i = 0; i < 20; i++) {
@@ -134,8 +141,7 @@ bool bme280_read(bme280_data_t *out)
         return false;
     }
 
-    if (success)
-    {       
+    {
         int32_t adc_P = (int32_t)((raw[0] << 12) | (raw[1] << 4) | (raw[2] >> 4));
         int32_t adc_T = (int32_t)((raw[3] << 12) | (raw[4] << 4) | (raw[5] >> 4));
         int32_t adc_H = (int32_t)((raw[6] << 8) | raw[7]);
@@ -177,7 +183,5 @@ bool bme280_read(bme280_data_t *out)
         out->humidity_percent = (float)H;
     }
 
-    i2c_bus_unlock();
-
-    return success;
+    return true;
 }

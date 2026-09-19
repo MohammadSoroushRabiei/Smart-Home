@@ -4,9 +4,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_touch_gt911.h"
 #include "driver/i2c_master.h"
+#include "driver/gpio.h"
 
 static const char *TAG = "touch_driver";
 
@@ -16,6 +18,18 @@ static const char *TAG = "touch_driver";
 #define TOUCH_ERROR_BACKOFF_COUNT   5
 #define TOUCH_ERROR_BACKOFF_MS      2000
 
+// GT911 در IDF v6 از طریق esp_lcd با timeout بی‌نهایت (‎-1‎) با باس حرف می‌زند؛
+// اگر چیپ بعد از یک glitch خط SDA را پایین نگه دارد، تراکنش هیچ‌وقت برنمی‌گردد.
+// تسک ناظر با تپش قلبِ poll این حالت را می‌فهمد و GT911 را با پالس سخت‌افزاری
+// روی پایه RST (همان توالی init درایور) ریست می‌کند تا باس آزاد شود - بدون ریبوت
+#define TOUCH_WATCHDOG_CHECK_MS         2000
+#define TOUCH_STUCK_HEARTBEAT_MS        6000   // سکوت heartbeat = گیر کردن داخل تراکنش
+#define TOUCH_FAIL_STREAK_RECOVER       50     // خطای متوالی (مثلاً NACK همیشگی) هم ریکاوری را رقم می‌زند
+#define TOUCH_RECOVER_MIN_INTERVAL_MS   10000
+#define TOUCH_WATCHDOG_MAX_BLIND        5      // بعد از این تعداد ریکاوری بی‌نتیجه، تور نجات: TWDT panic
+#define TOUCH_WATCHDOG_TASK_STACK       3072
+#define TOUCH_WATCHDOG_TASK_PRIORITY    3      // بالاتر از touch_poll تا هنگام اسپین I2C هم اجرا شود
+
 static esp_lcd_touch_handle_t s_tp_handle = NULL;
 
 // نتیجه‌ی خوانده‌شده توسط تسک پس‌زمینه؛ callback فقط این‌ها را می‌خواند (بدون I2C)
@@ -23,17 +37,25 @@ static volatile bool     s_touch_pressed = false;
 static volatile uint16_t s_touch_x = 0;
 static volatile uint16_t s_touch_y = 0;
 
+// تپش قلب تسک poll (به‌روزرسانی در ابتدای هر دور حلقه) و شمارش خطاهای متوالی
+static volatile int64_t  s_last_poll_us = 0;
+static volatile uint32_t s_fail_streak = 0;
+// ریکاوری‌های بی‌نتیجه‌ی پشت‌سرهم - فقط در تسک ناظر دستکاری می‌شود
+static int s_blind_recoveries = 0;
+
 static void touch_poll_task(void *arg)
 {
     uint8_t consecutive_errors = 0;
 
     while (1) {
+        s_last_poll_us = esp_timer_get_time();
 
         i2c_bus_lock();
         esp_err_t ret = esp_lcd_touch_read_data(s_tp_handle);
         i2c_bus_unlock();
         if (ret == ESP_OK) {
             consecutive_errors = 0;
+            s_fail_streak = 0;
 
             esp_lcd_touch_point_data_t pt[1];
             uint8_t cnt = 0;
@@ -48,6 +70,7 @@ static void touch_poll_task(void *arg)
             }
         } else {
             consecutive_errors++;
+            s_fail_streak++;
             s_touch_pressed = false;   // در حالت خطا، لمس را رهاشده در نظر بگیر
 
             if (consecutive_errors >= TOUCH_ERROR_BACKOFF_COUNT) {
@@ -58,6 +81,72 @@ static void touch_poll_task(void *arg)
         }
 
         vTaskDelay(pdMS_TO_TICKS(TOUCH_POLL_PERIOD_MS));
+    }
+}
+
+// همان توالی ریست/انتخاب آدرس در esp_lcd_touch_gt911 (INT پایین هنگام بالا آمدن
+// RST یعنی آدرس 0x5D) تا GT911 بعد از ریست روی همان آدرس قبلی بالا بیاید و
+// هندل موجود درایور معتبر بماند و نیاز به ساخت مجدد panel_io نباشد
+static void gt911_hw_reset_for_recovery(void)
+{
+    gpio_config_t int_out_cfg = {
+        .mode = GPIO_MODE_OUTPUT,
+        .intr_type = GPIO_INTR_DISABLE,
+        .pull_up_en = 1,
+        .pin_bit_mask = BIT64(TOUCH_PIN_INT),
+    };
+    gpio_config(&int_out_cfg);
+
+    gpio_set_level(TOUCH_PIN_RST, 0);   // levels.reset = 0
+    gpio_set_level(TOUCH_PIN_INT, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(TOUCH_PIN_INT, 0);   // انتخاب آدرس 0x5D (برای آدرس 0x14 باید 1 باشد)
+    vTaskDelay(pdMS_TO_TICKS(1));
+    gpio_set_level(TOUCH_PIN_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // بازگرداندن INT به حالت ورودی - مثل انتهای init درایور
+    gpio_config_t int_in_cfg = {
+        .mode = GPIO_MODE_INPUT,
+        .intr_type = GPIO_INTR_NEGEDGE,
+        .pin_bit_mask = BIT64(TOUCH_PIN_INT),
+    };
+    gpio_config(&int_in_cfg);
+
+    ESP_LOGW(TAG, "GT911 hardware reset issued to release stuck I2C bus");
+}
+
+static void touch_watchdog_task(void *arg)
+{
+    int64_t last_recover_us = 0;
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(TOUCH_WATCHDOG_CHECK_MS));
+
+        int64_t now = esp_timer_get_time();
+        bool stuck = (now - s_last_poll_us) > ((int64_t)TOUCH_STUCK_HEARTBEAT_MS * 1000);
+        bool failing = s_fail_streak >= TOUCH_FAIL_STREAK_RECOVER;
+
+        if (!stuck && !failing) {
+            s_blind_recoveries = 0;
+            continue;
+        }
+        // اگر ریست‌های مکرر هم heartbeat را برنگرداندند، کاری از دست ناظر برنمی‌آید؛
+        // ول کن تا Task Watchdog با panic دستگاه را ریبوت کند (آخرین خط دفاع)
+        if (stuck && s_blind_recoveries >= TOUCH_WATCHDOG_MAX_BLIND) {
+            continue;
+        }
+        if ((now - last_recover_us) < ((int64_t)TOUCH_RECOVER_MIN_INTERVAL_MS * 1000)) {
+            continue;
+        }
+
+        last_recover_us = now;
+        if (stuck) {
+            s_blind_recoveries++;
+        }
+        gt911_hw_reset_for_recovery();
+        s_fail_streak = 0;
     }
 }
 
@@ -111,6 +200,9 @@ bool touch_driver_init(lv_display_t *disp, i2c_master_bus_handle_t i2c_bus)
 
     xTaskCreate(touch_poll_task, "touch_poll", TOUCH_POLL_TASK_STACK, NULL,
                 TOUCH_POLL_TASK_PRIORITY, NULL);
+
+    xTaskCreate(touch_watchdog_task, "touch_wdt", TOUCH_WATCHDOG_TASK_STACK, NULL,
+                TOUCH_WATCHDOG_TASK_PRIORITY, NULL);
 
     ESP_LOGI(TAG, "Touch driver initialized");
     return true;
