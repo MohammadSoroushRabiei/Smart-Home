@@ -1,19 +1,30 @@
 #include "mqtt_manager.h"
+#include "mqtt_config.h"
+#include "wifi_manager.h"
 #include <string.h>
 #include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "mqtt_client.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "app_state.h"
 
 static const char *TAG = "mqtt_manager";
 
-// ===== تنظیمات اتصال (هاردکد فعلاً - مشابه wifi_manager.c) =====
-#define MQTT_BROKER_URI  "mqtt://10.64.102.114:1883"
-
-// ===== شناسه‌ی دستگاه (باید در همه‌ی پیام‌های discovery یکسان باشد) =====
 #define DEVICE_ID  "esp32_smarthome"
 
-// ===== تاپیک‌های State/Command =====
+#define MQTT_MAX_RETRIES         3
+#define MQTT_RETRY_DELAY_MS      3000
+#define MQTT_BROKER_PORT         1883
+// Mosquitto بعد از ۱٫۵ برابر این مقدار (~۲۲ ثانیه) LWT را منتشر می‌کند؛
+// پیش‌فرض esp-mqtt ۱۲۰ ثانیه است (یعنی ~۳ دقیقه تا HA بفهمد).
+#define MQTT_KEEPALIVE_S         15
+
+#define MQTT_NETWORK_TIMEOUT_MS   3000
+#define MQTT_TEST_WAIT_TIMEOUT_MS (MQTT_NETWORK_TIMEOUT_MS + 500)
+
 #define TOPIC_STATUS        "smarthome/status"
 #define TOPIC_LIGHT_STATE   "smarthome/light/state"
 #define TOPIC_LIGHT_SET     "smarthome/light/set"
@@ -21,8 +32,6 @@ static const char *TAG = "mqtt_manager";
 #define TOPIC_ACCESS_STATE  "smarthome/access/state"
 #define TOPIC_LOCK_STATE   "smarthome/lock/state"
 
-
-// ===== تاپیک‌های Discovery =====
 #define DISC_LIGHT   "homeassistant/light/" DEVICE_ID "/light/config"
 #define DISC_TEMP    "homeassistant/sensor/" DEVICE_ID "/temperature/config"
 #define DISC_HUM     "homeassistant/sensor/" DEVICE_ID "/humidity/config"
@@ -30,8 +39,6 @@ static const char *TAG = "mqtt_manager";
 #define DISC_ACCESS  "homeassistant/event/" DEVICE_ID "/access/config"
 #define DISC_LOCK_STATUS   "homeassistant/binary_sensor/" DEVICE_ID "/lock_status/config"
 
-// بلاک مشترک "device" که در همه‌ی پیام‌های discovery تکرار می‌شود
-// تا HA بفهمد همه‌ی entity ها متعلق به یک دستگاه واحد هستند
 #define DEVICE_BLOCK \
     "\"device\":{" \
     "\"identifiers\":[\"" DEVICE_ID "\"]," \
@@ -40,22 +47,29 @@ static const char *TAG = "mqtt_manager";
     "\"manufacturer\":\"Soroush Rabiei\"" \
     "}"
 
-// بلاک مشترک availability (وابسته به Birth/LWT روی TOPIC_STATUS)
 #define AVAILABILITY_BLOCK \
     "\"availability_topic\":\"" TOPIC_STATUS "\"," \
     "\"payload_available\":\"online\"," \
     "\"payload_not_available\":\"offline\""
 
 static esp_mqtt_client_handle_t s_client = NULL;
-
-// وضعیت واقعی اتصال - همه‌ی توابع publish قبل از هر کاری این را چک می‌کنند
-// تا وقتی broker در دسترس نیست، اصلاً چیزی صف نشود (نه فقط بلاک نشود).
-// این هم از رشد بی‌رویه‌ی outbox داخلی esp-mqtt جلوگیری می‌کند، هم از
-// سناریوی نادر «enqueue برای مدت کوتاه بلاک می‌شود اگر outbox پر باشد».
 static volatile bool s_mqtt_connected = false;
+static bool s_client_started = false;
+
+static mqtt_manager_state_t s_state = MQTT_MGR_STATE_UNCONFIGURED;
+static mqtt_manager_state_change_cb_t s_state_cb = NULL;
+static esp_timer_handle_t s_retry_timer = NULL;
+static uint8_t s_retry_count = 0;
+static char s_broker_host[MQTT_CONFIG_HOST_MAX_LEN + 1] = "";
+
+static bool s_user_disabled = false;
+
+static esp_mqtt_client_handle_t s_test_client = NULL;
+static SemaphoreHandle_t s_test_sem = NULL;
+static volatile bool s_test_success = false;
 
 // ---------------------------------------------------------------------
-// Payload های ثابت Discovery (رشته‌های ادغام‌شده در زمان کامپایل)
+// Payload های ثابت Discovery
 // ---------------------------------------------------------------------
 
 static const char *s_light_discovery =
@@ -116,7 +130,6 @@ static const char *s_access_discovery =
     DEVICE_BLOCK
     "}";
 
-
 static const char *s_lock_status_discovery =
     "{"
     "\"name\":\"Door Lock Status\","
@@ -128,6 +141,31 @@ static const char *s_lock_status_discovery =
     AVAILABILITY_BLOCK ","
     DEVICE_BLOCK
     "}";
+
+// ---------------------------------------------------------------------
+// مدیریت وضعیت
+// ---------------------------------------------------------------------
+
+static void set_state(mqtt_manager_state_t new_state)
+{
+    if (s_state == new_state) {
+        return;
+    }
+    s_state = new_state;
+    if (s_state_cb != NULL) {
+        s_state_cb(new_state);
+    }
+}
+
+static void retry_timer_cb(void *arg)
+{
+    if (s_client == NULL || !s_client_started) {
+        return;
+    }
+    ESP_LOGI(TAG, "Retrying MQTT connection (attempt %d/%d)", s_retry_count, MQTT_MAX_RETRIES);
+    set_state(MQTT_MGR_STATE_CONNECTING);
+    esp_mqtt_client_reconnect(s_client);
+}
 
 // ---------------------------------------------------------------------
 // توابع داخلی
@@ -144,23 +182,8 @@ static const char *access_event_type_to_str(access_event_type_t type)
     }
 }
 
-// ⚠️ نکته‌ی حیاتی: از esp_mqtt_client_enqueue به‌جای esp_mqtt_client_publish
-// استفاده می‌کنیم. تابع _publish سینکرون است و write واقعی روی سوکت TCP/TLS
-// را مستقیماً از همان تسکی که آن را صدا زده انجام می‌دهد؛ اگر broker در
-// دسترس نباشد، این write می‌تواند تا زمان timeout سوکت (چند ثانیه) بلاک
-// بماند. چون این توابع از داخل callback دکمه‌های LVGL (در حالی که قفل
-// LVGL گرفته شده) هم صدا زده می‌شوند، آن بلاک‌شدن یعنی کل تاچ/LCD فریز
-// می‌شود. تابع _enqueue فقط پیام را در outbox داخلی می‌گذارد و فوراً
-// برمی‌گردد؛ ارسال واقعی توسط تسک داخلی خود کتابخانه‌ی esp-mqtt انجام
-// می‌شود، نه تسک تماس‌گیرنده.
 static void publish_discovery_configs(void)
 {
-    // این تابع فقط از داخل case MQTT_EVENT_CONNECTED صدا زده می‌شود، پس
-    // اتصال قطعاً برقرار است؛ گارد جداگانه لازم نیست.
-    // qos=1 چون گم‌شدن پیام معرفی یعنی entity اصلاً در HA ساخته نمی‌شود
-    // retain=true چون HA ممکن است دیرتر از ESP32 بالا بیاید و باید بتواند
-    // پیام را بعداً هم از broker بخواند
-    // store=true تا در outbox بماند و بعد از وصل‌شدن مجدد ارسال شود
     esp_mqtt_client_enqueue(s_client, DISC_LIGHT,  s_light_discovery,     0, 1, true, true);
     esp_mqtt_client_enqueue(s_client, DISC_TEMP,   s_temperature_discovery, 0, 1, true, true);
     esp_mqtt_client_enqueue(s_client, DISC_HUM,    s_humidity_discovery,  0, 1, true, true);
@@ -171,12 +194,17 @@ static void publish_discovery_configs(void)
     ESP_LOGI(TAG, "Discovery configs enqueued for 6 entities");
 }
 
+static void on_main_client_connected(void)
+{
+    publish_discovery_configs();
+    esp_mqtt_client_enqueue(s_client, TOPIC_STATUS, "online", 0, 1, true, true);
+    esp_mqtt_client_subscribe(s_client, TOPIC_LIGHT_SET, 1);
+}
+
 static void handle_light_command(esp_mqtt_event_handle_t event)
 {
     bool on = (event->data_len == 2 && memcmp(event->data, "ON", 2) == 0);
     ESP_LOGI(TAG, "Received light command from HA: %s", on ? "ON" : "OFF");
-
-    // نقطه‌ی ورودی مشترک همه‌ی منابع کنترل چراغ (دکمه، LCD، HTTP، حالا MQTT هم)
     app_state_set_light(on);
 }
 
@@ -184,34 +212,70 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                 int32_t event_id, void *event_data)
 {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+    esp_mqtt_client_handle_t event_client = (esp_mqtt_client_handle_t)handler_args;
+    bool is_test = (event_client == s_test_client);
+    bool is_main = (event_client == s_client);
 
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "Connected to broker");
-        s_mqtt_connected = true;
-        publish_discovery_configs();
-
-        // Birth message - به HA اعلام می‌کند که دستگاه آنلاین است
-        esp_mqtt_client_enqueue(s_client, TOPIC_STATUS, "online", 0, 1, true, true);
-
-        esp_mqtt_client_subscribe(s_client, TOPIC_LIGHT_SET, 1);
+        if (is_test) {
+            s_test_success = true;
+            xSemaphoreGive(s_test_sem);
+            break;
+        }
+        if (is_main) {
+            ESP_LOGI(TAG, "Connected to broker");
+            s_mqtt_connected = true;
+            s_retry_count = 0;
+            esp_timer_stop(s_retry_timer);
+            set_state(MQTT_MGR_STATE_CONNECTED);
+            on_main_client_connected();
+        }
         break;
 
     case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGW(TAG, "Disconnected from broker");
-        s_mqtt_connected = false;
+        if (is_test) {
+            s_test_success = false;
+            xSemaphoreGive(s_test_sem);
+            break;
+        }
+        if (is_main) {
+            ESP_LOGW(TAG, "Disconnected from broker");
+            s_mqtt_connected = false;
+
+            if (!s_client_started) {
+                break;   // نتیجه‌ی توقف دستی است - وارد retry نشو
+            }
+
+            if (s_retry_count < MQTT_MAX_RETRIES) {
+                s_retry_count++;
+                set_state(MQTT_MGR_STATE_CONNECTING);
+                esp_timer_stop(s_retry_timer);
+                esp_timer_start_once(s_retry_timer, (uint64_t)MQTT_RETRY_DELAY_MS * 1000);
+            } else {
+                ESP_LOGW(TAG, "Max MQTT retries reached, going offline");
+                set_state(MQTT_MGR_STATE_DISABLED);
+            }
+        }
         break;
 
     case MQTT_EVENT_DATA:
-        if (event->topic_len == strlen(TOPIC_LIGHT_SET) &&
+        if (is_main && event->topic_len == strlen(TOPIC_LIGHT_SET) &&
             memcmp(event->topic, TOPIC_LIGHT_SET, event->topic_len) == 0) {
             handle_light_command(event);
         }
         break;
 
     case MQTT_EVENT_ERROR:
-        ESP_LOGE(TAG, "MQTT error event");
-        s_mqtt_connected = false;
+        if (is_test) {
+            s_test_success = false;
+            xSemaphoreGive(s_test_sem);
+            break;
+        }
+        if (is_main) {
+            ESP_LOGE(TAG, "MQTT error event");
+            s_mqtt_connected = false;
+        }
         break;
 
     default:
@@ -219,33 +283,242 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     }
 }
 
+static esp_mqtt_client_config_t build_client_config(const char *uri)
+{
+    esp_mqtt_client_config_t cfg = {
+        .broker.address.uri = uri,
+        .network.disable_auto_reconnect = true,
+        .network.timeout_ms = MQTT_NETWORK_TIMEOUT_MS,
+        .session.keepalive = MQTT_KEEPALIVE_S,
+        .session.last_will.topic = TOPIC_STATUS,
+        .session.last_will.msg = "offline",
+        .session.last_will.msg_len = 0,
+        .session.last_will.qos = 1,
+        .session.last_will.retain = true,
+    };
+    return cfg;
+}
+
+static void start_client(const char *host)
+{
+    if (s_client == NULL) {
+        char uri[96];
+        snprintf(uri, sizeof(uri), "mqtt://%s:%d", host, MQTT_BROKER_PORT);
+
+        esp_mqtt_client_config_t mqtt_cfg = build_client_config(uri);
+        s_client = esp_mqtt_client_init(&mqtt_cfg);
+        if (s_client == NULL) {
+            ESP_LOGE(TAG, "Failed to init MQTT client");
+            set_state(MQTT_MGR_STATE_DISABLED);
+            return;
+        }
+        esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, (void *)s_client);
+    }
+
+    s_retry_count = 0;
+    s_mqtt_connected = false;
+    esp_timer_stop(s_retry_timer);
+    set_state(MQTT_MGR_STATE_CONNECTING);
+
+    // ⚠️ باید قبل از start ست شود - وگرنه یک شکست فوری (مثلاً شبکه هنوز
+    // آماده نیست) توسط handler به‌اشتباه «توقف دستی» تفسیر می‌شود
+    s_client_started = true;
+    esp_mqtt_client_start(s_client);
+
+    ESP_LOGI(TAG, "MQTT client starting (broker: %s)", host);
+}
+
+static void stop_client_with_offline_publish(void)
+{
+    if (s_client == NULL || !s_client_started) {
+        return;
+    }
+    esp_timer_stop(s_retry_timer);
+    if (s_mqtt_connected) {
+        esp_mqtt_client_publish(s_client, TOPIC_STATUS, "offline", 0, 1, true);
+    }
+    s_client_started = false;   // قبل از stop: تا DISCONNECTED حین توقف وارد retry نشود
+    esp_mqtt_client_stop(s_client);
+    s_mqtt_connected = false;
+    s_retry_count = 0;
+}
+
+// تسک پس‌زمینه‌ای که آماده‌سازی برای قطع (publish آفلاین + stop) را انجام
+// می‌دهد و خودش را پاک می‌کند - برای فراخوانی از یک callback LVGL که نباید
+// خودش بلاک بشود (مثل تپ روی دکمه‌ی HA).
+static void disable_task(void *arg)
+{
+    mqtt_manager_prepare_for_network_loss();
+    vTaskDelete(NULL);
+}
+
 // ---------------------------------------------------------------------
 // API عمومی
 // ---------------------------------------------------------------------
 
+void mqtt_manager_register_state_change_cb(mqtt_manager_state_change_cb_t cb)
+{
+    s_state_cb = cb;
+}
+
+mqtt_manager_state_t mqtt_manager_get_state(void)
+{
+    return s_state;
+}
+
 void mqtt_manager_init(void)
 {
-    esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = MQTT_BROKER_URI,
-        // LWT: اگر اتصال به‌طور غیرمنتظره قطع شود (کرش، قطع Wi-Fi)،
-        // broker خودش این پیام را به‌جای ESP32 منتشر می‌کند
-        .session.last_will.topic = TOPIC_STATUS,
-        .session.last_will.msg = "offline",
-        .session.last_will.msg_len = 0,   // 0 یعنی از strlen خود msg استفاده کن
-        .session.last_will.qos = 1,
-        .session.last_will.retain = true,
-    };
+    if (s_retry_timer == NULL) {
+        const esp_timer_create_args_t retry_timer_args = {
+            .callback = &retry_timer_cb,
+            .name = "mqtt_retry",
+        };
+        esp_timer_create(&retry_timer_args, &s_retry_timer);
+    }
+    if (s_test_sem == NULL) {
+        s_test_sem = xSemaphoreCreateBinary();
+    }
 
-    s_client = esp_mqtt_client_init(&mqtt_cfg);
-    if (s_client == NULL) {
-        ESP_LOGE(TAG, "Failed to init MQTT client");
+    s_user_disabled = false;
+
+    if (!mqtt_config_get_host(s_broker_host, sizeof(s_broker_host))) {
+        ESP_LOGI(TAG, "No MQTT broker configured yet - staying unconfigured");
+        set_state(MQTT_MGR_STATE_UNCONFIGURED);
         return;
     }
 
-    esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(s_client);
+    if (!wifi_is_connected()) {
+        // WiFi هنوز وصل نشده (wifi_manager_enable غیربلاک‌کننده است) - منتظر
+        // اعلان mqtt_manager_notify_network_available می‌مانیم، مثل WiFi
+        ESP_LOGI(TAG, "MQTT broker configured but WiFi not connected yet - waiting");
+        set_state(MQTT_MGR_STATE_DISABLED);
+        return;
+    }
 
-    ESP_LOGI(TAG, "MQTT client starting (broker: %s)", MQTT_BROKER_URI);
+    start_client(s_broker_host);
+}
+
+bool mqtt_manager_connect_and_save(const char *host)
+{
+    if (host == NULL || host[0] == '\0') {
+        return false;
+    }
+
+    if (s_state == MQTT_MGR_STATE_CONNECTED && strcmp(host, s_broker_host) == 0) {
+        return true;
+    }
+
+    char uri[96];
+    snprintf(uri, sizeof(uri), "mqtt://%s:%d", host, MQTT_BROKER_PORT);
+
+    esp_mqtt_client_config_t test_cfg = build_client_config(uri);
+    esp_mqtt_client_handle_t test_client = esp_mqtt_client_init(&test_cfg);
+    if (test_client == NULL) {
+        return false;
+    }
+    esp_mqtt_client_register_event(test_client, ESP_EVENT_ANY_ID, mqtt_event_handler, (void *)test_client);
+
+    xSemaphoreTake(s_test_sem, 0);
+    s_test_success = false;
+    s_test_client = test_client;
+
+    esp_mqtt_client_start(test_client);
+
+    BaseType_t got_signal = xSemaphoreTake(s_test_sem, pdMS_TO_TICKS(MQTT_TEST_WAIT_TIMEOUT_MS));
+    s_test_client = NULL;
+
+    bool success = (got_signal == pdTRUE) && s_test_success;
+
+    if (!success) {
+        ESP_LOGW(TAG, "Test connection to '%s' failed", uri);
+        esp_mqtt_client_stop(test_client);
+        esp_mqtt_client_destroy(test_client);
+        return false;
+    }
+
+    if (s_client != NULL) {
+        esp_timer_stop(s_retry_timer);
+        if (s_mqtt_connected) {
+            esp_mqtt_client_publish(s_client, TOPIC_STATUS, "offline", 0, 1, true);
+        }
+        esp_mqtt_client_stop(s_client);
+        esp_mqtt_client_destroy(s_client);
+    }
+
+    s_client = test_client;
+    s_client_started = true;
+    s_mqtt_connected = true;
+    s_retry_count = 0;
+    s_user_disabled = false;
+
+    mqtt_config_set_host(host);
+    strncpy(s_broker_host, host, sizeof(s_broker_host) - 1);
+    s_broker_host[sizeof(s_broker_host) - 1] = '\0';
+
+    set_state(MQTT_MGR_STATE_CONNECTED);
+    on_main_client_connected();
+
+    ESP_LOGI(TAG, "Switched MQTT broker to: %s", uri);
+    return true;
+}
+
+void mqtt_manager_enable(void)
+{
+    if (s_broker_host[0] == '\0') {
+        return;   // هنوز هیچ بروکری تنظیم نشده
+    }
+    if (!wifi_is_connected()) {
+        ESP_LOGW(TAG, "Cannot enable MQTT - WiFi is not connected");
+        return;   // دکمه باید خاکستری بماند، نه نارنجی
+    }
+    ESP_LOGI(TAG, "Manual MQTT enable requested");
+    s_user_disabled = false;
+    start_client(s_broker_host);
+}
+
+void mqtt_manager_disable(void)
+{
+    if (s_client == NULL || !s_client_started) {
+        return;
+    }
+    ESP_LOGI(TAG, "MQTT manually disabled");
+    s_user_disabled = true;
+    xTaskCreate(disable_task, "mqtt_disable_task", 4096, NULL, 3, NULL);
+}
+
+void mqtt_manager_prepare_for_network_loss(void)
+{
+    if (s_client == NULL || !s_client_started) {
+        return;
+    }
+    stop_client_with_offline_publish();
+    set_state(MQTT_MGR_STATE_DISABLED);
+}
+
+void mqtt_manager_notify_network_lost(void)
+{
+    if (s_client == NULL || !s_client_started) {
+        return;
+    }
+    ESP_LOGI(TAG, "Network lost - stopping MQTT (will auto-retry once network is back)");
+    xTaskCreate(disable_task, "mqtt_netlost_task", 4096, NULL, 3, NULL);
+    // s_user_disabled دست‌نخورده می‌ماند
+}
+
+void mqtt_manager_notify_network_available(void)
+{
+    if (s_user_disabled) {
+        return;
+    }
+    if (s_broker_host[0] == '\0') {
+        return;
+    }
+    if (s_state == MQTT_MGR_STATE_CONNECTED || s_state == MQTT_MGR_STATE_CONNECTING) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Network available - auto-reconnecting to last known MQTT broker");
+    start_client(s_broker_host);
 }
 
 void mqtt_manager_publish_light_state(bool on)
@@ -272,16 +545,14 @@ void mqtt_manager_publish_sensor_state(float temp, float hum, float pressure)
 
 void mqtt_manager_publish_access_event(access_event_type_t type)
 {
-    if (s_client == NULL || !s_mqtt_connected) {
+    if (s_client == NULL) {
         return;
     }
 
     char payload[64];
     snprintf(payload, sizeof(payload), "{\"event_type\":\"%s\"}", access_event_type_to_str(type));
 
-    // qos=0, retain=false, store=false: یک رویداد لحظه‌ای است - نه نیاز به
-    // تحویل تضمینی دارد و نه ارزش نگه‌داشتن در outbox حین قطعی را دارد
-    esp_mqtt_client_enqueue(s_client, TOPIC_ACCESS_STATE, payload, 0, 0, false, false);
+    esp_mqtt_client_enqueue(s_client, TOPIC_ACCESS_STATE, payload, 0, 1, false, true);
 }
 
 void mqtt_manager_publish_lock_state(bool unlocked)

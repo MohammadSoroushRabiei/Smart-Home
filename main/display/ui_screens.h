@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include "wifi_manager.h"
+#include "mqtt_manager.h"
 
 
 void ui_screens_init(void);
@@ -13,3 +14,9 @@ void ui_update_lock_status(bool unlocked);
  */
 void ui_update_light_status(bool on);
 void ui_update_sensor_status(float temp, float hum, float pressure);
+
+/**
+ * @brief به‌روزرسانی رنگ دکمه‌ی وضعیت MQTT/HA در صفحه‌ی اصلی.
+ *        باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.
+ */
+void ui_update_mqtt_status(mqtt_manager_state_t state);
