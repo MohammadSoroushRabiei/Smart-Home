@@ -162,8 +162,10 @@ static const char *recognize_html =
     "</script></body></html>";
 
 
-// صفحه‌ی Enroll - پشت توکن یک‌بارمصرف؛ توکن از query string خوانده و به هر
-// درخواست POST پیوست می‌شود؛ اگر نامعتبر باشد سرور با 403 رد می‌کند
+// صفحه‌ی Enroll چند-نمونه‌ای - پشت توکن یک‌بارمصرف؛ توکن از query string خوانده
+// و به هر درخواست POST پیوست می‌شود؛ اگر نامعتبر باشد سرور با 403 رد می‌کند.
+// نام یک‌بار وارد می‌شود و هر «Add Sample» یک نمونه‌ی جدید زیر همان نام ثبت
+// می‌کند؛ توکن تا پایان مهلت خود چندبارمصرف است (تصمیم عمدی ماژول enroll_token)
 static const char *enroll_html =
     "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -176,14 +178,17 @@ static const char *enroll_html =
     "button{flex:1;padding:12px;font-size:15px;border-radius:6px;border:none;color:#fff;cursor:pointer;}"
     "#btn-capture{background:#2196F3;}"
     "#btn-retake{background:#888;}"
-    "#btn-enroll{background:#4CAF50;}"
+    "#btn-add{background:#4CAF50;}"
+    "#btn-done{background:#FF9800;}"
     "#btn-flip{background:#607D8B;}"
     "#status{margin-top:10px;font-weight:bold;min-height:24px;}"
+    "#sample-status{margin:8px 0;color:#666;font-size:14px;}"
     "button:disabled{opacity:0.5;cursor:not-allowed;}"
-    "#name-input{width:100%;padding:10px;margin-bottom:10px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;font-size:15px;}"
+    "#name-input{width:100%;padding:10px;margin-bottom:4px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;font-size:15px;}"
     "</style></head><body>"
     "<h2>Face Enrollment</h2>"
     "<input type=\"text\" id=\"name-input\" placeholder=\"Full name\" maxlength=\"22\">"
+    "<div id=\"sample-status\">Samples added: 0 (3+ recommended)</div>"
     "<video id=\"video\" autoplay playsinline></video>"
     "<canvas id=\"canvas\" width=\"320\" height=\"240\"></canvas>"
     "<div class=\"btn-row\">"
@@ -192,27 +197,36 @@ static const char *enroll_html =
     "</div>"
     "<div class=\"btn-row\" id=\"action-row\" style=\"display:none\">"
     "<button id=\"btn-retake\">Retake</button>"
-    "<button id=\"btn-enroll\">Enroll</button>"
+    "<button id=\"btn-add\">Add Sample</button>"
+    "</div>"
+    "<div class=\"btn-row\" id=\"done-row\" style=\"display:none\">"
+    "<button id=\"btn-done\">Done</button>"
     "</div>"
     "<div id=\"status\"></div>"
     "<script>"
-    "let stream=null, facingMode='user';"
+    "let stream=null, facingMode='user', samples=0, busy=false;"
     "const video=document.getElementById('video');"
     "const canvas=document.getElementById('canvas');"
     "const statusEl=document.getElementById('status');"
+    "const sampleEl=document.getElementById('sample-status');"
     "const params=new URLSearchParams(window.location.search);"
     "const token=params.get('token')||'';"
-    
+
     "const nameInput=document.getElementById('name-input');"
-    "const btnEnroll=document.getElementById('btn-enroll');"
-    
-    "function updateEnrollState(){"
+    "const btnAdd=document.getElementById('btn-add');"
+    "const btnDone=document.getElementById('btn-done');"
+
+    "function setSampleText(){"
+    "  sampleEl.textContent='Samples added: '+samples+' (3+ recommended)';"
+    "}"
+
+    "function updateAddState(){"
     "  const hasName = nameInput.value.trim().length>0;"
     "  const hasCapture = canvas.style.display==='block';"
-    "  btnEnroll.disabled = !(hasName && hasCapture);"
+    "  btnAdd.disabled = busy || !(hasName && hasCapture);"
     "}"
-    
-    "nameInput.addEventListener('input', updateEnrollState);"
+
+    "nameInput.addEventListener('input', updateAddState);"
 
     "async function startCamera(){"
     "  if(stream){stream.getTracks().forEach(t=>t.stop());}"
@@ -222,8 +236,7 @@ static const char *enroll_html =
     "    video.style.display='block';"
     "    canvas.style.display='none';"
     "    document.getElementById('action-row').style.display='none';"
-    "    statusEl.textContent='';"
-    "    updateEnrollState();"
+    "    updateAddState();"
     "  }catch(err){statusEl.textContent='Camera error: '+err.message;}"
     "}"
 
@@ -243,21 +256,42 @@ static const char *enroll_html =
     "  video.style.display='none';"
     "  canvas.style.display='block';"
     "  document.getElementById('action-row').style.display='flex';"
-    "  updateEnrollState();" 
+    "  updateAddState();"
     "});"
 
     "document.getElementById('btn-retake').addEventListener('click', startCamera);"
 
-    "document.getElementById('btn-enroll').addEventListener('click',()=>{"
-    "  if(btnEnroll.disabled) return;"
-    "  statusEl.textContent='Sending...';"
+    "btnAdd.addEventListener('click',()=>{"
+    "  if(btnAdd.disabled) return;"
+    "  busy=true; updateAddState();"
+    "  statusEl.textContent='Sending sample '+(samples+1)+'...';"
     "  canvas.toBlob((blob)=>{"
     "    const name=encodeURIComponent(nameInput.value.trim());"
     "    fetch('/api/face/enroll?token='+encodeURIComponent(token)+'&name='+name,{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})"
     "    .then(r=>r.text().then(text=>({status:r.status,text})))"
-    "    .then(({status,text})=>{statusEl.textContent='HTTP '+status+': '+text;})"
-    "    .catch(err=>{statusEl.textContent='Error: '+err.message;});"
+    "    .then(({status,text})=>{"
+    "      busy=false;"
+    "      if(status===200){"
+    "        samples++; setSampleText();"
+    "        document.getElementById('done-row').style.display='flex';"
+    "        statusEl.textContent='Sample '+samples+' added.';"
+    "        startCamera();"
+    "      } else {"
+    "        statusEl.textContent='HTTP '+status+': '+text;"
+    "        updateAddState();"
+    "      }"
+    "    })"
+    "    .catch(err=>{busy=false; statusEl.textContent='Error: '+err.message; updateAddState();});"
     "  },'image/jpeg',0.85);"
+    "});"
+
+    "btnDone.addEventListener('click',()=>{"
+    "  if(samples===0) return;"
+    "  statusEl.textContent='Enrollment complete: '+samples+' sample(s) for '+nameInput.value.trim()+'.';"
+    "  samples=0; setSampleText();"
+    "  document.getElementById('done-row').style.display='none';"
+    "  nameInput.value='';"
+    "  updateAddState();"
     "});"
 
     "startCamera();"
@@ -626,11 +660,19 @@ static void handle_enroll(httpd_req_t *req, const char *name)
 
     esp_err_t db_ret = face_db_add((uint16_t)new_id, name);
     if (db_ret != ESP_OK) {
-        ESP_LOGW(TAG, "Face enrolled (ID %d) but failed to save name: %s", new_id, esp_err_to_name(db_ret));
+        // نمونه‌ی بدون نگاشت نام در face_db یتیم می‌شود: نه در لیست دیده و نه
+        // حذف می‌شود؛ پس feature تازه‌ساخته را پس می‌گیریم و خطا برمی‌گردانیم
+        face_recognition_delete((uint16_t)new_id);
+        ESP_LOGE(TAG, "Enrollment rolled back (ID %d): failed to save name: %s",
+                 new_id, esp_err_to_name(db_ret));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save enrollment");
+        return;
     }
 
+    size_t sample_no = face_db_count_by_name(name);
     char resp[96];
-    snprintf(resp, sizeof(resp), "Face enrolled successfully: %s (ID: %d)", name, new_id);
+    snprintf(resp, sizeof(resp), "Sample %u enrolled for %s (ID: %d)",
+             (unsigned)sample_no, name, new_id);
     httpd_resp_sendstr(req, resp);
 }
 

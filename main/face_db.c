@@ -142,3 +142,86 @@ bool face_db_get_name(uint16_t id, char *out_buf, size_t out_size)
 
     return found;
 }
+
+size_t face_db_count_by_name(const char *name)
+{
+    if (name == NULL) {
+        return 0;
+    }
+
+    size_t count = 0;
+
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    for (size_t i = 0; i < s_count; i++) {
+        if (strcmp(s_entries[i].name, name) == 0) {
+            count++;
+        }
+    }
+    xSemaphoreGive(s_mutex);
+
+    return count;
+}
+
+size_t face_db_get_persons(face_db_person_t *out_array, size_t max_count)
+{
+    size_t n = 0;
+
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    for (size_t i = 0; i < s_count && n < max_count; i++) {
+        size_t j;
+        for (j = 0; j < n; j++) {
+            if (strcmp(out_array[j].name, s_entries[i].name) == 0) {
+                out_array[j].sample_count++;
+                break;
+            }
+        }
+        if (j == n) {   // نام جدید - به لیست افراد اضافه کن
+            strncpy(out_array[n].name, s_entries[i].name, FACE_DB_NAME_MAX_LEN);
+            out_array[n].name[FACE_DB_NAME_MAX_LEN] = '\0';
+            out_array[n].sample_count = 1;
+            n++;
+        }
+    }
+    xSemaphoreGive(s_mutex);
+
+    return n;
+}
+
+esp_err_t face_db_remove_by_name(const char *name, uint16_t *removed_ids,
+                                 size_t max_ids, size_t *removed_count)
+{
+    if (name == NULL || removed_count == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *removed_count = 0;
+
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+
+    bool changed = false;
+    for (size_t i = 0; i < s_count; ) {
+        if (strcmp(s_entries[i].name, name) == 0) {
+            if (removed_ids != NULL && *removed_count < max_ids) {
+                removed_ids[(*removed_count)++] = s_entries[i].id;
+            }
+            // جابه‌جایی آخرین عضو به این جایگاه - ترتیب لیست اهمیتی ندارد
+            s_entries[i] = s_entries[s_count - 1];
+            s_count--;
+            changed = true;
+            // بدون i++ - عضو جابه‌جا شده هم باید دوباره بررسی شود
+        } else {
+            i++;
+        }
+    }
+
+    esp_err_t ret = ESP_OK;
+    if (!changed) {
+        ret = ESP_ERR_NOT_FOUND;
+    } else {
+        ret = save_to_nvs();
+        ESP_LOGI(TAG, "Removed %u sample(s) of \"%s\"", (unsigned)*removed_count, name);
+    }
+
+    xSemaphoreGive(s_mutex);
+
+    return ret;
+}

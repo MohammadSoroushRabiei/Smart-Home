@@ -21,7 +21,10 @@ static lv_timer_t *s_countdown_timer = NULL;
 static int64_t s_token_expiry_us = 0;
 static lv_obj_t *s_faces_view;
 static lv_obj_t *s_faces_list;
-static uint16_t s_pending_delete_id = 0;
+// لیست تجمیع‌شده‌ی افراد؛ نامِ در حال حذف بین کلیک و تایید مودال نگه داشته می‌شود
+static face_db_person_t s_persons[FACE_DB_MAX_ENTRIES];
+static char s_pending_delete_name[FACE_DB_NAME_MAX_LEN + 1];
+static size_t s_pending_delete_count = 0;
 
 // ===== نمای تغییر رمز (مشترک بین رمز قفل و رمز تنظیمات) =====
 // نقشه‌ی دکمه‌های کیبورد - همانند keypad_screen.c
@@ -157,8 +160,16 @@ static void confirm_cancel_btn_event_cb(lv_event_t *e)
 static void confirm_delete_btn_event_cb(lv_event_t *e)
 {
     lv_obj_t *mbox = (lv_obj_t *)lv_event_get_user_data(e);
-    face_recognition_delete(s_pending_delete_id);
-    face_db_remove(s_pending_delete_id);
+
+    // همه‌ی نمونه‌های این شخص (هر کدام یک feature مستقل) حذف می‌شوند
+    uint16_t removed_ids[FACE_DB_MAX_ENTRIES];
+    size_t removed = 0;
+    if (face_db_remove_by_name(s_pending_delete_name, removed_ids,
+                               FACE_DB_MAX_ENTRIES, &removed) == ESP_OK) {
+        for (size_t i = 0; i < removed; i++) {
+            face_recognition_delete(removed_ids[i]);
+        }
+    }
     lv_msgbox_close(mbox);
     populate_faces_list();
 }
@@ -167,8 +178,7 @@ static void populate_faces_list(void)
 {
     lv_obj_clean(s_faces_list);
 
-    face_db_entry_t entries[FACE_DB_MAX_ENTRIES];
-    size_t n = face_db_get_list(entries, FACE_DB_MAX_ENTRIES);
+    size_t n = face_db_get_persons(s_persons, FACE_DB_MAX_ENTRIES);
 
     if (n == 0) {
         lv_list_add_text(s_faces_list, "No faces enrolled yet");
@@ -176,30 +186,39 @@ static void populate_faces_list(void)
     }
 
     for (size_t i = 0; i < n; i++) {
-        char buf[48];
-        snprintf(buf, sizeof(buf), "#%u  %s", entries[i].id, entries[i].name);
-        
+        char buf[56];
+        snprintf(buf, sizeof(buf), "%s  (%u sample%s)",
+                 s_persons[i].name, (unsigned)s_persons[i].sample_count,
+                 s_persons[i].sample_count == 1 ? "" : "s");
+
         lv_obj_t *btn = lv_list_add_button(s_faces_list, LV_SYMBOL_TRASH, NULL);
-        
+
         /* آیکون سطل زباله قرمز */
         lv_obj_set_style_text_color(btn, lv_color_hex(0xFF0000), LV_PART_MAIN);
-        
+
         lv_obj_t *label = lv_label_create(btn);
         lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN);
         lv_label_set_text(label, buf);
-        
+
         lv_obj_add_event_cb(btn, delete_face_btn_event_cb, LV_EVENT_CLICKED,
-                             (void *)(uintptr_t)entries[i].id);
+                             (void *)(uintptr_t)i);
     }
 }
 
 static void delete_face_btn_event_cb(lv_event_t *e)
 {
-    s_pending_delete_id = (uint16_t)(uintptr_t)lv_event_get_user_data(e);
+    size_t idx = (size_t)(uintptr_t)lv_event_get_user_data(e);
+    strncpy(s_pending_delete_name, s_persons[idx].name, sizeof(s_pending_delete_name) - 1);
+    s_pending_delete_name[sizeof(s_pending_delete_name) - 1] = '\0';
+    s_pending_delete_count = s_persons[idx].sample_count;
 
     lv_obj_t *mbox = lv_msgbox_create(NULL);   // NULL = روی بالاترین لایه، مودال
     lv_msgbox_add_title(mbox, "Confirm Delete");
-    lv_msgbox_add_text(mbox, "Delete this enrolled face?");
+
+    char text[80];
+    snprintf(text, sizeof(text), "Delete all %u sample(s) of \"%s\"?",
+             (unsigned)s_pending_delete_count, s_pending_delete_name);
+    lv_msgbox_add_text(mbox, text);
 
     lv_obj_t *cancel_btn = lv_msgbox_add_footer_button(mbox, "Cancel");
     lv_obj_t *delete_btn = lv_msgbox_add_footer_button(mbox, "Delete");
