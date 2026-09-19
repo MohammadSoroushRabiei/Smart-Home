@@ -1333,6 +1333,8 @@ static esp_err_t api_settings_restart_handler(httpd_req_t *req)
 // حداکثر زمان کل برای دریافت بدنه: قبلاً روی timeout هر recv بی‌قید continue
 // می‌شد، پس کلاینتی که وسط آپلود میخوابید face_worker را تا ابد بلاک می‌کرد
 #define FACE_BODY_DEADLINE_MS   20000
+// فاصله‌ی حداکثر تغذیه‌ی TWDT توسط face_worker - باید از TASK_WDT_TIMEOUT_S کوچک‌تر باشد
+#define FACE_WDT_FEED_MS        5000
 
 static esp_err_t receive_jpeg_body(httpd_req_t *req, uint8_t **out_buf, size_t *out_len)
 {
@@ -1506,13 +1508,16 @@ static void face_worker_task(void *arg)
 {
     face_work_item_t item;
 
-    // عضویت در Task Watchdog: اگر هر چیزی این تسک را برای همیشه گیر اندازد،
-    // TWDT آن را گزارش می‌کند (و با CONFIG_ESP_TASK_WDT_PANIC دستگاه را ریبوت می‌کند).
-    // esp_task_wdt_reset در حلقه‌ی دریافت بدنه و بعد از هر آیتم زده می‌شود.
+    // عضویت در Task Watchdog: اگر هر چیزی این تسک را گیر اندازد، TWDT آن را
+    // گزارش می‌کند (و با CONFIG_ESP_TASK_WDT_PANIC دستگاه را ریبوت می‌کند).
+    // نکته: تسک در بیکاری روی صف می‌ماند، پس منتظرِ صف timeout دارد و در انتهای
+    // هر دور حلقه (بیکار یا پس از پردازش) به TWDT خبر می‌دهد؛ فقط گیر کردن
+    // واقعی که reset نزند باعث panic می‌شود. قبلاً بلاکِ portMAX_DELAY روی صف
+    // خالی، هر ۱۵ ثانیه panic/ریبوت می‌ساخت.
     esp_task_wdt_add(NULL);
 
     while (1) {
-        if (xQueueReceive(s_face_queue, &item, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(s_face_queue, &item, pdMS_TO_TICKS(FACE_WDT_FEED_MS)) == pdTRUE) {
             ESP_LOGI(TAG, "Face worker processing %s request",
                      item.op == FACE_OP_RECOGNIZE ? "recognize" :
                      item.op == FACE_OP_ENROLL    ? "enroll" : "delete");
@@ -1529,8 +1534,9 @@ static void face_worker_task(void *arg)
             if (item.req != NULL) {
                 httpd_req_async_handler_complete(item.req);
             }
-            esp_task_wdt_reset();
         }
+
+        esp_task_wdt_reset();
     }
 }
 
