@@ -496,15 +496,15 @@ void ui_update_ml_status(bool any_auto, float acc_light, uint32_t n_light,
     }
     lv_label_set_text(s_ml_pop_acc, buf);
 
-    // «باید چه باشد» + میزان اطمینان مدل به همان سمت
+    // اطمینان مدل به همان سمتی که می‌گوید: max(p, 1-p)
     snprintf(buf, sizeof(buf), "Light should be: %s (%.0f%%)",
              p_light >= 0.5f ? "ON" : "OFF",
-             (p_light >= 0.5f ? p_light : 100.0f - p_light) * 100.0f);
+             (p_light >= 0.5f ? p_light : 1.0f - p_light) * 100.0f);
     lv_label_set_text(s_ml_pop_light, buf);
 
     snprintf(buf, sizeof(buf), "Fan should be: %s (%.0f%%)",
              p_fan >= 0.5f ? "ON" : "OFF",
-             (p_fan >= 0.5f ? p_fan : 100.0f - p_fan) * 100.0f);
+             (p_fan >= 0.5f ? p_fan : 1.0f - p_fan) * 100.0f);
     lv_label_set_text(s_ml_pop_fan, buf);
 }
 
@@ -513,8 +513,13 @@ void ui_update_virtual_env(bool presence, float lux)
     if (s_ml_pop_env == NULL) {
         return;
     }
-    char buf[32];
-    snprintf(buf, sizeof(buf), "Presence: %s • %.0f lx", presence ? "Home" : "Away", lux);
+    const char *room = lux < 10.0f  ? "Dark"
+                     : lux < 50.0f  ? "Dim"
+                     : lux < 300.0f ? "Indoor"
+                                    : "Bright";
+    char buf[40];
+    snprintf(buf, sizeof(buf), "Home: %s • Room: %s (%.0f lx)",
+             presence ? "Yes" : "No", room, lux);
     lv_label_set_text(s_ml_pop_env, buf);
 }
 
