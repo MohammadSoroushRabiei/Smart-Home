@@ -85,10 +85,10 @@ static void window_push(ml_dev_t *d, bool correct)
 }
 
 /**
- * @brief ویژگی‌های مشترک (بدون بیت 8 که وضعیت فعلی همان دستگاه است) -
- *        قرینه‌ی_exactload در ml/train.py:
- *        0:bias 1:sin(hour) 2:cos(hour) 3:weekend 4:presence
- *        5:lux_n 6:temp_n 7:hum_n
+ * @brief ویژگی‌های مدل (قرینه‌ی_exactload در ml/train.py) - مدل فقط-بافت است
+ *        و وضعیت فعلی دستگاه در آن نیست (پایداری با آستانه‌های اطمینان):
+ *        0:bias 1..6:sin/cos ساعت ×۳ هارمونیک 7:weekend 8:presence
+ *        9:lux_n 10:temp_n 11:hum_n
  */
 static bool build_features_base(float x[ML_N_FEATURES])
 {
@@ -124,12 +124,15 @@ static bool build_features_base(float x[ML_N_FEATURES])
     x[0] = 1.0f;
     x[1] = sinf(2.0f * (float)M_PI * hour / 24.0f);
     x[2] = cosf(2.0f * (float)M_PI * hour / 24.0f);
-    x[3] = (tm_now.tm_wday == 4 || tm_now.tm_wday == 5) ? 1.0f : 0.0f;  // پنج‌شنبه/جمعه
-    x[4] = presence ? 1.0f : 0.0f;
-    x[5] = lux_n;
-    x[6] = temp_n;
-    x[7] = hum_n;
-    x[8] = 0.0f;   // فراخواننده پر می‌کند
+    x[3] = sinf(4.0f * (float)M_PI * hour / 24.0f);
+    x[4] = cosf(4.0f * (float)M_PI * hour / 24.0f);
+    x[5] = sinf(6.0f * (float)M_PI * hour / 24.0f);
+    x[6] = cosf(6.0f * (float)M_PI * hour / 24.0f);
+    x[7] = (tm_now.tm_wday == 4 || tm_now.tm_wday == 5) ? 1.0f : 0.0f;  // پنج‌شنبه/جمعه
+    x[8] = presence ? 1.0f : 0.0f;
+    x[9] = lux_n;
+    x[10] = temp_n;
+    x[11] = hum_n;
     return true;
 }
 
@@ -167,7 +170,6 @@ static void on_device_changed(app_device_t dev, bool new_state,
     if (!build_features_base(x)) {
         return;
     }
-    x[8] = prev_state ? 1.0f : 0.0f;
 
     xSemaphoreTake(s_mutex, portMAX_DELAY);
     float p = ml_predict(&d->model, x);
@@ -217,20 +219,13 @@ static void ml_task_fn(void *arg)
             // خواندن وضعیت فعلی *قبل* از گرفتن قفل ML (بدون hold-and-wait)
             bool cur_light = app_state_get_light();
             bool cur_fan = app_state_get_fan();
-
             have_features = true;
 
             // تصمیم‌ها داخل قفل محاسبه می‌شوند؛ عمل (که خودش observer را
             // صدا می‌زند) حتماً بیرون از قفل - وگرنه deadlock
             xSemaphoreTake(s_mutex, portMAX_DELAY);
-            float xl[ML_N_FEATURES], xf[ML_N_FEATURES];
-            memcpy(xl, xb, sizeof(xb));
-            memcpy(xf, xb, sizeof(xb));
-            xl[8] = cur_light ? 1.0f : 0.0f;
-            xf[8] = cur_fan ? 1.0f : 0.0f;
-
-            p_light = ml_predict(&s_light.model, xl);
-            p_fan = ml_predict(&s_fan.model, xf);
+            p_light = ml_predict(&s_light.model, xb);
+            p_fan = ml_predict(&s_fan.model, xb);
 
             if (s_light.mode == ML_MODE_AUTO) {
                 if (p_light >= ML_ACT_ON_P && !cur_light)  act_light_on = true;

@@ -6,17 +6,21 @@ main/ml_model_weights.h برای استقرار روی ESP32.
 
 بردار ویژگی - باید *دقیقاً* با ml_model.h و ml_agent.c در فیرمور یکی باشد:
   0: bias = 1
-  1: sin(2*pi*hour/24)
-  2: cos(2*pi*hour/24)
-  3: آخر هفته (پنج‌شنبه/جمعه)
-  4: حضور
-  5: min(lux, 1000) / 1000
-  6: clamp((temp - 15) / 15, 0, 1)
-  7: clamp(hum / 100, 0, 1)
-  8: وضعیت فعلی همان دستگاه (هسترزیس)
+  1-6: sin/cos ساعت با ۳ هارمونیک (2πh/24, 4πh/24, 6πh/24)
+       - هارمونیک‌ها برای بازنمایی دو پنجره‌ی شبانه‌ی چراغ (18-24 و 5-8)
+  7: آخر هفته (پنج‌شنبه/جمعه)
+  8: حضور
+  9: min(lux, 1000) / 1000
+  10: clamp((temp - 15) / 15, 0, 1)
+  11: clamp(hum / 100, 0, 1)
 
-آموزش: full-batch gradient descent + L2 (numpy) - دقت انتظاری ~93-95%
-(سقف طبیعی به‌خاطر نویز 4-5% برچسب‌ها).
+عمداً «وضعیت فعلی دستگاه» در ویژگی‌ها نیست: با حضورش، شواهدِ بافت (ساعت/
+حضور/نور/دما) به نفع هسترزیس سرقت می‌شود و مدل در حالت خودکار منفعل می‌ماند.
+پایداری به‌جای هسترزیس با آستانه‌های اطمینان (0.75/0.25) در ml_agent.c تأمین
+می‌شود.
+
+آموزش: full-batch gradient descent + L2 (numpy) - دقت انتظاری ~94%
+(سقف بایز = نویز 4-5% برچسب‌ها).
 
 اجرا:  python ml/train.py     (اول generate_data.py را اجرا کنید)
 """
@@ -32,13 +36,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(HERE, "data", "synthetic_log.csv")
 HEADER_PATH = os.path.abspath(os.path.join(HERE, "..", "main", "ml_model_weights.h"))
 
-N_FEATURES = 9
-FEATURE_NAMES = ["bias", "sin_hour", "cos_hour", "is_weekend", "presence",
-                 "lux_n", "temp_n", "hum_n", "cur_state"]
-EPOCHS = 400
-LR = 0.5
-LR_DECAY = 0.995
-L2 = 1e-4
+N_FEATURES = 12
+FEATURE_NAMES = ["bias", "sin_hour", "cos_hour", "sin_hour2", "cos_hour2",
+                 "sin_hour3", "cos_hour3",
+                 "is_weekend", "presence", "lux_n", "temp_n", "hum_n"]
+EPOCHS = 1500
+LR = 1.0
+LR_DECAY = 0.9995
+L2 = 3e-5
 VAL_DAYS = 6          # آخرین ۶ روز برای اعتبارسنجی
 
 
@@ -74,12 +79,12 @@ def export_header(w_light, w_fan, n_train, acc_l, acc_f):
     content = f"""#pragma once
 // ======================================================================
 //  خودکار تولید شده توسط ml/train.py - لطفاً دستی ویرایش نکنید.
-//  مدل: رگرسیون لجستیک (هیبرید: پیش‌آموزش آفلاین + یادگیری آنلاین SGD)
+//  مدل: رگرسیون لجستیک فقط-بافت (هیبرید: پیش‌آموزش آفلاین + SGD آنلاین)
 //  تاریخ آموزش: {now} | نمونه‌های آموزش: {n_train}
 //  دقت اعتبارسنجی: چراغ {acc_l * 100:.1f}% | فن {acc_f * 100:.1f}%
 // ======================================================================
 
-#define ML_MODEL_VERSION   1
+#define ML_MODEL_VERSION   2
 #define ML_N_FEATURES      {N_FEATURES}
 #define ML_TRAIN_SAMPLES   {n_train}
 
@@ -99,17 +104,19 @@ static const float ML_FAN_W[ML_N_FEATURES] = {{
 
 
 def main():
-    Xl, Xf, y_light, y_fan, days = load_dataset_split_features()
+    X, y_light, y_fan, days = load_dataset()
+    assert X.shape[1] == N_FEATURES
+
     max_day = days.max()
     train_mask = days <= (max_day - VAL_DAYS)
     val_mask = ~train_mask
 
     print(f"samples: train={int(train_mask.sum())}  val={int(val_mask.sum())}")
 
-    w_light = train_model(Xl[train_mask], y_light[train_mask])
-    w_fan = train_model(Xf[train_mask], y_fan[train_mask])
+    w_light = train_model(X[train_mask], y_light[train_mask])
+    w_fan = train_model(X[train_mask], y_fan[train_mask])
 
-    for name, w, X, y in (("LIGHT", w_light, Xl, y_light), ("FAN", w_fan, Xf, y_fan)):
+    for name, w, y in (("LIGHT", w_light, y_light), ("FAN", w_fan, y_fan)):
         a_tr, l_tr = metrics(w, X[train_mask], y[train_mask])
         a_va, l_va = metrics(w, X[val_mask], y[val_mask])
         print(f"\n[{name}]  train acc={a_tr * 100:.2f}%  loss={l_tr:.4f}")
@@ -120,42 +127,37 @@ def main():
     for i, name in enumerate(FEATURE_NAMES):
         print(f"{name:<12}{w_light[i]:>12.4f}{w_fan[i]:>12.4f}")
 
-    acc_l, _ = metrics(w_light, Xl[val_mask], y_light[val_mask])
-    acc_f, _ = metrics(w_fan, Xf[val_mask], y_fan[val_mask])
+    acc_l, _ = metrics(w_light, X[val_mask], y_light[val_mask])
+    acc_f, _ = metrics(w_fan, X[val_mask], y_fan[val_mask])
     export_header(w_light, w_fan, int(train_mask.sum()), acc_l, acc_f)
 
 
-def load_dataset_split_features():
-    """دو ماتریس ویژگی می‌سازد که فقط ستون آخر (وضعیت فعلی) فرق دارد:
-    یکی با cur_light برای مدل چراغ، یکی با cur_fan برای مدل فن."""
-    xs, cur_l, cur_f, y_light, y_fan, days = [], [], [], [], [], []
+def load_dataset():
+    xs, y_light, y_fan, days = [], [], [], []
     with open(DATA_PATH) as f:
         for row in csv.DictReader(f):
             hour = float(row["hour"])
             lux = float(row["lux"])
             temp = float(row["temp"])
             hum = float(row["hum"])
-            x = [
+            xs.append([
                 1.0,
                 math.sin(2 * math.pi * hour / 24.0),
                 math.cos(2 * math.pi * hour / 24.0),
+                math.sin(4 * math.pi * hour / 24.0),
+                math.cos(4 * math.pi * hour / 24.0),
+                math.sin(6 * math.pi * hour / 24.0),
+                math.cos(6 * math.pi * hour / 24.0),
                 float(row["is_weekend"]),
                 float(row["presence"]),
                 min(lux, 1000.0) / 1000.0,
                 min(max((temp - 15.0) / 15.0, 0.0), 1.0),
                 min(max(hum / 100.0, 0.0), 1.0),
-                0.0,
-            ]
-            xs.append(x)
-            cur_l.append(float(row["cur_light"]))
-            cur_f.append(float(row["cur_fan"]))
+            ])
             y_light.append(int(row["label_light"]))
             y_fan.append(int(row["label_fan"]))
             days.append(int(row["day"]))
-    X = np.array(xs, dtype=np.float64)
-    Xl = X.copy(); Xl[:, 8] = cur_l
-    Xf = X.copy(); Xf[:, 8] = cur_f
-    return (Xl, Xf,
+    return (np.array(xs, dtype=np.float64),
             np.array(y_light, dtype=np.float64),
             np.array(y_fan, dtype=np.float64),
             np.array(days))
