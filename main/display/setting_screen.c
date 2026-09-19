@@ -1,6 +1,7 @@
 #include "setting_screen.h"
 #include "enroll_token.h"
 #include "wifi_manager.h"
+#include "password_manager.h"
 #include <stdio.h>
 #include <string.h>
 #include "lvgl.h"
@@ -22,9 +23,45 @@ static lv_obj_t *s_faces_view;
 static lv_obj_t *s_faces_list;
 static uint16_t s_pending_delete_id = 0;
 
+// ===== نمای تغییر رمز (مشترک بین رمز قفل و رمز تنظیمات) =====
+// نقشه‌ی دکمه‌های کیبورد - همانند keypad_screen.c
+static const char *s_pw_btnm_map[] = {
+    "1", "2", "3", "\n",
+    "4", "5", "6", "\n",
+    "7", "8", "9", "\n",
+    "C", "0", "OK", ""
+};
+
+typedef enum {
+    PW_STAGE_CURRENT,   // تایید رمز فعلی
+    PW_STAGE_NEW,       // ورود رمز جدید
+    PW_STAGE_CONFIRM,   // تکرار رمز جدید برای تایید
+} pw_stage_t;
+
+static lv_obj_t *s_pw_view;
+static lv_obj_t *s_pw_title;
+static lv_obj_t *s_pw_textarea;
+static lv_obj_t *s_pw_eye_btn;
+static lv_obj_t *s_pw_error_label;
+static lv_obj_t *s_pw_success_label;
+static lv_obj_t *s_pw_btnm;
+static lv_timer_t *s_pw_success_timer = NULL;
+
+static bool s_pw_visible = false;
+static char s_pw_input_buf[PASSWORD_MAX_LEN + 1];
+static size_t s_pw_input_len = 0;
+
+static pw_stage_t s_pw_stage;
+static password_kind_t s_pw_kind;
+// مقدار موقت رمز جدید - فقط بین مرحله‌ی NEW و CONFIRM نگه داشته می‌شود و
+// به‌محض خروج از این نما (موفق، ناموفق یا انصراف) پاک می‌شود.
+static char s_pw_new_value[PASSWORD_MAX_LEN + 1];
+
 
 static void populate_faces_list(void);
 static void delete_face_btn_event_cb(lv_event_t *e);
+static void start_change_password(password_kind_t kind);
+static void reset_pw_input(void);
 
 
 // ---------------------------------------------------------------------
@@ -37,9 +74,17 @@ static void show_menu_view(void)
         lv_timer_del(s_countdown_timer);
         s_countdown_timer = NULL;
     }
+    if (s_pw_success_timer) {
+        lv_timer_del(s_pw_success_timer);
+        s_pw_success_timer = NULL;
+    }
     lv_obj_add_flag(s_enroll_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_faces_view, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_pw_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_menu_view, LV_OBJ_FLAG_HIDDEN);
+
+    // هر مقدار موقت رمز جدیدی که ممکن است در حافظه مانده باشد را پاک کن
+    memset(s_pw_new_value, 0, sizeof(s_pw_new_value));
 }
 
 static void countdown_timer_cb(lv_timer_t *timer)
@@ -180,6 +225,168 @@ static void faces_back_btn_event_cb(lv_event_t *e)
 {
     show_menu_view();
 }
+
+// ---------------------------------------------------------------------
+// نمای تغییر رمز - قابل استفاده هم برای رمز قفل درب هم رمز منوی تنظیمات
+// ---------------------------------------------------------------------
+
+static void reset_pw_input(void)
+{
+    s_pw_input_len = 0;
+    s_pw_input_buf[0] = '\0';
+    lv_textarea_set_text(s_pw_textarea, "");
+    lv_obj_add_flag(s_pw_error_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_pw_success_label, LV_OBJ_FLAG_HIDDEN);
+
+    s_pw_visible = false;
+    lv_textarea_set_password_mode(s_pw_textarea, true);
+    lv_label_set_text(lv_obj_get_child(s_pw_eye_btn, 0), LV_SYMBOL_EYE_OPEN);
+}
+
+static void show_pw_error(const char *msg)
+{
+    lv_label_set_text(s_pw_error_label, msg);
+    lv_obj_clear_flag(s_pw_error_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_pw_success_label, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void show_pw_success(const char *msg)
+{
+    lv_label_set_text(s_pw_success_label, msg);
+    lv_obj_clear_flag(s_pw_success_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_pw_error_label, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void pw_success_timer_cb(lv_timer_t *timer)
+{
+    s_pw_success_timer = NULL;
+    // بعد از تغییر موفق رمز، به منوی تنظیمات برمی‌گردیم (نه صفحه‌ی اصلی)
+    show_menu_view();
+}
+
+static void start_change_password(password_kind_t kind)
+{
+    s_pw_kind = kind;
+    s_pw_stage = PW_STAGE_CURRENT;
+    memset(s_pw_new_value, 0, sizeof(s_pw_new_value));
+    reset_pw_input();
+
+    lv_label_set_text(s_pw_title,
+        kind == PASSWORD_KIND_SETTINGS ? "Current Settings Password" : "Current Lock Password");
+
+    lv_obj_add_flag(s_menu_view, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(s_pw_view, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void change_settings_pw_btn_event_cb(lv_event_t *e)
+{
+    start_change_password(PASSWORD_KIND_SETTINGS);
+}
+
+static void change_lock_pw_btn_event_cb(lv_event_t *e)
+{
+    start_change_password(PASSWORD_KIND_LOCK);
+}
+
+static void pw_back_btn_event_cb(lv_event_t *e)
+{
+    // انصراف در هر مرحله - چیزی ذخیره نمی‌شود، فقط به منوی تنظیمات برمی‌گردیم
+    show_menu_view();
+}
+
+static void pw_eye_btn_event_cb(lv_event_t *e)
+{
+    s_pw_visible = !s_pw_visible;
+    lv_textarea_set_password_mode(s_pw_textarea, !s_pw_visible);
+    lv_obj_t *icon = lv_obj_get_child(s_pw_eye_btn, 0);
+    lv_label_set_text(icon, s_pw_visible ? LV_SYMBOL_EYE_CLOSE : LV_SYMBOL_EYE_OPEN);
+}
+
+static void pw_btnm_event_cb(lv_event_t *e)
+{
+    if (lv_obj_has_flag(s_pw_view, LV_OBJ_FLAG_HIDDEN)) {
+        return;
+    }
+
+    lv_obj_t *btnm = lv_event_get_target(e);
+    uint32_t id = lv_buttonmatrix_get_selected_button(btnm);
+    const char *txt = lv_buttonmatrix_get_button_text(btnm, id);
+    if (txt == NULL) {
+        return;
+    }
+
+    if (strcmp(txt, "C") == 0) {
+        reset_pw_input();
+        return;
+    }
+
+    if (strcmp(txt, "OK") == 0) {
+        switch (s_pw_stage) {
+
+        case PW_STAGE_CURRENT:
+            if (password_manager_verify(s_pw_kind, s_pw_input_buf)) {
+                s_pw_stage = PW_STAGE_NEW;
+                reset_pw_input();
+                lv_label_set_text(s_pw_title, "Enter New Password");
+            } else {
+                ESP_LOGW(TAG, "Password change rejected: current password incorrect");
+                reset_pw_input();
+                show_pw_error("Wrong password, try again");
+            }
+            break;
+
+        case PW_STAGE_NEW:
+            if (s_pw_input_len < PASSWORD_MIN_LEN) {
+                show_pw_error("Too short (min 4 digits)");
+                reset_pw_input();
+            } else {
+                strncpy(s_pw_new_value, s_pw_input_buf, sizeof(s_pw_new_value) - 1);
+                s_pw_new_value[sizeof(s_pw_new_value) - 1] = '\0';
+                s_pw_stage = PW_STAGE_CONFIRM;
+                reset_pw_input();
+                lv_label_set_text(s_pw_title, "Confirm New Password");
+            }
+            break;
+
+        case PW_STAGE_CONFIRM:
+            if (strcmp(s_pw_input_buf, s_pw_new_value) != 0) {
+                show_pw_error("Passwords do not match");
+                s_pw_stage = PW_STAGE_NEW;
+                memset(s_pw_new_value, 0, sizeof(s_pw_new_value));
+                reset_pw_input();
+                lv_label_set_text(s_pw_title, "Enter New Password");
+            } else {
+                esp_err_t ret = password_manager_set(s_pw_kind, s_pw_new_value);
+                memset(s_pw_new_value, 0, sizeof(s_pw_new_value));
+
+                if (ret == ESP_OK) {
+                    reset_pw_input();
+                    show_pw_success("Password Changed");
+                    if (s_pw_success_timer) {
+                        lv_timer_del(s_pw_success_timer);
+                    }
+                    s_pw_success_timer = lv_timer_create(pw_success_timer_cb, 1200, NULL);
+                    lv_timer_set_repeat_count(s_pw_success_timer, 1);
+                } else {
+                    s_pw_stage = PW_STAGE_NEW;
+                    reset_pw_input();
+                    show_pw_error("Failed to save, try again");
+                    lv_label_set_text(s_pw_title, "Enter New Password");
+                }
+            }
+            break;
+        }
+        return;
+    }
+
+    // رقم عددی
+    if (s_pw_input_len < PASSWORD_MAX_LEN) {
+        s_pw_input_buf[s_pw_input_len++] = txt[0];
+        s_pw_input_buf[s_pw_input_len] = '\0';
+        lv_textarea_set_text(s_pw_textarea, s_pw_input_buf);
+    }
+}
+
 // ---------------------------------------------------------------------
 // API عمومی
 // ---------------------------------------------------------------------
@@ -215,8 +422,8 @@ void settings_screen_init(void)
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
 
     lv_obj_t *enroll_btn = lv_button_create(s_menu_view);
-    lv_obj_set_size(enroll_btn, 220, 60);
-    lv_obj_align(enroll_btn, LV_ALIGN_CENTER, 0, -40);
+    lv_obj_set_size(enroll_btn, 220, 55);
+    lv_obj_align(enroll_btn, LV_ALIGN_TOP_MID, 0, 90);
     lv_obj_set_style_bg_color(enroll_btn, lv_palette_main(LV_PALETTE_GREEN), 0);
     lv_obj_add_event_cb(enroll_btn, enroll_btn_event_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t *enroll_label = lv_label_create(enroll_btn);
@@ -224,13 +431,35 @@ void settings_screen_init(void)
     lv_obj_center(enroll_label);
     
     lv_obj_t *manage_btn = lv_button_create(s_menu_view);
-    lv_obj_set_size(manage_btn, 220, 60);
-    lv_obj_align(manage_btn, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_set_size(manage_btn, 220, 55);
+    lv_obj_align(manage_btn, LV_ALIGN_TOP_MID, 0, 155);
     lv_obj_set_style_bg_color(manage_btn, lv_palette_main(LV_PALETTE_BLUE), 0);
     lv_obj_add_event_cb(manage_btn, manage_faces_btn_event_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t *manage_label = lv_label_create(manage_btn);
     lv_label_set_text(manage_label, "Manage Faces");
     lv_obj_center(manage_label);
+
+    lv_obj_t *change_settings_pw_btn = lv_button_create(s_menu_view);
+    lv_obj_set_size(change_settings_pw_btn, 220, 55);
+    lv_obj_align(change_settings_pw_btn, LV_ALIGN_TOP_MID, 0, 220);
+    lv_obj_set_style_bg_color(change_settings_pw_btn, lv_palette_main(LV_PALETTE_ORANGE), 0);
+    lv_obj_add_event_cb(change_settings_pw_btn, change_settings_pw_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *change_settings_pw_label = lv_label_create(change_settings_pw_btn);
+    lv_label_set_text(change_settings_pw_label, "Change Settings Password");
+    lv_obj_set_style_text_align(change_settings_pw_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(change_settings_pw_label, 200);
+    lv_obj_center(change_settings_pw_label);
+
+    lv_obj_t *change_lock_pw_btn = lv_button_create(s_menu_view);
+    lv_obj_set_size(change_lock_pw_btn, 220, 55);
+    lv_obj_align(change_lock_pw_btn, LV_ALIGN_TOP_MID, 0, 285);
+    lv_obj_set_style_bg_color(change_lock_pw_btn, lv_palette_main(LV_PALETTE_DEEP_PURPLE), 0);
+    lv_obj_add_event_cb(change_lock_pw_btn, change_lock_pw_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *change_lock_pw_label = lv_label_create(change_lock_pw_btn);
+    lv_label_set_text(change_lock_pw_label, "Change Door Lock Password");
+    lv_obj_set_style_text_align(change_lock_pw_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(change_lock_pw_label, 200);
+    lv_obj_center(change_lock_pw_label);
 
     // ===== نمای Enroll QR =====
     s_enroll_view = lv_obj_create(s_overlay);
@@ -292,7 +521,67 @@ void settings_screen_init(void)
 
     lv_obj_add_flag(s_faces_view, LV_OBJ_FLAG_HIDDEN);
 
+    // ===== نمای تغییر رمز (مشترک بین قفل و تنظیمات) =====
+    s_pw_view = lv_obj_create(s_overlay);
+    lv_obj_remove_style_all(s_pw_view);
+    lv_obj_set_size(s_pw_view, LV_PCT(100), LV_PCT(100));
+    lv_obj_clear_flag(s_pw_view, LV_OBJ_FLAG_SCROLLABLE);
 
+    lv_obj_t *pw_back_btn = lv_button_create(s_pw_view);
+    lv_obj_set_size(pw_back_btn, 36, 36);
+    lv_obj_align(pw_back_btn, LV_ALIGN_TOP_LEFT, 5, 5);
+    lv_obj_set_style_bg_color(pw_back_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(pw_back_btn, pw_back_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *pw_back_label = lv_label_create(pw_back_btn);
+    lv_label_set_text(pw_back_label, LV_SYMBOL_LEFT);
+    lv_obj_center(pw_back_label);
+
+    s_pw_title = lv_label_create(s_pw_view);
+    lv_obj_set_style_text_color(s_pw_title, lv_color_white(), 0);
+    lv_label_set_text(s_pw_title, "Current Password");
+    lv_obj_align(s_pw_title, LV_ALIGN_TOP_MID, 0, 12);
+
+    s_pw_textarea = lv_textarea_create(s_pw_view);
+    lv_obj_set_style_text_font(s_pw_textarea, &lv_font_montserrat_28, 0);
+    lv_textarea_set_password_mode(s_pw_textarea, true);
+    lv_textarea_set_one_line(s_pw_textarea, true);
+    lv_textarea_set_max_length(s_pw_textarea, PASSWORD_MAX_LEN);
+    lv_obj_set_width(s_pw_textarea, 160);
+    lv_obj_align(s_pw_textarea, LV_ALIGN_TOP_MID, 0, 45);
+    lv_obj_clear_flag(s_pw_textarea, LV_OBJ_FLAG_CLICKABLE);
+
+    s_pw_eye_btn = lv_button_create(s_pw_view);
+    lv_obj_set_size(s_pw_eye_btn, 36, 36);
+    lv_obj_align_to(s_pw_eye_btn, s_pw_textarea, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
+    lv_obj_add_event_cb(s_pw_eye_btn, pw_eye_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *pw_eye_icon = lv_label_create(s_pw_eye_btn);
+    lv_label_set_text(pw_eye_icon, LV_SYMBOL_EYE_OPEN);
+    lv_obj_center(pw_eye_icon);
+
+    s_pw_error_label = lv_label_create(s_pw_view);
+    lv_obj_set_style_text_color(s_pw_error_label, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_set_width(s_pw_error_label, 220);
+    lv_obj_set_style_text_align(s_pw_error_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(s_pw_error_label, "");
+    lv_obj_align_to(s_pw_error_label, s_pw_textarea, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+    lv_obj_add_flag(s_pw_error_label, LV_OBJ_FLAG_HIDDEN);
+
+    s_pw_success_label = lv_label_create(s_pw_view);
+    lv_obj_set_style_text_color(s_pw_success_label, lv_palette_main(LV_PALETTE_GREEN), 0);
+    lv_obj_set_width(s_pw_success_label, 220);
+    lv_obj_set_style_text_align(s_pw_success_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(s_pw_success_label, "");
+    lv_obj_align_to(s_pw_success_label, s_pw_textarea, LV_ALIGN_OUT_BOTTOM_MID, 0, 3);
+    lv_obj_add_flag(s_pw_success_label, LV_OBJ_FLAG_HIDDEN);
+
+    s_pw_btnm = lv_buttonmatrix_create(s_pw_view);
+    lv_buttonmatrix_set_map(s_pw_btnm, s_pw_btnm_map);
+    lv_obj_set_size(s_pw_btnm, 260, 220);
+    lv_obj_align(s_pw_btnm, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_add_event_cb(s_pw_btnm, pw_btnm_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_buttonmatrix_set_button_ctrl_all(s_pw_btnm, LV_BUTTONMATRIX_CTRL_NO_REPEAT);
+
+    lv_obj_add_flag(s_pw_view, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 
@@ -311,11 +600,17 @@ void settings_screen_hide(void)
         lv_timer_del(s_countdown_timer);
         s_countdown_timer = NULL;
     }
+    if (s_pw_success_timer) {
+        lv_timer_del(s_pw_success_timer);
+        s_pw_success_timer = NULL;
+    }
     enroll_token_invalidate();
+    memset(s_pw_new_value, 0, sizeof(s_pw_new_value));
 
     // بازگشت به نمای منو برای دفعه‌ی بعد که Settings باز می‌شود
     lv_obj_add_flag(s_enroll_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_faces_view, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_pw_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_menu_view, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
