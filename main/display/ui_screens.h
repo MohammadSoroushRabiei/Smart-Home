@@ -42,3 +42,10 @@ void ui_update_virtual_env(bool presence, float lux);
  *        باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.
  */
 void ui_update_mqtt_status(mqtt_manager_state_t state);
+
+/**
+ * @brief QR کد داشبورد وب، زیر لیبل IP در صفحه‌ی اصلی. فقط هنگام اتصال WiFi
+ *        نمایش داده می‌شود (url == NULL یا رشته‌ی خالی = پنهان شدن).
+ *        باید بین lcd_driver_lvgl_lock/unlock صدا زده شود.
+ */
+void ui_update_dashboard_qr(const char *url);

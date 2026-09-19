@@ -356,3 +356,16 @@ bool ml_agent_any_auto(void)
     xSemaphoreGive(s_mutex);
     return any;
 }
+
+void ml_agent_get_stats(ml_agent_stats_t *out)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    out->any_auto = (s_light.mode == ML_MODE_AUTO) || (s_fan.mode == ML_MODE_AUTO);
+    out->p_light = s_last_p_light;
+    out->p_fan = s_last_p_fan;
+    out->acc_light = s_last_acc_l;
+    out->acc_fan = s_last_acc_f;
+    out->n_light = s_last_n_l;
+    out->n_fan = s_last_n_f;
+    xSemaphoreGive(s_mutex);
+}
