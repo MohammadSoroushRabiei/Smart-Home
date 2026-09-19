@@ -99,7 +99,13 @@ static void btnm_event_cb(lv_event_t *e)
     }
 
     if (strcmp(txt, "OK") == 0) {
-        bool ok = password_manager_verify(s_input_buf);
+        // از KEYPAD_PURPOSE_SETTINGS به بعد، رمز تنظیمات و رمز قفل درب دو
+        // رمز کاملاً مستقل هستند (هرکدام جداگانه از منوی تنظیمات قابل
+        // تغییرند) - پس باید نوع درست را به password_manager بدهیم.
+        password_kind_t kind = (s_current_purpose == KEYPAD_PURPOSE_SETTINGS)
+                                    ? PASSWORD_KIND_SETTINGS
+                                    : PASSWORD_KIND_LOCK;
+        bool ok = password_manager_verify(kind, s_input_buf);
         keypad_purpose_t purpose = s_current_purpose;
         keypad_result_cb_t cb = s_current_cb;
 

@@ -265,6 +265,8 @@ static const char *enroll_html =
 
 
 // صفحه‌ی مستقل تغییر رمز - جدا از صفحه‌ی اصلی، هم‌الگو با /capture
+// از این نسخه به بعد، رمز قفل درب و رمز منوی تنظیمات دو رمز مستقل هستند؛
+// کاربر باید مشخص کند کدام‌یک را می‌خواهد تغییر دهد (فیلد "type").
 static const char *password_html =
     "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -273,12 +275,17 @@ static const char *password_html =
     "body{font-family:sans-serif;max-width:360px;margin:40px auto;padding:0 16px;}"
     "h2{text-align:center;}"
     "label{display:block;margin:14px 0 4px;font-size:14px;color:#333;}"
-    "input{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;}"
+    "input,select{width:100%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;}"
     "button{width:100%;margin-top:20px;padding:12px;font-size:16px;border-radius:6px;border:none;background:#2196F3;color:#fff;cursor:pointer;}"
     "#status{margin-top:14px;font-weight:bold;min-height:24px;text-align:center;}"
     "</style></head><body>"
     "<h2>Change Password</h2>"
     "<form id=\"pw-form\">"
+    "<label for=\"type\">Which password?</label>"
+    "<select id=\"type\">"
+    "<option value=\"settings\">Settings Menu Password</option>"
+    "<option value=\"lock\">Door Unlock Password</option>"
+    "</select>"
     "<label for=\"current\">Current password</label>"
     "<input type=\"password\" id=\"current\" inputmode=\"numeric\">"
     "<label for=\"new\">New password (4-8 chars, letters/digits only)</label>"
@@ -293,6 +300,7 @@ static const char *password_html =
     "document.getElementById('pw-form').addEventListener('submit', async (ev)=>{"
     "  ev.preventDefault();"
     "  const statusEl=document.getElementById('status');"
+    "  const type=document.getElementById('type').value;"
     "  const current=document.getElementById('current').value;"
     "  const newPw=document.getElementById('new').value;"
     "  const confirm=document.getElementById('confirm').value;"
@@ -302,7 +310,7 @@ static const char *password_html =
     "  if(newPw!==confirm){ statusEl.textContent='New passwords do not match'; return; }"
     "  statusEl.textContent='Sending...';"
     "  try{"
-    "    const body='current='+encodeURIComponent(current)+'&new='+encodeURIComponent(newPw)+'&confirm='+encodeURIComponent(confirm);"
+    "    const body='type='+encodeURIComponent(type)+'&current='+encodeURIComponent(current)+'&new='+encodeURIComponent(newPw)+'&confirm='+encodeURIComponent(confirm);"
     "    const r=await fetch('/api/password',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});"
     "    const text=await r.text();"
     "    statusEl.textContent='HTTP '+r.status+': '+text;"
@@ -434,6 +442,17 @@ static bool is_alnum_str(const char *s)
     return true;
 }
 
+// نگاشت مقدار فیلد "type" فرم به نوع رمز؛ هر مقدار نامعتبر یا خالی
+// (مثلاً از یک کلاینت قدیمی‌تر که این فیلد را نمی‌فرستاد) به‌طور محافظه‌کارانه
+// رمز منوی تنظیمات در نظر گرفته می‌شود، نه رمز قفل درب.
+static password_kind_t parse_password_kind(const char *type_str)
+{
+    if (type_str != NULL && strcmp(type_str, "lock") == 0) {
+        return PASSWORD_KIND_LOCK;
+    }
+    return PASSWORD_KIND_SETTINGS;
+}
+
 static esp_err_t api_password_handler(httpd_req_t *req)
 {
     if (req->content_len == 0 || req->content_len > PASSWORD_FORM_MAX_SIZE) {
@@ -450,9 +469,14 @@ static esp_err_t api_password_handler(httpd_req_t *req)
     }
     body[received] = '\0';
 
+    char type_str[16] = {0};
     char current[PASSWORD_MAX_LEN + 1] = {0};
     char new_pw[PASSWORD_MAX_LEN + 1] = {0};
     char confirm[PASSWORD_MAX_LEN + 1] = {0};
+
+    // فیلد "type" اختیاری است (سازگاری با کلاینت‌های قدیمی‌تر) - نبودش
+    // یعنی رمز منوی تنظیمات در نظر گرفته می‌شود
+    extract_form_value(body, "type", type_str, sizeof(type_str));
 
     if (!extract_form_value(body, "current", current, sizeof(current)) ||
         !extract_form_value(body, "new", new_pw, sizeof(new_pw)) ||
@@ -462,7 +486,9 @@ static esp_err_t api_password_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    if (!password_manager_verify(current)) {
+    password_kind_t kind = parse_password_kind(type_str);
+
+    if (!password_manager_verify(kind, current)) {
         ESP_LOGW(TAG, "Password change rejected: current password incorrect");
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Current password incorrect");
@@ -481,14 +507,15 @@ static esp_err_t api_password_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    esp_err_t ret = password_manager_set(new_pw);
+    esp_err_t ret = password_manager_set(kind, new_pw);
     if (ret != ESP_OK) {
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_sendstr(req, "Password must be 4-8 characters");
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Password changed successfully via web");
+    ESP_LOGI(TAG, "Password (%s) changed successfully via web",
+             kind == PASSWORD_KIND_SETTINGS ? "settings" : "lock");
     httpd_resp_sendstr(req, "Password changed successfully");
     return ESP_OK;
 }
