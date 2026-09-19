@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "app_state.h"
+#include "ml_agent.h"
 
 static const char *TAG = "mqtt_manager";
 
@@ -28,9 +29,16 @@ static const char *TAG = "mqtt_manager";
 #define TOPIC_STATUS        "smarthome/status"
 #define TOPIC_LIGHT_STATE   "smarthome/light/state"
 #define TOPIC_LIGHT_SET     "smarthome/light/set"
+#define TOPIC_FAN_STATE     "smarthome/fan/state"
+#define TOPIC_FAN_SET       "smarthome/fan/set"
 #define TOPIC_SENSOR_STATE  "smarthome/sensor/state"
 #define TOPIC_ACCESS_STATE  "smarthome/access/state"
 #define TOPIC_LOCK_STATE   "smarthome/lock/state"
+#define TOPIC_PRESENCE      "smarthome/presence/state"
+#define TOPIC_LUX           "smarthome/lux/state"
+#define TOPIC_ML_MODE       "smarthome/ml/mode"
+#define TOPIC_ML_MODE_SET   "smarthome/ml/mode/set"
+#define TOPIC_ML_STATS      "smarthome/ml/stats"
 
 #define DISC_LIGHT   "homeassistant/light/" DEVICE_ID "/light/config"
 #define DISC_TEMP    "homeassistant/sensor/" DEVICE_ID "/temperature/config"
@@ -38,6 +46,13 @@ static const char *TAG = "mqtt_manager";
 #define DISC_PRESS   "homeassistant/sensor/" DEVICE_ID "/pressure/config"
 #define DISC_ACCESS  "homeassistant/event/" DEVICE_ID "/access/config"
 #define DISC_LOCK_STATUS   "homeassistant/binary_sensor/" DEVICE_ID "/lock_status/config"
+#define DISC_FAN           "homeassistant/fan/" DEVICE_ID "/fan/config"
+#define DISC_PRESENCE      "homeassistant/binary_sensor/" DEVICE_ID "/presence/config"
+#define DISC_LUX           "homeassistant/sensor/" DEVICE_ID "/lux/config"
+#define DISC_ML_SWITCH     "homeassistant/switch/" DEVICE_ID "/ml_autonomy/config"
+#define DISC_ML_STATUS     "homeassistant/sensor/" DEVICE_ID "/ml_agent/config"
+#define DISC_ML_PLIGHT     "homeassistant/sensor/" DEVICE_ID "/ml_p_light/config"
+#define DISC_ML_PFAN       "homeassistant/sensor/" DEVICE_ID "/ml_p_fan/config"
 
 #define DEVICE_BLOCK \
     "\"device\":{" \
@@ -142,6 +157,88 @@ static const char *s_lock_status_discovery =
     DEVICE_BLOCK
     "}";
 
+static const char *s_fan_discovery =
+    "{"
+    "\"name\":\"Fan\","
+    "\"unique_id\":\"" DEVICE_ID "_fan\","
+    "\"state_topic\":\"" TOPIC_FAN_STATE "\","
+    "\"command_topic\":\"" TOPIC_FAN_SET "\","
+    "\"payload_on\":\"ON\","
+    "\"payload_off\":\"OFF\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+static const char *s_presence_discovery =
+    "{"
+    "\"name\":\"Presence\","
+    "\"unique_id\":\"" DEVICE_ID "_presence\","
+    "\"state_topic\":\"" TOPIC_PRESENCE "\","
+    "\"payload_on\":\"HOME\","
+    "\"payload_off\":\"AWAY\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+static const char *s_lux_discovery =
+    "{"
+    "\"name\":\"Ambient Light\","
+    "\"unique_id\":\"" DEVICE_ID "_lux\","
+    "\"state_topic\":\"" TOPIC_LUX "\","
+    "\"value_template\":\"{{ value_json.lux }}\","
+    "\"unit_of_measurement\":\"lx\","
+    "\"device_class\":\"illuminance\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+// سوییچ ML Autonomy: فرمان AUTO/SHADOW → ml_agent_set_autonomy
+static const char *s_ml_switch_discovery =
+    "{"
+    "\"name\":\"ML Autonomy\","
+    "\"unique_id\":\"" DEVICE_ID "_ml_autonomy\","
+    "\"state_topic\":\"" TOPIC_ML_MODE "\","
+    "\"command_topic\":\"" TOPIC_ML_MODE_SET "\","
+    "\"payload_on\":\"AUTO\","
+    "\"payload_off\":\"SHADOW\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+// سنسور وضعیت عامل: state = AUTO/SHADOW + بقیه به‌عنوان attribute
+static const char *s_ml_status_discovery =
+    "{"
+    "\"name\":\"ML Agent\","
+    "\"unique_id\":\"" DEVICE_ID "_ml_agent\","
+    "\"state_topic\":\"" TOPIC_ML_STATS "\","
+    "\"value_template\":\"{% if value_json.auto_light or value_json.auto_fan %}AUTO{% else %}SHADOW{% endif %}\","
+    "\"json_attributes_topic\":\"" TOPIC_ML_STATS "\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+static const char *s_ml_p_light_discovery =
+    "{"
+    "\"name\":\"ML Light Probability\","
+    "\"unique_id\":\"" DEVICE_ID "_ml_p_light\","
+    "\"state_topic\":\"" TOPIC_ML_STATS "\","
+    "\"value_template\":\"{{ (value_json.p_light * 100) | round(0) }}\","
+    "\"unit_of_measurement\":\"%\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
+static const char *s_ml_p_fan_discovery =
+    "{"
+    "\"name\":\"ML Fan Probability\","
+    "\"unique_id\":\"" DEVICE_ID "_ml_p_fan\","
+    "\"state_topic\":\"" TOPIC_ML_STATS "\","
+    "\"value_template\":\"{{ (value_json.p_fan * 100) | round(0) }}\","
+    "\"unit_of_measurement\":\"%\","
+    AVAILABILITY_BLOCK ","
+    DEVICE_BLOCK
+    "}";
+
 // ---------------------------------------------------------------------
 // مدیریت وضعیت
 // ---------------------------------------------------------------------
@@ -190,15 +287,34 @@ static void publish_discovery_configs(void)
     esp_mqtt_client_enqueue(s_client, DISC_PRESS,  s_pressure_discovery,  0, 1, true, true);
     esp_mqtt_client_enqueue(s_client, DISC_ACCESS, s_access_discovery,    0, 1, true, true);
     esp_mqtt_client_enqueue(s_client, DISC_LOCK_STATUS, s_lock_status_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_FAN, s_fan_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_PRESENCE, s_presence_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_LUX, s_lux_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_ML_SWITCH, s_ml_switch_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_ML_STATUS, s_ml_status_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_ML_PLIGHT, s_ml_p_light_discovery, 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, DISC_ML_PFAN, s_ml_p_fan_discovery, 0, 1, true, true);
 
-    ESP_LOGI(TAG, "Discovery configs enqueued for 6 entities");
+    ESP_LOGI(TAG, "Discovery configs enqueued for 13 entities");
 }
 
 static void on_main_client_connected(void)
 {
     publish_discovery_configs();
     esp_mqtt_client_enqueue(s_client, TOPIC_STATUS, "online", 0, 1, true, true);
+
+    // همگام‌سازی وضعیت واقعی دستگاه‌ها با HA: retained های قدیمی ممکن است
+    // بعد از ریست برد با وضعیت فعلی فرق داشته باشند
+    esp_mqtt_client_enqueue(s_client, TOPIC_LIGHT_STATE,
+                            app_state_get_light() ? "ON" : "OFF", 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, TOPIC_FAN_STATE,
+                            app_state_get_fan() ? "ON" : "OFF", 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, TOPIC_ML_MODE,
+                            ml_agent_any_auto() ? "AUTO" : "SHADOW", 0, 1, true, true);
+
     esp_mqtt_client_subscribe(s_client, TOPIC_LIGHT_SET, 1);
+    esp_mqtt_client_subscribe(s_client, TOPIC_FAN_SET, 1);
+    esp_mqtt_client_subscribe(s_client, TOPIC_ML_MODE_SET, 1);
 }
 
 static void handle_light_command(esp_mqtt_event_handle_t event)
@@ -206,6 +322,26 @@ static void handle_light_command(esp_mqtt_event_handle_t event)
     bool on = (event->data_len == 2 && memcmp(event->data, "ON", 2) == 0);
     ESP_LOGI(TAG, "Received light command from HA: %s", on ? "ON" : "OFF");
     app_state_set_light(on);
+}
+
+static void handle_fan_command(esp_mqtt_event_handle_t event)
+{
+    bool on = (event->data_len == 2 && memcmp(event->data, "ON", 2) == 0);
+    ESP_LOGI(TAG, "Received fan command from HA: %s", on ? "ON" : "OFF");
+    app_state_set_fan(on);
+}
+
+static void handle_ml_mode_command(esp_mqtt_event_handle_t event)
+{
+    if (event->data_len == 4 && memcmp(event->data, "AUTO", 4) == 0) {
+        ESP_LOGI(TAG, "Received ML autonomy command from HA: AUTO");
+        ml_agent_set_autonomy(true);
+    } else if (event->data_len == 6 && memcmp(event->data, "SHADOW", 6) == 0) {
+        ESP_LOGI(TAG, "Received ML autonomy command from HA: SHADOW");
+        ml_agent_set_autonomy(false);
+    } else {
+        ESP_LOGW(TAG, "Unknown ML mode payload (%d bytes)", event->data_len);
+    }
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
@@ -260,9 +396,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
         break;
 
     case MQTT_EVENT_DATA:
-        if (is_main && event->topic_len == strlen(TOPIC_LIGHT_SET) &&
-            memcmp(event->topic, TOPIC_LIGHT_SET, event->topic_len) == 0) {
-            handle_light_command(event);
+        if (is_main) {
+            if (event->topic_len == strlen(TOPIC_LIGHT_SET) &&
+                memcmp(event->topic, TOPIC_LIGHT_SET, event->topic_len) == 0) {
+                handle_light_command(event);
+            } else if (event->topic_len == strlen(TOPIC_FAN_SET) &&
+                       memcmp(event->topic, TOPIC_FAN_SET, event->topic_len) == 0) {
+                handle_fan_command(event);
+            } else if (event->topic_len == strlen(TOPIC_ML_MODE_SET) &&
+                       memcmp(event->topic, TOPIC_ML_MODE_SET, event->topic_len) == 0) {
+                handle_ml_mode_command(event);
+            }
         }
         break;
 
@@ -561,4 +705,60 @@ void mqtt_manager_publish_lock_state(bool unlocked)
         return;
     }
     esp_mqtt_client_enqueue(s_client, TOPIC_LOCK_STATE, unlocked ? "UNLOCKED" : "LOCKED", 0, 1, true, true);
+}
+
+void mqtt_manager_publish_fan_state(bool on)
+{
+    if (s_client == NULL || !s_mqtt_connected) {
+        return;
+    }
+    esp_mqtt_client_enqueue(s_client, TOPIC_FAN_STATE, on ? "ON" : "OFF", 0, 1, true, true);
+}
+
+void mqtt_manager_publish_presence(bool present)
+{
+    if (s_client == NULL || !s_mqtt_connected) {
+        return;
+    }
+    esp_mqtt_client_enqueue(s_client, TOPIC_PRESENCE, present ? "HOME" : "AWAY", 0, 1, true, true);
+}
+
+void mqtt_manager_publish_lux(float lux)
+{
+    if (s_client == NULL || !s_mqtt_connected) {
+        return;
+    }
+    char payload[32];
+    snprintf(payload, sizeof(payload), "{\"lux\":%.1f}", lux);
+    esp_mqtt_client_enqueue(s_client, TOPIC_LUX, payload, 0, 1, true, true);
+}
+
+void mqtt_manager_publish_ml_mode(bool any_auto)
+{
+    if (s_client == NULL || !s_mqtt_connected) {
+        return;
+    }
+    esp_mqtt_client_enqueue(s_client, TOPIC_ML_MODE, any_auto ? "AUTO" : "SHADOW", 0, 1, true, true);
+}
+
+void mqtt_manager_publish_ml_stats(float p_light, float p_fan,
+                                   float acc_light, float acc_fan,
+                                   uint32_t n_light, uint32_t n_fan,
+                                   uint32_t total_updates,
+                                   bool auto_light, bool auto_fan)
+{
+    if (s_client == NULL || !s_mqtt_connected) {
+        return;
+    }
+    char payload[224];
+    snprintf(payload, sizeof(payload),
+             "{\"p_light\":%.2f,\"p_fan\":%.2f,"
+             "\"acc_light\":%.0f,\"acc_fan\":%.0f,"
+             "\"n_light\":%u,\"n_fan\":%u,"
+             "\"updates\":%u,"
+             "\"auto_light\":%s,\"auto_fan\":%s}",
+             p_light, p_fan, acc_light, acc_fan,
+             (unsigned)n_light, (unsigned)n_fan, (unsigned)total_updates,
+             auto_light ? "true" : "false", auto_fan ? "true" : "false");
+    esp_mqtt_client_enqueue(s_client, TOPIC_ML_STATS, payload, 0, 1, false, true);
 }

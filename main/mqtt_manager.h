@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,6 +96,38 @@ void mqtt_manager_publish_sensor_state(float temp, float hum, float pressure);
  * @brief publish کردن وضعیت واقعی قفل (باز/بسته) به HA.
  */
 void mqtt_manager_publish_lock_state(bool unlocked);
+
+/**
+ * @brief publish کردن وضعیت فن (روشن/خاموش) به HA (retained).
+ */
+void mqtt_manager_publish_fan_state(bool on);
+
+/**
+ * @brief سنسور مجازی حضور (binary_sensor در HA، retained).
+ */
+void mqtt_manager_publish_presence(bool present);
+
+/**
+ * @brief سنسور مجازی نور محیط به لوکس (sensor در HA، retained).
+ */
+void mqtt_manager_publish_lux(float lux);
+
+/**
+ * @brief وضعیت کلی عامل ML روی سوییچ ML Autonomy در HA (retained).
+ */
+void mqtt_manager_publish_ml_mode(bool any_auto);
+
+/**
+ * @brief آمار عامل ML به‌صورت JSON واحد:
+ *        p_light/p_fan (احتمال پیش‌بینی)، acc_light/acc_fan (دقت پنجره %)،
+ *        n_light/n_fan (اندازه پنجره)، updates (کل به‌روزرسانی‌های SGD)،
+ *        auto_light/auto_fan (حالت فعلی هر دستگاه).
+ */
+void mqtt_manager_publish_ml_stats(float p_light, float p_fan,
+                                   float acc_light, float acc_fan,
+                                   uint32_t n_light, uint32_t n_fan,
+                                   uint32_t total_updates,
+                                   bool auto_light, bool auto_fan);
 
 typedef enum {
     ACCESS_EVENT_GRANTED_FACE,
