@@ -517,8 +517,8 @@ void ui_update_virtual_env(bool presence, float lux)
                      : lux < 50.0f  ? "Dim"
                      : lux < 300.0f ? "Indoor"
                                     : "Bright";
-    char buf[40];
-    snprintf(buf, sizeof(buf), "Home: %s • Room: %s (%.0f lx)",
+    char buf[64];
+    snprintf(buf, sizeof(buf), "In Home: %s\nRoom luminance: %s (%.0f lx)",
              presence ? "Yes" : "No", room, lux);
     lv_label_set_text(s_ml_pop_env, buf);
 }
