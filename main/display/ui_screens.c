@@ -25,6 +25,14 @@ static lv_obj_t *s_unlock_btn;
 static lv_obj_t *s_unlock_label;
 static lv_obj_t *s_settings_btn;
 
+// ===== ردیف دوم: دکمه‌ی فن + کارت وضعیت ML/محیط (همگام با HA) =====
+static lv_obj_t *s_fan_btn;
+static lv_obj_t *s_fan_label;
+static lv_obj_t *s_ml_card;
+static lv_obj_t *s_ml_mode_label;   // "ML:AUTO L87 F92" - حالت + دقت پنجره
+static lv_obj_t *s_ml_prob_label;   // "pL95% pF10%" - احتمال پیش‌بینی فعلی
+static lv_obj_t *s_env_label;       // "HOME • 45 lx" - حضور + نور مجازی
+
 // ===== کارت‌های سنسور (جایگزین لیبل واحد قبلی) =====
 static lv_obj_t *s_temp_value_label;
 static lv_obj_t *s_hum_value_label;
@@ -41,6 +49,12 @@ static volatile bool s_wifi_off_in_progress = false;
 static void light_btn_event_cb(lv_event_t *e)
 {
     app_state_set_light(!app_state_get_light());
+}
+
+static void fan_btn_event_cb(lv_event_t *e)
+{
+    // از مسیر رسمی app_state می‌رود: مثل چراغ، نمونه‌ی آموزشی برای مدل ثبت می‌شود
+    app_state_set_fan(!app_state_get_fan());
 }
 
 static void on_keypad_result(keypad_purpose_t purpose, bool success)
@@ -233,6 +247,44 @@ void ui_screens_init(void)
     lv_label_set_text(s_unlock_label, "Locked");
     lv_obj_center(s_unlock_label);
 
+    // ===== ردیف دوم: فن + کارت ML =====
+    s_fan_btn = lv_button_create(scr);
+    lv_obj_set_size(s_fan_btn, 140, 70);
+    lv_obj_align(s_fan_btn, LV_ALIGN_CENTER, -80, 85);
+    lv_obj_set_style_bg_color(s_fan_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(s_fan_btn, fan_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    s_fan_label = lv_label_create(s_fan_btn);
+    lv_label_set_text(s_fan_label, "Fan: OFF");
+    lv_obj_center(s_fan_label);
+
+    s_ml_card = lv_obj_create(scr);
+    lv_obj_remove_style_all(s_ml_card);
+    lv_obj_set_size(s_ml_card, 140, 70);
+    lv_obj_align(s_ml_card, LV_ALIGN_CENTER, 80, 85);
+    lv_obj_set_style_bg_color(s_ml_card, lv_color_hex(0x1E1E1E), 0);
+    lv_obj_set_style_bg_opa(s_ml_card, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(s_ml_card, 14, 0);
+    lv_obj_set_style_border_width(s_ml_card, 3, 0);
+    lv_obj_set_style_border_color(s_ml_card, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_set_style_border_side(s_ml_card, LV_BORDER_SIDE_TOP, 0);
+    lv_obj_clear_flag(s_ml_card, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_ml_mode_label = lv_label_create(s_ml_card);
+    lv_obj_set_style_text_color(s_ml_mode_label, lv_color_hex(0x999999), 0);
+    lv_label_set_text(s_ml_mode_label, "ML:SHADOW");
+    lv_obj_align(s_ml_mode_label, LV_ALIGN_TOP_MID, 0, 6);
+
+    s_ml_prob_label = lv_label_create(s_ml_card);
+    lv_obj_set_style_text_color(s_ml_prob_label, lv_color_white(), 0);
+    lv_label_set_text(s_ml_prob_label, "pL --%  pF --%");
+    lv_obj_align(s_ml_prob_label, LV_ALIGN_CENTER, 0, 0);
+
+    s_env_label = lv_label_create(s_ml_card);
+    lv_obj_set_style_text_color(s_env_label, lv_color_hex(0x999999), 0);
+    lv_label_set_text(s_env_label, "-- • -- lx");
+    lv_obj_align(s_env_label, LV_ALIGN_BOTTOM_MID, 0, -6);
+
     s_settings_btn = lv_button_create(scr);
     lv_obj_set_size(s_settings_btn, 40, 40);
     lv_obj_align(s_settings_btn, LV_ALIGN_TOP_RIGHT, -10, 10);
@@ -305,6 +357,53 @@ void ui_update_lock_status(bool unlocked)
     lv_obj_set_style_bg_color(s_unlock_btn,
         unlocked ? lv_palette_main(LV_PALETTE_GREEN) : lv_palette_main(LV_PALETTE_GREY), 0);
     lv_label_set_text(s_unlock_label, unlocked ? "Unlocked" : "Locked");
+}
+
+void ui_update_fan_status(bool on)
+{
+    if (s_fan_label == NULL) {
+        return;
+    }
+    lv_obj_set_style_bg_color(s_fan_btn,
+        on ? lv_palette_main(LV_PALETTE_CYAN) : lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_label_set_text(s_fan_label, on ? "Fan: ON" : "Fan: OFF");
+}
+
+void ui_update_ml_status(bool any_auto, float acc_light, uint32_t n_light,
+                         float acc_fan, uint32_t n_fan,
+                         float p_light, float p_fan)
+{
+    if (s_ml_mode_label == NULL || s_ml_prob_label == NULL || s_ml_card == NULL) {
+        return;
+    }
+
+    char buf[40];
+    if (n_light > 0 || n_fan > 0) {
+        snprintf(buf, sizeof(buf), "ML:%s L%.0f F%.0f",
+                 any_auto ? "AUTO" : "SHADOW", acc_light, acc_fan);
+    } else {
+        snprintf(buf, sizeof(buf), "ML:%s", any_auto ? "AUTO" : "SHADOW");
+    }
+    lv_label_set_text(s_ml_mode_label, buf);
+    lv_obj_set_style_text_color(s_ml_mode_label,
+        any_auto ? lv_color_white() : lv_color_hex(0x999999), 0);
+
+    // حاشیه‌ی آبی = حداقل یک دستگاه خودکار؛ خاکستری = سایه
+    lv_obj_set_style_border_color(s_ml_card,
+        any_auto ? lv_palette_main(LV_PALETTE_BLUE) : lv_palette_main(LV_PALETTE_GREY), 0);
+
+    snprintf(buf, sizeof(buf), "pL%.0f%%  pF%.0f%%", p_light * 100.0f, p_fan * 100.0f);
+    lv_label_set_text(s_ml_prob_label, buf);
+}
+
+void ui_update_virtual_env(bool presence, float lux)
+{
+    if (s_env_label == NULL) {
+        return;
+    }
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%s • %.0f lx", presence ? "HOME" : "AWAY", lux);
+    lv_label_set_text(s_env_label, buf);
 }
 
 void ui_update_sensor_status(float temp, float hum, float pressure)

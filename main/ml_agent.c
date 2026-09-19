@@ -13,6 +13,8 @@
 #include "mqtt_manager.h"
 #include "time_sync.h"
 #include "virtual_devices.h"
+#include "lcd_driver.h"
+#include "ui_screens.h"
 
 static const char *TAG = "ml_agent";
 
@@ -54,6 +56,23 @@ static ml_dev_t s_light;
 static ml_dev_t s_fan;
 static volatile bool s_dirty = false;      // نیاز به ذخیره در NVS
 static bool s_shadow_lock = false;         // کاربر با سوییچ HA سایه را قفل کرده
+
+// آخرین آمار منتشرشده - برای به‌روزرسانی فوری LCD هنگام تغییر حالت از HA
+static float s_last_p_light = 0.5f, s_last_p_fan = 0.5f;
+static float s_last_acc_l = 0.0f, s_last_acc_f = 0.0f;
+static uint32_t s_last_n_l = 0, s_last_n_f = 0;
+
+static void ml_update_ui(bool auto_light, bool auto_fan)
+{
+    if (!app_state_lcd_available()) {
+        return;
+    }
+    lcd_driver_lvgl_lock();
+    ui_update_ml_status(auto_light || auto_fan,
+                        s_last_acc_l, s_last_n_l, s_last_acc_f, s_last_n_f,
+                        s_last_p_light, s_last_p_fan);
+    lcd_driver_lvgl_unlock();
+}
 
 // ---------------------------------------------------------------------
 // ابزارهای داخلی
@@ -260,6 +279,12 @@ static void ml_task_fn(void *arg)
             mqtt_manager_publish_ml_stats(p_light, p_fan, a_light, a_fan,
                                           n_light, n_fan, upd_total,
                                           auto_light, auto_fan);
+
+            // کش آمار برای بازخورد فوری LCD در ml_agent_set_autonomy
+            s_last_p_light = p_light;  s_last_p_fan = p_fan;
+            s_last_acc_l = a_light;    s_last_acc_f = a_fan;
+            s_last_n_l = n_light;      s_last_n_f = n_fan;
+            ml_update_ui(auto_light, auto_fan);
         }
 
         // ذخیره‌ی وزن‌ها در NVS (هر سیکل حداکثر یک‌بار)
@@ -319,6 +344,7 @@ void ml_agent_set_autonomy(bool auto_mode)
     xSemaphoreGive(s_mutex);
 
     mqtt_manager_publish_ml_mode(ml_agent_any_auto());
+    ml_update_ui(auto_mode, auto_mode);   // بازخورد فوری روی LCD
     ESP_LOGI(TAG, "Autonomy forced via HA: %s (shadow-lock=%s)",
              auto_mode ? "AUTO" : "SHADOW", auto_mode ? "no" : "yes");
 }

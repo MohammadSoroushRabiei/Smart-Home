@@ -302,6 +302,16 @@ static void on_main_client_connected(void)
 {
     publish_discovery_configs();
     esp_mqtt_client_enqueue(s_client, TOPIC_STATUS, "online", 0, 1, true, true);
+
+    // همگام‌سازی وضعیت واقعی دستگاه‌ها با HA: retained های قدیمی ممکن است
+    // بعد از ریست برد با وضعیت فعلی فرق داشته باشند
+    esp_mqtt_client_enqueue(s_client, TOPIC_LIGHT_STATE,
+                            app_state_get_light() ? "ON" : "OFF", 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, TOPIC_FAN_STATE,
+                            app_state_get_fan() ? "ON" : "OFF", 0, 1, true, true);
+    esp_mqtt_client_enqueue(s_client, TOPIC_ML_MODE,
+                            ml_agent_any_auto() ? "AUTO" : "SHADOW", 0, 1, true, true);
+
     esp_mqtt_client_subscribe(s_client, TOPIC_LIGHT_SET, 1);
     esp_mqtt_client_subscribe(s_client, TOPIC_FAN_SET, 1);
     esp_mqtt_client_subscribe(s_client, TOPIC_ML_MODE_SET, 1);

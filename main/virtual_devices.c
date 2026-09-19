@@ -11,6 +11,9 @@
 #include "esp_timer.h"
 #include "mqtt_manager.h"
 #include "time_sync.h"
+#include "app_state.h"
+#include "lcd_driver.h"
+#include "ui_screens.h"
 
 static const char *TAG = "virtual_dev";
 
@@ -138,6 +141,13 @@ static void virtual_task_fn(void *arg)
             }
             mqtt_manager_publish_presence(presence);
             mqtt_manager_publish_lux(lux);
+
+            // همگام‌سازی LCD با entity های Presence/Ambient Light در HA
+            if (app_state_lcd_available()) {
+                lcd_driver_lvgl_lock();
+                ui_update_virtual_env(presence, lux);
+                lcd_driver_lvgl_unlock();
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(VD_TASK_PERIOD_MS));
     }
@@ -157,10 +167,20 @@ void virtual_devices_notify_user_seen(void)
 {
     s_home_until_us = esp_timer_get_time() + (int64_t)VD_HOME_FORCE_MS * 1000;
 
+    float lux_now;
     xSemaphoreTake(s_mutex, portMAX_DELAY);
     s_presence = true;
     s_values_valid = true;
+    lux_now = s_lux;
     xSemaphoreGive(s_mutex);
+
+    // بازخورد فوری روی LCD (مثلاً از مسیر نتیجه‌ی کیپد در تسک LVGL - قفل
+    // بازگشتی است و مشکلی ندارد)
+    if (app_state_lcd_available()) {
+        lcd_driver_lvgl_lock();
+        ui_update_virtual_env(true, lux_now);
+        lcd_driver_lvgl_unlock();
+    }
 
     ESP_LOGI(TAG, "User seen (unlock) - presence forced home for 45min");
 }

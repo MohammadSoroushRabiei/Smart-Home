@@ -22,6 +22,12 @@ void app_state_set_light(bool on);
 void app_state_set_lcd_available(bool available);
 
 /**
+ * @brief آیا LCD آماده است؟ ماژول‌های غیر UI (ml_agent، virtual_devices) با
+ *        این چک می‌کنند که آیا به‌روزرسانی مستقیم UI برایشان مجاز است.
+ */
+bool app_state_lcd_available(void);
+
+/**
  * دستگاه‌های قابل کنترل (قفل عمداً در این فهرست نیست - هرگز خودکار نمی‌شود)
  */
 typedef enum {

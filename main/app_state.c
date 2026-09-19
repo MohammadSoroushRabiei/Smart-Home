@@ -51,6 +51,11 @@ void app_state_set_lcd_available(bool available)
     s_lcd_available = available;
 }
 
+bool app_state_lcd_available(void)
+{
+    return s_lcd_available;
+}
+
 void app_state_register_device_cb(app_state_device_cb_t cb)
 {
     s_device_cb = cb;
@@ -113,7 +118,7 @@ bool app_state_get_fan(void)
     return value;
 }
 
-// فن فعلاً مجازی است (بدون GPIO/رله) - فقط وضعیت + publish + observer.
+// فن فعلاً مجازی است (بدون GPIO/رله) - وضعیت + publish + UI + observer.
 // با اتصال رله واقعی، همین‌جا set_level اضافه می‌شود.
 static void set_fan_core(bool on, bool from_ml)
 {
@@ -130,6 +135,13 @@ static void set_fan_core(bool on, bool from_ml)
              from_ml ? "ML" : "user");
 
     mqtt_manager_publish_fan_state(on);
+
+    if (s_lcd_available) {
+        lcd_driver_lvgl_lock();
+        ui_update_fan_status(on);
+        lcd_driver_lvgl_unlock();
+    }
+
     notify_device_change(APP_DEV_FAN, on, prev, from_ml);
 }
 
