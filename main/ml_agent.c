@@ -301,7 +301,7 @@ void ml_agent_init(void)
         ESP_LOGI(TAG, "Restored learned models (pretrained fallback skipped)");
     } else {
         ESP_LOGI(TAG, "No valid NVS state - using pretrained weights "
-                      "(light acc ~91%, fan acc ~93% on synthetic data)");
+                      "(light acc ~94%%, fan acc ~93%% on synthetic data)");
     }
 
     app_state_register_device_cb(on_device_changed);
