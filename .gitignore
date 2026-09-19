@@ -61,6 +61,9 @@ venv/
 .venv/
 env/
 
+# ML pipeline: داده‌ی تولیدشده - با اجرای ml/generate_data.py بازتولید می‌شود
+ml/data/
+
 # Language Servers
 .clangd/
 .ccls-cache/

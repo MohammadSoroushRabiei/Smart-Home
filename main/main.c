@@ -26,6 +26,9 @@
 #include "enroll_token.h"
 #include "setting_screen.h"
 #include "face_db.h"
+#include "time_sync.h"
+#include "ml_agent.h"
+#include "virtual_devices.h"
 
 static bool s_lcd_ok = false;
 
@@ -92,8 +95,9 @@ void app_main(void)
     ESP_ERROR_CHECK(mqtt_config_init());
 
     wifi_manager_init_radio();
-    
-    
+
+    time_sync_init();          // SNTP غیربلاک‌کننده - با وصل‌شدن WiFi ساعت می‌گیرد
+
     ESP_ERROR_CHECK(password_manager_init());
     ESP_ERROR_CHECK(enroll_token_init());
     ESP_ERROR_CHECK(face_db_init());
@@ -129,6 +133,10 @@ void app_main(void)
     btn_init();
     lock_init();
 
+    // عامل ML باید قبل از هر تعامل کاربر observer خودش را ثبت کند تا هیچ
+    // اقدام دستی‌ای از قلم نیفتد؛ خودش تا sync شدن ساعت منتظر می‌ماند.
+    ml_agent_init();
+
 
     wifi_register_state_change_cb(on_wifi_state_change);
     wifi_manager_enable();
@@ -144,6 +152,8 @@ void app_main(void)
     } else {
         ESP_LOGW("main", "BME280 not found, continuing without sensor data");
     }
+
+    virtual_devices_start();   // سنسورهای مجازی حضور/نور - مدل ML به آن‌ها وابسته است
 
     http_server_start();
 
