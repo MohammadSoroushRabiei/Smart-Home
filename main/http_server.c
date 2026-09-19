@@ -2,9 +2,10 @@
 #include "face_recognition.h"
 #include "password_manager.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "esp_task_wdt.h"
 #include "esp_heap_caps.h"
 #include "esp_random.h"
-#include "esp_timer.h"
 #include "esp_system.h"
 #include "led.h"
 #include "freertos/FreeRTOS.h"
@@ -1329,6 +1330,10 @@ static esp_err_t api_settings_restart_handler(httpd_req_t *req)
 // پردازش سنگین چهره - این تابع فقط داخل face_worker_task اجرا می‌شود
 // ---------------------------------------------------------------------
 
+// حداکثر زمان کل برای دریافت بدنه: قبلاً روی timeout هر recv بی‌قید continue
+// می‌شد، پس کلاینتی که وسط آپلود میخوابید face_worker را تا ابد بلاک می‌کرد
+#define FACE_BODY_DEADLINE_MS   20000
+
 static esp_err_t receive_jpeg_body(httpd_req_t *req, uint8_t **out_buf, size_t *out_len)
 {
     size_t content_len = req->content_len;
@@ -1341,22 +1346,58 @@ static esp_err_t receive_jpeg_body(httpd_req_t *req, uint8_t **out_buf, size_t *
         return ESP_ERR_NO_MEM;
     }
 
-    int total_received = 0;
+    int64_t deadline_us = esp_timer_get_time() + ((int64_t)FACE_BODY_DEADLINE_MS * 1000);
+    size_t total_received = 0;
     while (total_received < content_len) {
         int received = httpd_req_recv(req, (char *)buf + total_received, content_len - total_received);
-        if (received <= 0) {
-            if (received == HTTPD_SOCK_ERR_TIMEOUT) {
-                continue;
+        if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+            if (esp_timer_get_time() > deadline_us) {
+                ESP_LOGE(TAG, "Client stalled mid-upload (%u/%u bytes) - aborting",
+                         (unsigned)total_received, (unsigned)content_len);
+                heap_caps_free(buf);
+                return ESP_ERR_TIMEOUT;
             }
+            continue;   // مهلت کل هنوز تمام نشده - منتظر بایت بعدی
+        }
+        if (received <= 0) {
+            ESP_LOGE(TAG, "Receive failed after %u/%u bytes",
+                     (unsigned)total_received, (unsigned)content_len);
             heap_caps_free(buf);
             return ESP_FAIL;
         }
         total_received += received;
+        esp_task_wdt_reset();   // آپلودهای کند شبکه نباید TWDT را بنشانند
+    }
+
+    // امضای JPEG (SOI) - زودتر از کتابخانه رد می‌شود تا خطای شفاف به کلاینت برسد
+    if (total_received < 2 || buf[0] != 0xFF || buf[1] != 0xD8) {
+        heap_caps_free(buf);
+        return ESP_ERR_INVALID_RESPONSE;
     }
 
     *out_buf = buf;
     *out_len = total_received;
     return ESP_OK;
+}
+
+// پاسخ HTTP مناسب برای هر کد خطای receive_jpeg_body - مشترک بین recognize و enroll
+static void send_receive_body_error(httpd_req_t *req, esp_err_t ret)
+{
+    switch (ret) {
+    case ESP_ERR_INVALID_SIZE:
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid image size");
+        break;
+    case ESP_ERR_INVALID_RESPONSE:
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Not a JPEG image");
+        break;
+    case ESP_ERR_TIMEOUT:
+        httpd_resp_set_status(req, "408 Request Timeout");
+        httpd_resp_sendstr(req, "Client stalled during image upload");
+        break;
+    default:
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive image");
+        break;
+    }
 }
 
 static void handle_recognize(httpd_req_t *req)
@@ -1365,11 +1406,8 @@ static void handle_recognize(httpd_req_t *req)
     size_t len = 0;
 
     esp_err_t ret = receive_jpeg_body(req, &jpeg_buf, &len);
-    if (ret == ESP_ERR_INVALID_SIZE) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid image size");
-        return;
-    } else if (ret != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive image");
+    if (ret != ESP_OK) {
+        send_receive_body_error(req, ret);
         return;
     }
 
@@ -1412,11 +1450,8 @@ static void handle_enroll(httpd_req_t *req, const char *name)
     size_t len = 0;
 
     esp_err_t ret = receive_jpeg_body(req, &jpeg_buf, &len);
-    if (ret == ESP_ERR_INVALID_SIZE) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid image size");
-        return;
-    } else if (ret != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive image");
+    if (ret != ESP_OK) {
+        send_receive_body_error(req, ret);
         return;
     }
 
@@ -1471,6 +1506,11 @@ static void face_worker_task(void *arg)
 {
     face_work_item_t item;
 
+    // عضویت در Task Watchdog: اگر هر چیزی این تسک را برای همیشه گیر اندازد،
+    // TWDT آن را گزارش می‌کند (و با CONFIG_ESP_TASK_WDT_PANIC دستگاه را ریبوت می‌کند).
+    // esp_task_wdt_reset در حلقه‌ی دریافت بدنه و بعد از هر آیتم زده می‌شود.
+    esp_task_wdt_add(NULL);
+
     while (1) {
         if (xQueueReceive(s_face_queue, &item, portMAX_DELAY) == pdTRUE) {
             ESP_LOGI(TAG, "Face worker processing %s request",
@@ -1489,6 +1529,7 @@ static void face_worker_task(void *arg)
             if (item.req != NULL) {
                 httpd_req_async_handler_complete(item.req);
             }
+            esp_task_wdt_reset();
         }
     }
 }
