@@ -26,14 +26,21 @@ static lv_obj_t *s_unlock_btn;
 static lv_obj_t *s_unlock_label;
 static lv_obj_t *s_settings_btn;
 
-// ===== ردیف دوم: دکمه‌ی فن + کارت وضعیت ML/محیط (همگام با HA) =====
+// ===== ردیف دوم: دکمه‌ی فن + دکمه‌ی حالت ML (همگام با HA) =====
 static lv_obj_t *s_fan_btn;
 static lv_obj_t *s_fan_label;
-static lv_obj_t *s_ml_card;
-static lv_obj_t *s_ml_mode_label;   // "ML:AUTO" / "ML:SHADOW" - تپ = تغییر autonomy
-static lv_obj_t *s_ml_acc_label;    // "L87% F92%" - دقت پنجره‌ی هر دستگاه
-static lv_obj_t *s_ml_prob_label;   // "pL95% pF10%" - احتمال پیش‌بینی فعلی
-static lv_obj_t *s_env_label;       // "HOME • 45 lx" - حضور + نور مجازی
+static lv_obj_t *s_ml_btn;
+static lv_obj_t *s_ml_btn_label;
+
+// پاپ‌آپ جزئیات ML - با هولد روی دکمه‌ی ML باز می‌شود
+static lv_obj_t *s_ml_popup;
+static lv_obj_t *s_ml_pop_mode;     // "Mode: SHADOW"
+static lv_obj_t *s_ml_pop_acc;      // "Agrees: Light 87% Fan 92%"
+static lv_obj_t *s_ml_pop_light;    // "Light should be: ON (95%)"
+static lv_obj_t *s_ml_pop_fan;      // "Fan should be: OFF (10%)"
+static lv_obj_t *s_ml_pop_env;      // "Presence: Home • 45 lx"
+static bool s_ml_btn_hold_handled = false;
+static bool s_ml_popup_visible = false;
 
 // ===== کارت‌های سنسور (جایگزین لیبل واحد قبلی) =====
 static lv_obj_t *s_temp_value_label;
@@ -59,11 +66,39 @@ static void fan_btn_event_cb(lv_event_t *e)
     app_state_set_fan(!app_state_get_fan());
 }
 
-// تپ روی کارت ML = تغییر حالت autonomy (همان کاری که سوییچ ML Autonomy در
-// HA می‌کند) - هم LCD و هم HA بلافاصله همگام می‌شوند
-static void ml_card_click_cb(lv_event_t *e)
+static void ml_popup_close(void)
 {
+    if (s_ml_popup != NULL) {
+        lv_obj_add_flag(s_ml_popup, LV_OBJ_FLAG_HIDDEN);
+        s_ml_popup_visible = false;
+    }
+}
+
+// تپ روی دکمه‌ی ML = تغییر حالت autonomy (همان سوییچ ML Autonomy در HA؛
+// هر دو طرف فوراً همگام می‌شوند)
+static void ml_btn_click_cb(lv_event_t *e)
+{
+    if (s_ml_btn_hold_handled) {
+        s_ml_btn_hold_handled = false;
+        return;
+    }
     ml_agent_set_autonomy(!ml_agent_any_auto());
+}
+
+// هولد روی دکمه‌ی ML = پاپ‌آپ جزئیات (دقت، پیش‌بینی، محیط)
+static void ml_btn_hold_cb(lv_event_t *e)
+{
+    s_ml_btn_hold_handled = true;
+    if (s_ml_popup != NULL) {
+        lv_obj_clear_flag(s_ml_popup, LV_OBJ_FLAG_HIDDEN);
+        s_ml_popup_visible = true;
+    }
+}
+
+static void ml_popup_close_cb(lv_event_t *e)
+{
+    (void)e;
+    ml_popup_close();
 }
 
 static void on_keypad_result(keypad_purpose_t purpose, bool success)
@@ -243,7 +278,7 @@ void ui_screens_init(void)
     lv_obj_add_event_cb(s_light_btn, light_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     s_light_label = lv_label_create(s_light_btn);
-    lv_label_set_text(s_light_label, "Light: OFF");
+    lv_label_set_text(s_light_label, LV_SYMBOL_POWER " Light: OFF");
     lv_obj_center(s_light_label);
 
     s_unlock_btn = lv_button_create(scr);
@@ -253,10 +288,10 @@ void ui_screens_init(void)
     lv_obj_add_event_cb(s_unlock_btn, unlock_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     s_unlock_label = lv_label_create(s_unlock_btn);
-    lv_label_set_text(s_unlock_label, "Locked");
+    lv_label_set_text(s_unlock_label, LV_SYMBOL_CLOSE " Locked");
     lv_obj_center(s_unlock_label);
 
-    // ===== ردیف دوم: فن + کارت ML =====
+    // ===== ردیف دوم: فن + دکمه‌ی حالت ML =====
     s_fan_btn = lv_button_create(scr);
     lv_obj_set_size(s_fan_btn, 140, 70);
     lv_obj_align(s_fan_btn, LV_ALIGN_CENTER, -80, 85);
@@ -264,42 +299,20 @@ void ui_screens_init(void)
     lv_obj_add_event_cb(s_fan_btn, fan_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     s_fan_label = lv_label_create(s_fan_btn);
-    lv_label_set_text(s_fan_label, "Fan: OFF");
+    lv_label_set_text(s_fan_label, LV_SYMBOL_STOP " Fan: OFF");
     lv_obj_center(s_fan_label);
 
-    s_ml_card = lv_obj_create(scr);
-    lv_obj_remove_style_all(s_ml_card);
-    lv_obj_set_size(s_ml_card, 140, 80);
-    lv_obj_align(s_ml_card, LV_ALIGN_CENTER, 80, 85);
-    lv_obj_set_style_bg_color(s_ml_card, lv_color_hex(0x1E1E1E), 0);
-    lv_obj_set_style_bg_opa(s_ml_card, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(s_ml_card, 14, 0);
-    lv_obj_set_style_border_width(s_ml_card, 3, 0);
-    lv_obj_set_style_border_color(s_ml_card, lv_palette_main(LV_PALETTE_GREY), 0);
-    lv_obj_set_style_border_side(s_ml_card, LV_BORDER_SIDE_TOP, 0);
-    lv_obj_clear_flag(s_ml_card, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(s_ml_card, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(s_ml_card, ml_card_click_cb, LV_EVENT_CLICKED, NULL);
+    // تپ = تغییر SHADOW/AUTO، هولد = پاپ‌آپ جزئیات
+    s_ml_btn = lv_button_create(scr);
+    lv_obj_set_size(s_ml_btn, 140, 70);
+    lv_obj_align(s_ml_btn, LV_ALIGN_CENTER, 80, 85);
+    lv_obj_set_style_bg_color(s_ml_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(s_ml_btn, ml_btn_click_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_ml_btn, ml_btn_hold_cb, LV_EVENT_LONG_PRESSED, NULL);
 
-    s_ml_mode_label = lv_label_create(s_ml_card);
-    lv_obj_set_style_text_color(s_ml_mode_label, lv_color_hex(0x999999), 0);
-    lv_label_set_text(s_ml_mode_label, "ML:SHADOW");
-    lv_obj_align(s_ml_mode_label, LV_ALIGN_TOP_MID, 0, 5);
-
-    s_ml_acc_label = lv_label_create(s_ml_card);
-    lv_obj_set_style_text_color(s_ml_acc_label, lv_color_white(), 0);
-    lv_label_set_text(s_ml_acc_label, "L--% F--%");
-    lv_obj_align(s_ml_acc_label, LV_ALIGN_TOP_MID, 0, 22);
-
-    s_ml_prob_label = lv_label_create(s_ml_card);
-    lv_obj_set_style_text_color(s_ml_prob_label, lv_color_white(), 0);
-    lv_label_set_text(s_ml_prob_label, "pL --% pF --%");
-    lv_obj_align(s_ml_prob_label, LV_ALIGN_TOP_MID, 0, 39);
-
-    s_env_label = lv_label_create(s_ml_card);
-    lv_obj_set_style_text_color(s_env_label, lv_color_hex(0x999999), 0);
-    lv_label_set_text(s_env_label, "-- • -- lx");
-    lv_obj_align(s_env_label, LV_ALIGN_BOTTOM_MID, 0, -5);
+    s_ml_btn_label = lv_label_create(s_ml_btn);
+    lv_label_set_text(s_ml_btn_label, LV_SYMBOL_EYE_OPEN " ML: SHADOW");
+    lv_obj_center(s_ml_btn_label);
 
     s_settings_btn = lv_button_create(scr);
     lv_obj_set_size(s_settings_btn, 40, 40);
@@ -322,6 +335,72 @@ void ui_screens_init(void)
     lv_obj_t *card_press = create_sensor_card(scr, "Pressure", "hPa",
         lv_palette_main(LV_PALETTE_GREEN), &s_press_value_label);
     lv_obj_align(card_press, LV_ALIGN_BOTTOM_MID, 104, -14);
+
+    // ===== پاپ‌آپ جزئیات ML (هولد روی دکمه‌ی ML) - آخرین ویجت تا روی همه باشد =====
+    // پس‌زمینه‌ی نیمه‌شفاف: تپ روی فضای خالی = بستن
+    s_ml_popup = lv_obj_create(scr);
+    lv_obj_remove_style_all(s_ml_popup);
+    lv_obj_set_size(s_ml_popup, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(s_ml_popup, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(s_ml_popup, LV_OPA_60, 0);
+    lv_obj_clear_flag(s_ml_popup, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_ml_popup, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_ml_popup, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(s_ml_popup, ml_popup_close_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *panel = lv_obj_create(s_ml_popup);
+    lv_obj_remove_style_all(panel);
+    lv_obj_set_size(panel, 250, 200);
+    lv_obj_align(panel, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(panel, lv_color_hex(0x1E1E1E), 0);
+    lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(panel, 14, 0);
+    lv_obj_set_style_border_width(panel, 3, 0);
+    lv_obj_set_style_border_color(panel, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *pop_title = lv_label_create(panel);
+    lv_label_set_text(pop_title, "ML Agent");
+    lv_obj_set_style_text_color(pop_title, lv_color_white(), 0);
+    lv_obj_align(pop_title, LV_ALIGN_TOP_LEFT, 12, 10);
+
+    lv_obj_t *pop_close = lv_button_create(panel);
+    lv_obj_set_size(pop_close, 34, 34);
+    lv_obj_align(pop_close, LV_ALIGN_TOP_RIGHT, -8, -8);
+    lv_obj_add_event_cb(pop_close, ml_popup_close_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *close_icon = lv_label_create(pop_close);
+    lv_label_set_text(close_icon, LV_SYMBOL_CLOSE);
+    lv_obj_center(close_icon);
+
+    s_ml_pop_mode = lv_label_create(panel);
+    lv_obj_set_style_text_color(s_ml_pop_mode, lv_color_white(), 0);
+    lv_label_set_text(s_ml_pop_mode, "Mode: SHADOW");
+    lv_obj_align(s_ml_pop_mode, LV_ALIGN_TOP_LEFT, 12, 40);
+
+    s_ml_pop_acc = lv_label_create(panel);
+    lv_obj_set_style_text_color(s_ml_pop_acc, lv_color_white(), 0);
+    lv_label_set_text(s_ml_pop_acc, "Agrees: Light --% Fan --%");
+    lv_obj_align(s_ml_pop_acc, LV_ALIGN_TOP_LEFT, 12, 62);
+
+    s_ml_pop_light = lv_label_create(panel);
+    lv_obj_set_style_text_color(s_ml_pop_light, lv_color_white(), 0);
+    lv_label_set_text(s_ml_pop_light, "Light should be: -- (--%)");
+    lv_obj_align(s_ml_pop_light, LV_ALIGN_TOP_LEFT, 12, 84);
+
+    s_ml_pop_fan = lv_label_create(panel);
+    lv_obj_set_style_text_color(s_ml_pop_fan, lv_color_white(), 0);
+    lv_label_set_text(s_ml_pop_fan, "Fan should be: -- (--%)");
+    lv_obj_align(s_ml_pop_fan, LV_ALIGN_TOP_LEFT, 12, 106);
+
+    s_ml_pop_env = lv_label_create(panel);
+    lv_obj_set_style_text_color(s_ml_pop_env, lv_color_white(), 0);
+    lv_label_set_text(s_ml_pop_env, "Presence: -- • -- lx");
+    lv_obj_align(s_ml_pop_env, LV_ALIGN_TOP_LEFT, 12, 128);
+
+    lv_obj_t *pop_hint = lv_label_create(panel);
+    lv_obj_set_style_text_color(pop_hint, lv_color_hex(0x999999), 0);
+    lv_label_set_text(pop_hint, "Tap ML button = switch mode");
+    lv_obj_align(pop_hint, LV_ALIGN_BOTTOM_LEFT, 12, -10);
 }
 
 void ui_update_wifi_status(wifi_state_t state)
@@ -362,7 +441,8 @@ void ui_update_light_status(bool on)
     }
     lv_obj_set_style_bg_color(s_light_btn,
         on ? lv_palette_main(LV_PALETTE_ORANGE) : lv_palette_main(LV_PALETTE_GREY), 0);
-    lv_label_set_text(s_light_label, on ? "Light: ON" : "Light: OFF");
+    lv_label_set_text(s_light_label, on ? LV_SYMBOL_CHARGE " Light: ON"
+                                        : LV_SYMBOL_POWER " Light: OFF");
 }
 
 void ui_update_lock_status(bool unlocked)
@@ -372,7 +452,8 @@ void ui_update_lock_status(bool unlocked)
     }
     lv_obj_set_style_bg_color(s_unlock_btn,
         unlocked ? lv_palette_main(LV_PALETTE_GREEN) : lv_palette_main(LV_PALETTE_GREY), 0);
-    lv_label_set_text(s_unlock_label, unlocked ? "Unlocked" : "Locked");
+    lv_label_set_text(s_unlock_label, unlocked ? LV_SYMBOL_OK " Unlocked"
+                                               : LV_SYMBOL_CLOSE " Locked");
 }
 
 void ui_update_fan_status(bool on)
@@ -382,46 +463,59 @@ void ui_update_fan_status(bool on)
     }
     lv_obj_set_style_bg_color(s_fan_btn,
         on ? lv_palette_main(LV_PALETTE_CYAN) : lv_palette_main(LV_PALETTE_GREY), 0);
-    lv_label_set_text(s_fan_label, on ? "Fan: ON" : "Fan: OFF");
+    lv_label_set_text(s_fan_label, on ? LV_SYMBOL_REFRESH " Fan: ON"
+                                      : LV_SYMBOL_STOP " Fan: OFF");
 }
 
 void ui_update_ml_status(bool any_auto, float acc_light, uint32_t n_light,
                          float acc_fan, uint32_t n_fan,
                          float p_light, float p_fan)
 {
-    if (s_ml_mode_label == NULL || s_ml_acc_label == NULL ||
-        s_ml_prob_label == NULL || s_ml_card == NULL) {
+    if (s_ml_btn == NULL || s_ml_btn_label == NULL) {
         return;
     }
 
-    char buf[24];
-    lv_label_set_text(s_ml_mode_label, any_auto ? "ML:AUTO" : "ML:SHADOW");
-    lv_obj_set_style_text_color(s_ml_mode_label,
-        any_auto ? lv_color_white() : lv_color_hex(0x999999), 0);
-
-    // حاشیه‌ی آبی = حداقل یک دستگاه خودکار؛ خاکستری = سایه
-    lv_obj_set_style_border_color(s_ml_card,
+    // دکمه: خاکستری = سایه (فقط تماشا)، آبی = خودکار
+    lv_obj_set_style_bg_color(s_ml_btn,
         any_auto ? lv_palette_main(LV_PALETTE_BLUE) : lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_label_set_text(s_ml_btn_label, any_auto ? LV_SYMBOL_PLAY " ML: AUTO"
+                                               : LV_SYMBOL_EYE_OPEN " ML: SHADOW");
+
+    if (!s_ml_popup_visible || s_ml_pop_mode == NULL) {
+        return;
+    }
+
+    char buf[40];
+    snprintf(buf, sizeof(buf), "Mode: %s", any_auto ? "AUTO" : "SHADOW");
+    lv_label_set_text(s_ml_pop_mode, buf);
 
     if (n_light > 0 || n_fan > 0) {
-        snprintf(buf, sizeof(buf), "L%.0f%% F%.0f%%", acc_light, acc_fan);
+        snprintf(buf, sizeof(buf), "Agrees: Light %.0f%% Fan %.0f%%", acc_light, acc_fan);
     } else {
-        snprintf(buf, sizeof(buf), "L--%% F--%%");
+        snprintf(buf, sizeof(buf), "Agrees: Light -- Fan --");
     }
-    lv_label_set_text(s_ml_acc_label, buf);
+    lv_label_set_text(s_ml_pop_acc, buf);
 
-    snprintf(buf, sizeof(buf), "pL%.0f%% pF%.0f%%", p_light * 100.0f, p_fan * 100.0f);
-    lv_label_set_text(s_ml_prob_label, buf);
+    // «باید چه باشد» + میزان اطمینان مدل به همان سمت
+    snprintf(buf, sizeof(buf), "Light should be: %s (%.0f%%)",
+             p_light >= 0.5f ? "ON" : "OFF",
+             (p_light >= 0.5f ? p_light : 100.0f - p_light) * 100.0f);
+    lv_label_set_text(s_ml_pop_light, buf);
+
+    snprintf(buf, sizeof(buf), "Fan should be: %s (%.0f%%)",
+             p_fan >= 0.5f ? "ON" : "OFF",
+             (p_fan >= 0.5f ? p_fan : 100.0f - p_fan) * 100.0f);
+    lv_label_set_text(s_ml_pop_fan, buf);
 }
 
 void ui_update_virtual_env(bool presence, float lux)
 {
-    if (s_env_label == NULL) {
+    if (s_ml_pop_env == NULL) {
         return;
     }
-    char buf[24];
-    snprintf(buf, sizeof(buf), "%s • %.0f lx", presence ? "HOME" : "AWAY", lux);
-    lv_label_set_text(s_env_label, buf);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Presence: %s • %.0f lx", presence ? "Home" : "Away", lux);
+    lv_label_set_text(s_ml_pop_env, buf);
 }
 
 void ui_update_sensor_status(float temp, float hum, float pressure)
