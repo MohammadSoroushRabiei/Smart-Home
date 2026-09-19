@@ -13,6 +13,7 @@
 #include "mqtt_manager.h"
 #include "mqtt_setup_screen.h"
 #include "setting_screen.h"
+#include "ml_agent.h"
 
 static const char *TAG = "ui_screens";
 
@@ -29,7 +30,8 @@ static lv_obj_t *s_settings_btn;
 static lv_obj_t *s_fan_btn;
 static lv_obj_t *s_fan_label;
 static lv_obj_t *s_ml_card;
-static lv_obj_t *s_ml_mode_label;   // "ML:AUTO L87 F92" - حالت + دقت پنجره
+static lv_obj_t *s_ml_mode_label;   // "ML:AUTO" / "ML:SHADOW" - تپ = تغییر autonomy
+static lv_obj_t *s_ml_acc_label;    // "L87% F92%" - دقت پنجره‌ی هر دستگاه
 static lv_obj_t *s_ml_prob_label;   // "pL95% pF10%" - احتمال پیش‌بینی فعلی
 static lv_obj_t *s_env_label;       // "HOME • 45 lx" - حضور + نور مجازی
 
@@ -55,6 +57,13 @@ static void fan_btn_event_cb(lv_event_t *e)
 {
     // از مسیر رسمی app_state می‌رود: مثل چراغ، نمونه‌ی آموزشی برای مدل ثبت می‌شود
     app_state_set_fan(!app_state_get_fan());
+}
+
+// تپ روی کارت ML = تغییر حالت autonomy (همان کاری که سوییچ ML Autonomy در
+// HA می‌کند) - هم LCD و هم HA بلافاصله همگام می‌شوند
+static void ml_card_click_cb(lv_event_t *e)
+{
+    ml_agent_set_autonomy(!ml_agent_any_auto());
 }
 
 static void on_keypad_result(keypad_purpose_t purpose, bool success)
@@ -260,7 +269,7 @@ void ui_screens_init(void)
 
     s_ml_card = lv_obj_create(scr);
     lv_obj_remove_style_all(s_ml_card);
-    lv_obj_set_size(s_ml_card, 140, 70);
+    lv_obj_set_size(s_ml_card, 140, 80);
     lv_obj_align(s_ml_card, LV_ALIGN_CENTER, 80, 85);
     lv_obj_set_style_bg_color(s_ml_card, lv_color_hex(0x1E1E1E), 0);
     lv_obj_set_style_bg_opa(s_ml_card, LV_OPA_COVER, 0);
@@ -269,21 +278,28 @@ void ui_screens_init(void)
     lv_obj_set_style_border_color(s_ml_card, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_set_style_border_side(s_ml_card, LV_BORDER_SIDE_TOP, 0);
     lv_obj_clear_flag(s_ml_card, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_ml_card, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_ml_card, ml_card_click_cb, LV_EVENT_CLICKED, NULL);
 
     s_ml_mode_label = lv_label_create(s_ml_card);
     lv_obj_set_style_text_color(s_ml_mode_label, lv_color_hex(0x999999), 0);
     lv_label_set_text(s_ml_mode_label, "ML:SHADOW");
-    lv_obj_align(s_ml_mode_label, LV_ALIGN_TOP_MID, 0, 6);
+    lv_obj_align(s_ml_mode_label, LV_ALIGN_TOP_MID, 0, 5);
+
+    s_ml_acc_label = lv_label_create(s_ml_card);
+    lv_obj_set_style_text_color(s_ml_acc_label, lv_color_white(), 0);
+    lv_label_set_text(s_ml_acc_label, "L--% F--%");
+    lv_obj_align(s_ml_acc_label, LV_ALIGN_TOP_MID, 0, 22);
 
     s_ml_prob_label = lv_label_create(s_ml_card);
     lv_obj_set_style_text_color(s_ml_prob_label, lv_color_white(), 0);
-    lv_label_set_text(s_ml_prob_label, "pL --%  pF --%");
-    lv_obj_align(s_ml_prob_label, LV_ALIGN_CENTER, 0, 0);
+    lv_label_set_text(s_ml_prob_label, "pL --% pF --%");
+    lv_obj_align(s_ml_prob_label, LV_ALIGN_TOP_MID, 0, 39);
 
     s_env_label = lv_label_create(s_ml_card);
     lv_obj_set_style_text_color(s_env_label, lv_color_hex(0x999999), 0);
     lv_label_set_text(s_env_label, "-- • -- lx");
-    lv_obj_align(s_env_label, LV_ALIGN_BOTTOM_MID, 0, -6);
+    lv_obj_align(s_env_label, LV_ALIGN_BOTTOM_MID, 0, -5);
 
     s_settings_btn = lv_button_create(scr);
     lv_obj_set_size(s_settings_btn, 40, 40);
@@ -373,18 +389,13 @@ void ui_update_ml_status(bool any_auto, float acc_light, uint32_t n_light,
                          float acc_fan, uint32_t n_fan,
                          float p_light, float p_fan)
 {
-    if (s_ml_mode_label == NULL || s_ml_prob_label == NULL || s_ml_card == NULL) {
+    if (s_ml_mode_label == NULL || s_ml_acc_label == NULL ||
+        s_ml_prob_label == NULL || s_ml_card == NULL) {
         return;
     }
 
-    char buf[40];
-    if (n_light > 0 || n_fan > 0) {
-        snprintf(buf, sizeof(buf), "ML:%s L%.0f F%.0f",
-                 any_auto ? "AUTO" : "SHADOW", acc_light, acc_fan);
-    } else {
-        snprintf(buf, sizeof(buf), "ML:%s", any_auto ? "AUTO" : "SHADOW");
-    }
-    lv_label_set_text(s_ml_mode_label, buf);
+    char buf[24];
+    lv_label_set_text(s_ml_mode_label, any_auto ? "ML:AUTO" : "ML:SHADOW");
     lv_obj_set_style_text_color(s_ml_mode_label,
         any_auto ? lv_color_white() : lv_color_hex(0x999999), 0);
 
@@ -392,7 +403,14 @@ void ui_update_ml_status(bool any_auto, float acc_light, uint32_t n_light,
     lv_obj_set_style_border_color(s_ml_card,
         any_auto ? lv_palette_main(LV_PALETTE_BLUE) : lv_palette_main(LV_PALETTE_GREY), 0);
 
-    snprintf(buf, sizeof(buf), "pL%.0f%%  pF%.0f%%", p_light * 100.0f, p_fan * 100.0f);
+    if (n_light > 0 || n_fan > 0) {
+        snprintf(buf, sizeof(buf), "L%.0f%% F%.0f%%", acc_light, acc_fan);
+    } else {
+        snprintf(buf, sizeof(buf), "L--%% F--%%");
+    }
+    lv_label_set_text(s_ml_acc_label, buf);
+
+    snprintf(buf, sizeof(buf), "pL%.0f%% pF%.0f%%", p_light * 100.0f, p_fan * 100.0f);
     lv_label_set_text(s_ml_prob_label, buf);
 }
 
