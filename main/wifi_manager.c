@@ -19,6 +19,7 @@
 #define WIFI_RETRIES_PER_NETWORK   3   // در حالت پیمایش لیست: قبل از رفتن سراغ شبکه‌ی بعدی
 #define WIFI_MANUAL_RETRIES        3   // در حالت اتصال دستی (connect_and_save)
 #define WIFI_MANUAL_TIMEOUT_MS     15000
+#define WIFI_AUTO_RETRY_PERIOD_MS  20000   // فاصله‌ی تلاش مجدد پس‌زمینه بعد از شکست خودکار
 
 static const char *TAG = "WIFI";
 
@@ -35,6 +36,10 @@ static bool s_user_disabled = false;
 // (قبل از اسکن یا اتصال دستی) - رویداد DISCONNECTED بعدی باید نادیده گرفته شود
 // و وارد منطق retry نشود.
 static bool s_expect_disconnect = false;
+
+// true فقط وقتی سیستم به‌خاطر «شکست خودکار» (نه انتخاب کاربر) آفلاین شده -
+// تسک auto_retry_task فقط در این حالت دوباره تلاش می‌کند.
+static volatile bool s_auto_retry_pending = false;
 
 // --- حالت پیمایش لیست MRU (برای wifi_manager_enable) ---
 static wifi_known_network_t s_try_list[WIFI_CONFIG_MAX_NETWORKS];
@@ -161,7 +166,8 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
                          s_trying_index + 1, s_try_count);
                 connect_to_index(s_trying_index);
             } else {
-                ESP_LOGW(TAG, "All known networks failed, staying offline");
+                ESP_LOGW(TAG, "All known networks failed, staying offline (will auto-retry)");
+                s_auto_retry_pending = true;
                 wifi_set_state(WIFI_STATE_OFFLINE);
             }
         }
@@ -171,6 +177,8 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         snprintf(s_ip_str, sizeof(s_ip_str), IPSTR, IP2STR(&event->ip_info.ip));
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        s_retry_count = 0;              // سهمیه‌ی retry برای قطع بعدی از نو شروع شود
+        s_auto_retry_pending = false;
 
         if (s_manual_mode) {
             strncpy(s_connected_ssid, s_manual_ssid, sizeof(s_connected_ssid) - 1);
@@ -185,6 +193,21 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
                 wifi_config_promote(s_try_list[s_trying_index].ssid, s_try_list[s_trying_index].password);
             }
             wifi_set_state(WIFI_STATE_CONNECTED);
+        }
+    }
+}
+
+// تسک پس‌زمینه: اگر همه‌ی شبکه‌های شناخته‌شده شکست خوردند (مثلاً مودم خاموش بود)،
+// هر WIFI_AUTO_RETRY_PERIOD_MS دوباره از ابتدای لیست تلاش می‌کند.
+static void auto_retry_task(void *arg)
+{
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(WIFI_AUTO_RETRY_PERIOD_MS));
+        if (s_auto_retry_pending && !s_user_disabled && !s_manual_mode &&
+            wifi_state == WIFI_STATE_OFFLINE) {
+            ESP_LOGI(TAG, "Auto-retry: trying known networks again");
+            s_auto_retry_pending = false;   // اگر باز شکست بخورد، handler دوباره true می‌کند
+            wifi_manager_enable();
         }
     }
 }
@@ -210,6 +233,8 @@ void wifi_manager_init_radio(void)
     // ⚠️ عمداً esp_wifi_start() یا esp_wifi_connect() اینجا صدا زده نمی‌شود -
     // سیستم باید واقعاً آفلاین بوت شود؛ روشن‌کردن رادیو وظیفه‌ی wifi_manager_enable
     // یا wifi_manager_scan است.
+
+    xTaskCreate(auto_retry_task, "wifi_retry", 4096, NULL, 2, NULL);
 
     ESP_LOGI(TAG, "WiFi radio subsystem initialized (offline)");
 }
@@ -271,6 +296,7 @@ void wifi_manager_reconnect_from_list(void)
 void wifi_manager_disable(void)
 {
     s_user_disabled = true;
+    s_auto_retry_pending = false;
 
     if (s_radio_started) {
         s_expect_disconnect = true;
@@ -286,6 +312,7 @@ void wifi_manager_disable(void)
 
 void wifi_manager_disconnect(void)
 {
+    s_auto_retry_pending = false;   // انتخاب کاربر است، نباید خودکار برگردد
     if (wifi_is_connected()) {
         s_expect_disconnect = true;
         esp_wifi_disconnect();
@@ -393,6 +420,7 @@ esp_err_t wifi_manager_connect_and_save(const char *ssid, const char *password)
     strncpy(s_manual_pass, password ? password : "", sizeof(s_manual_pass) - 1);
     s_manual_pass[sizeof(s_manual_pass) - 1] = '\0';
 
+    s_auto_retry_pending = false;
     s_manual_retry_count = 0;
     s_manual_connect_success = false;
     s_manual_mode = true;

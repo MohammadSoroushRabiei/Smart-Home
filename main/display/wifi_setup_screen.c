@@ -2,7 +2,7 @@
 #include "wifi_manager.h"
 #include "wifi_config.h"
 #include "lcd_driver.h"
-
+#include "mqtt_manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,6 +82,33 @@ static void ssid_btn_event_cb(lv_event_t *e);
 static void ssid_btn_long_press_cb(lv_event_t *e);
 static void start_connect(const char *ssid, const char *password, connect_source_t source);
 
+
+typedef enum {
+    NET_OP_DISCONNECT,
+    NET_OP_RECONNECT_FROM_LIST,
+} net_op_t;
+
+// اول MQTT، بعد Wi-Fi - بلاک‌کننده است پس در تسک جدا اجرا می‌شود
+static void net_op_task(void *arg)
+{
+    net_op_t op = (net_op_t)(uintptr_t)arg;
+
+    mqtt_manager_prepare_for_network_loss();
+    vTaskDelay(pdMS_TO_TICKS(150));
+
+    if (op == NET_OP_DISCONNECT) {
+        wifi_manager_disconnect();
+    } else {
+        wifi_manager_reconnect_from_list();
+    }
+    vTaskDelete(NULL);
+}
+
+static void run_net_op(net_op_t op)
+{
+    xTaskCreate(net_op_task, "net_op", 4096, (void *)(uintptr_t)op, 3, NULL);
+}
+
 // ---------------------------------------------------------------------
 // ساخت یک آیتم لیست برای یک نتیجه‌ی اسکن (با ایندکس idx در s_scan_results)
 // ---------------------------------------------------------------------
@@ -104,8 +131,7 @@ static void ssid_action_btn_cb(lv_event_t *e)
             break;
 
         case SSID_ACTION_DISCONNECT :
-            wifi_manager_disconnect();
-            lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
+            run_net_op(NET_OP_DISCONNECT);            lv_obj_clear_flag(s_list_status_label, LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_text_color(s_list_status_label, lv_color_white(), 0);
             lv_label_set_text(s_list_status_label, "Disconnected");
             populate_list(); // به‌روزرسانی لیست برای حذف هایلایت آبی
@@ -126,8 +152,7 @@ static void ssid_action_btn_cb(lv_event_t *e)
             if (was_connected_to_this) {
                 // این شبکه دیگر معتبر نیست - قطعش کن و سعی کن به بهترین گزینه‌ی
                 // باقی‌مانده در لیست شناخته‌شده وصل شو
-                wifi_manager_reconnect_from_list();
-            }
+                run_net_op(NET_OP_RECONNECT_FROM_LIST);            }
 
             populate_list();
             break;

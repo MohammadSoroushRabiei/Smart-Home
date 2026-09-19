@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "lvgl.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lcd_driver.h"
 #include "wifi_manager.h"
 #include "wifi_setup_screen.h"
@@ -9,6 +11,7 @@
 #include "keypad_screen.h"
 #include "esp_log.h"
 #include "mqtt_manager.h"
+#include "mqtt_setup_screen.h"
 #include "setting_screen.h"
 
 static const char *TAG = "ui_screens";
@@ -22,10 +25,11 @@ static lv_obj_t *s_unlock_btn;
 static lv_obj_t *s_unlock_label;
 static lv_obj_t *s_settings_btn;
 static lv_obj_t *s_sensor_label;
+static lv_obj_t *s_mqtt_btn;
 
-// بعد از یک هولد روی دکمه‌ی WiFi، LVGL معمولاً یک CLICKED اضافه هم موقع
-// رهاکردن انگشت می‌فرستد - این فلگ از اجرای اشتباه منطق تپ جلوگیری می‌کند.
 static bool s_wifi_long_press_handled = false;
+static bool s_mqtt_long_press_handled = false;
+static volatile bool s_wifi_off_in_progress = false;
 
 
 static void light_btn_event_cb(lv_event_t *e)
@@ -33,7 +37,6 @@ static void light_btn_event_cb(lv_event_t *e)
     app_state_set_light(!app_state_get_light());
 }
 
-// نتیجه‌ی ورود رمز - چه از دکمه‌ی Unlock بیاد چه از دکمه‌ی Settings
 static void on_keypad_result(keypad_purpose_t purpose, bool success)
 {
     if (purpose == KEYPAD_PURPOSE_UNLOCK) {
@@ -44,12 +47,10 @@ static void on_keypad_result(keypad_purpose_t purpose, bool success)
         } else {
             ESP_LOGW(TAG, "Unlock code incorrect - ACCESS DENIED");
         }
-    } else if (purpose == KEYPAD_PURPOSE_SETTINGS) { // KEYPAD_PURPOSE_SETTINGS
+    } else if (purpose == KEYPAD_PURPOSE_SETTINGS) {
         if (success) {
- 
-            ESP_LOGI(TAG, "Settings code correct - settings screen not implemented yet");
+            ESP_LOGI(TAG, "Settings code correct");
             settings_screen_show();
-
         } else {
             ESP_LOGW(TAG, "Settings code incorrect - ACCESS DENIED");
         }
@@ -66,6 +67,17 @@ static void settings_btn_event_cb(lv_event_t *e)
     keypad_screen_show(KEYPAD_PURPOSE_SETTINGS, on_keypad_result);
 }
 
+// ترتیب مهم است: اول MQTT (publish "offline" + stop)، بعد رادیو Wi-Fi.
+// publish/stop بلاک‌کننده‌اند (تا ~۱ ثانیه) پس نباید در تسک LVGL اجرا شوند.
+static void wifi_off_task(void *arg)
+{
+    mqtt_manager_prepare_for_network_loss();
+    vTaskDelay(pdMS_TO_TICKS(150));   // فرصت خالی‌شدن بافر TCP قبل از خاموش‌شدن رادیو
+    wifi_manager_disable();
+    s_wifi_off_in_progress = false;
+    vTaskDelete(NULL);
+}
+
 static void wifi_btn_click_cb(lv_event_t *e)
 {
     if (s_wifi_long_press_handled) {
@@ -75,11 +87,17 @@ static void wifi_btn_click_cb(lv_event_t *e)
 
     wifi_state_t state = wifi_get_state();
     if (state == WIFI_STATE_CONNECTED) {
-        wifi_manager_disable();
+        if (s_wifi_off_in_progress) {
+            return;   // یک قطع در جریان است - تپ دوباره را نادیده بگیر
+        }
+        s_wifi_off_in_progress = true;
+        if (xTaskCreate(wifi_off_task, "wifi_off", 4096, NULL, 3, NULL) != pdPASS) {
+            s_wifi_off_in_progress = false;
+            wifi_manager_disable();   // fallback: بدون publish آفلاین
+        }
     } else if (state == WIFI_STATE_OFFLINE) {
         wifi_manager_enable();
     }
-    // در حالت CONNECTING تپ نادیده گرفته می‌شود - یک تلاش از قبل در جریان است
 }
 
 static void wifi_btn_hold_cb(lv_event_t *e)
@@ -88,9 +106,52 @@ static void wifi_btn_hold_cb(lv_event_t *e)
     wifi_setup_screen_show();
 }
 
+// دکمه‌ی MQTT/HA به‌صورت یک toggle واقعی عمل می‌کند: تپ وقتی خاموش است
+// (UNCONFIGURED/DISABLED) روشنش می‌کند (یا تنظیمات را باز می‌کند اگر هنوز
+// چیزی تنظیم نشده)؛ تپ وقتی روشن است (CONNECTING/CONNECTED) خاموشش می‌کند.
+static void mqtt_btn_click_cb(lv_event_t *e)
+{
+    if (s_mqtt_long_press_handled) {
+        s_mqtt_long_press_handled = false;
+        return;
+    }
+
+    mqtt_manager_state_t state = mqtt_manager_get_state();
+    switch (state) {
+        case MQTT_MGR_STATE_UNCONFIGURED:
+            mqtt_setup_screen_show();
+            break;
+        case MQTT_MGR_STATE_DISABLED:
+            mqtt_manager_enable();
+            break;
+        case MQTT_MGR_STATE_CONNECTING:
+        case MQTT_MGR_STATE_CONNECTED:
+        default:
+            mqtt_manager_disable();
+            break;
+    }
+}
+
+static void mqtt_btn_hold_cb(lv_event_t *e)
+{
+    s_mqtt_long_press_handled = true;
+    mqtt_setup_screen_show();
+}
+
 void ui_screens_init(void)
 {
     lv_obj_t *scr = lv_screen_active();
+
+    s_mqtt_btn = lv_button_create(scr);
+    lv_obj_set_size(s_mqtt_btn, 40, 40);
+    lv_obj_align(s_mqtt_btn, LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_set_style_bg_color(s_mqtt_btn, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_add_event_cb(s_mqtt_btn, mqtt_btn_click_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_mqtt_btn, mqtt_btn_hold_cb, LV_EVENT_LONG_PRESSED, NULL);
+
+    lv_obj_t *mqtt_icon = lv_label_create(s_mqtt_btn);
+    lv_label_set_text(mqtt_icon, LV_SYMBOL_HOME);
+    lv_obj_center(mqtt_icon);
 
     s_wifi_btn = lv_button_create(scr);
     lv_obj_set_size(s_wifi_btn, 130, 45);
@@ -128,7 +189,6 @@ void ui_screens_init(void)
     lv_label_set_text(s_unlock_label, "Locked");
     lv_obj_center(s_unlock_label);
 
-    // دکمه‌ی کوچک تنظیمات - گوشه‌ی بالا-راست، دور از دسترس تصادفی
     s_settings_btn = lv_button_create(scr);
     lv_obj_set_size(s_settings_btn, 40, 40);
     lv_obj_align(s_settings_btn, LV_ALIGN_TOP_RIGHT, -10, 10);
@@ -203,4 +263,27 @@ void ui_update_sensor_status(float temp, float hum, float pressure)
     char buf[64];
     snprintf(buf, sizeof(buf), "%.1f°C | %.0f%%RH | %.0fhPa", temp, hum, pressure);
     lv_label_set_text(s_sensor_label, buf);
+}
+
+void ui_update_mqtt_status(mqtt_manager_state_t state)
+{
+    if (s_mqtt_btn == NULL) {
+        return;
+    }
+
+    lv_color_t color;
+    switch (state) {
+        case MQTT_MGR_STATE_CONNECTED:
+            color = lv_palette_main(LV_PALETTE_BLUE);
+            break;
+        case MQTT_MGR_STATE_CONNECTING:
+            color = lv_palette_main(LV_PALETTE_ORANGE);
+            break;
+        case MQTT_MGR_STATE_DISABLED:
+        case MQTT_MGR_STATE_UNCONFIGURED:
+        default:
+            color = lv_palette_main(LV_PALETTE_GREY);
+            break;
+    }
+    lv_obj_set_style_bg_color(s_mqtt_btn, color, 0);
 }

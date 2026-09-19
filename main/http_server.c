@@ -783,7 +783,7 @@ httpd_handle_t http_server_start(void)
     config.httpd.stack_size        = 8192;
     config.httpd.recv_wait_timeout = 10;
     config.httpd.send_wait_timeout = 10;
-    config.httpd.max_uri_handlers  = 12;  // پیش‌فرض ۸ کافی نبود؛ الان ۹ هندلر داریم + کمی فضای رشد
+    config.httpd.max_uri_handlers  = 12; 
 
     esp_err_t err = httpd_ssl_start(&server, &config);
     if (err != ESP_OK) {

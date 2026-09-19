@@ -19,6 +19,8 @@
 #include "keypad_screen.h"
 #include "lock.h"
 #include "mqtt_manager.h"
+#include "mqtt_config.h"
+#include "mqtt_setup_screen.h"
 #include "wifi_config.h"
 #include "wifi_setup_screen.h"
 #include "enroll_token.h"
@@ -27,26 +29,50 @@
 
 static bool s_lcd_ok = false;
 
+
 static void on_wifi_state_change(wifi_state_t state)
 {
     if (s_lcd_ok) {
+
+
         lcd_driver_lvgl_lock();
         ui_update_wifi_status(state);
         wifi_setup_screen_notify_state_change();
 
-
         if (state == WIFI_STATE_CONNECTED) {
+            mqtt_manager_notify_network_available();
             const char *ip = wifi_get_ip_str();
             char url[48];
             snprintf(url, sizeof(url), "https://%s/recognize", ip);
             keypad_screen_update_capture_qr(url);
         } else {
+            mqtt_manager_notify_network_lost();
             keypad_screen_update_capture_qr("");
         }
 
         lcd_driver_lvgl_unlock();
     }
+
+    // MQTT به شبکه‌ی WiFi وابسته است، پس مستقل از وضعیت LCD مدیریت می‌شود -
+    // هر بار WiFi وصل می‌شود، اگر کاربر دستی MQTT را خاموش نکرده باشد، خودکار
+    // به آخرین بروکر شناخته‌شده وصل می‌شود (مثل الگوی خود WiFi)
+    if (state == WIFI_STATE_CONNECTED) {
+        mqtt_manager_notify_network_available();
+    } else if (state == WIFI_STATE_OFFLINE) {
+        mqtt_manager_notify_network_lost();
+    }
 }
+
+static void on_mqtt_state_change(mqtt_manager_state_t state)
+{
+    if (s_lcd_ok) {
+        lcd_driver_lvgl_lock();
+        ui_update_mqtt_status(state);
+        mqtt_setup_screen_notify_state_change(state);
+        lcd_driver_lvgl_unlock();
+    }
+}
+
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -63,6 +89,7 @@ void app_main(void)
     app_state_init();
 
     wifi_config_init();
+    ESP_ERROR_CHECK(mqtt_config_init());
 
     wifi_manager_init_radio();
     
@@ -94,6 +121,7 @@ void app_main(void)
         keypad_screen_init();
         wifi_setup_screen_init();
         settings_screen_init();
+        mqtt_setup_screen_init();
         lcd_driver_lvgl_unlock();
     }
 
@@ -104,6 +132,8 @@ void app_main(void)
 
     wifi_register_state_change_cb(on_wifi_state_change);
     wifi_manager_enable();
+
+    mqtt_manager_register_state_change_cb(on_mqtt_state_change);
     mqtt_manager_init();
 
 
