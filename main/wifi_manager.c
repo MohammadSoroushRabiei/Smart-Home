@@ -329,11 +329,9 @@ int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
         return 0;
     }
 
-    bool was_connected = wifi_is_connected();
-    if (was_connected) {
-        s_expect_disconnect = true;
-        esp_wifi_disconnect();
-    }
+    // اسکن حین اتصال پشتیبانی رسمی IDF است و لینک را نمی‌شکند؛ قبلاً عمداً
+    // esp_wifi_disconnect() می‌زدیم که هر ورود به صفحه‌ی تنظیمات وای‌فای،
+    // اتصال را ۲-۳ ثانیه قطع می‌کرد و MQTT را وصل/قطع می‌کرد.
     if (!s_radio_started) {
         ESP_ERROR_CHECK(esp_wifi_start());
         s_radio_started = true;
@@ -343,27 +341,18 @@ int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
     esp_err_t err = esp_wifi_scan_start(&scan_config, true);   // بلاک‌کننده
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Scan failed: %s", esp_err_to_name(err));
-        if (was_connected) {
-            esp_wifi_connect();
-        }
         return 0;
     }
 
     uint16_t ap_count = 0;
     esp_wifi_scan_get_ap_num(&ap_count);
     if (ap_count == 0) {
-        if (was_connected) {
-            esp_wifi_connect();
-        }
         return 0;
     }
 
     wifi_ap_record_t *records = malloc(sizeof(wifi_ap_record_t) * ap_count);
     if (records == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for scan results");
-        if (was_connected) {
-            esp_wifi_connect();
-        }
         return 0;
     }
     esp_wifi_scan_get_ap_records(&ap_count, records);
@@ -401,10 +390,6 @@ int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
     }
 
     free(records);
-
-    if (was_connected) {
-        esp_wifi_connect();   // اتصال قبلی را دوباره برقرار کن
-    }
 
     return count;
 }

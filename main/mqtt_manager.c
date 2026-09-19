@@ -259,6 +259,17 @@ static void retry_timer_cb(void *arg)
     if (s_client == NULL || !s_client_started) {
         return;
     }
+    // اگر شبکه هنوز برنگشته (مثلاً حین اسکن WiFi یا قطعی لحظه‌ای)، تلاش نسوز:
+    // قبلاً retryها درست در پنجره‌ی بی‌شبکه مصرف می‌شدند (esp-tls: Host is
+    // unreachable) و «Max retries» می‌توانست MQTT را تا ریبوت بعدی خاموش کند.
+    // تایمر بدون مصرف شمارنده عقب می‌افتد؛ برگشت شبکه را هم
+    // mqtt_manager_notify_network_available پوشش می‌دهد.
+    if (!wifi_is_connected()) {
+        ESP_LOGI(TAG, "Network not back yet - postponing MQTT retry (attempt %d/%d not consumed)",
+                 s_retry_count + 1, MQTT_MAX_RETRIES);
+        esp_timer_start_once(s_retry_timer, (uint64_t)MQTT_RETRY_DELAY_MS * 1000);
+        return;
+    }
     ESP_LOGI(TAG, "Retrying MQTT connection (attempt %d/%d)", s_retry_count, MQTT_MAX_RETRIES);
     set_state(MQTT_MGR_STATE_CONNECTING);
     esp_mqtt_client_reconnect(s_client);
