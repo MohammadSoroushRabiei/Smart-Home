@@ -48,6 +48,9 @@ static lv_obj_t *s_hum_value_label;
 static lv_obj_t *s_press_value_label;
 static lv_obj_t *s_mqtt_btn;
 
+// QR داشبورد وب زیر لیبل IP — با اتصال WiFi پر و با قطع آن پنهان می‌شود
+static lv_obj_t *s_dash_qr;
+
 // بعد از یک هولد روی دکمه‌ی WiFi، LVGL معمولاً یک CLICKED اضافه هم موقع
 // رهاکردن انگشت می‌فرستد - این فلگ از اجرای اشتباه منطق تپ جلوگیری می‌کند.
 static bool s_wifi_long_press_handled = false;
@@ -270,6 +273,13 @@ void ui_screens_init(void)
     lv_obj_set_style_text_align(s_wifi_ip_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(s_wifi_ip_label, "Offline");
     lv_obj_align(s_wifi_ip_label, LV_ALIGN_TOP_MID, 0, 62);
+
+    // QR داشبورد وب — زیر لیبل IP؛ فقط وقتی WiFi وصل است نشان داده می‌شود.
+    // پهنای آزاد بین لیبل IP (تا ~y=96) و ردیف دکمه‌ها (از ~y=205) است.
+    s_dash_qr = lv_qrcode_create(scr);
+    lv_qrcode_set_size(s_dash_qr, 90);
+    lv_obj_align(s_dash_qr, LV_ALIGN_TOP_MID, 0, 98);
+    lv_obj_add_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
 
     s_light_btn = lv_button_create(scr);
     lv_obj_set_size(s_light_btn, 140, 70);
@@ -521,6 +531,21 @@ void ui_update_virtual_env(bool presence, float lux)
     snprintf(buf, sizeof(buf), "In Home: %s\nRoom luminance: %s (%.0f lx)",
              presence ? "Yes" : "No", room, lux);
     lv_label_set_text(s_ml_pop_env, buf);
+}
+
+void ui_update_dashboard_qr(const char *url)
+{
+    if (s_dash_qr == NULL) {
+        return;
+    }
+
+    if (url == NULL || url[0] == '\0') {
+        lv_obj_add_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    lv_qrcode_update(s_dash_qr, url, strlen(url));
+    lv_obj_clear_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
 }
 
 void ui_update_sensor_status(float temp, float hum, float pressure)

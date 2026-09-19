@@ -171,8 +171,13 @@ static void init_lvgl(void)
     lv_display_set_flush_cb(s_display, flush_cb);
 
     size_t buf_size = LCD_H_RES * LVGL_DRAW_BUF_LINES * sizeof(lv_color16_t);
-    void *buf1 = heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-    void *buf2 = heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    // بافر رندر در PSRAM (روی ESP32-S3 با EDMA پشتیبانی می‌شود؛ هم‌ترازی
+    // ۶۴ بایتی برای cache-line): دو بافر ~۷۶KB از حافظه‌ی داخلی DMA آزاد
+    // می‌کند. وقتی این حافظه داخلی اشغال باشد، handshake تازه‌ی TLS وسط کار
+    // به کمبود حافظه می‌خورد (esp-aes: Failed to allocate memory ←
+    // MBEDTLS_ERR_SSL_ALLOC_FAILED) و وب‌سرور اتصال جدید نمی‌پذیرد.
+    void *buf1 = heap_caps_aligned_alloc(64, buf_size, MALLOC_CAP_SPIRAM);
+    void *buf2 = heap_caps_aligned_alloc(64, buf_size, MALLOC_CAP_SPIRAM);
     assert(buf1 && buf2);
     lv_display_set_buffers(s_display, buf1, buf2, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
 

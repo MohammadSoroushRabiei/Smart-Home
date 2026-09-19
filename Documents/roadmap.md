@@ -45,7 +45,7 @@
 - [x] اختیاری: چند-نمونه‌ای (multi-sample) در Enroll برای بهبود دقت — انجام شد (کامیت `e2fe172`: چند نمونه به‌ازای هر شخص با شمارنده، ظرفیت ۲۰→۶۰، حذف گروهی به ازای هر شخص)
 - [ ] ساخت داشبورد زیبا و مرتب در Home Assistant
 - [ ] افزودن گزینه اسکن چهره و رمز ورود و تغییر رمزها در HA
-- [ ] داشبورد وب جدا از HA (روشن/خاموش چراغ، باز کردن درب با رمز/چهره، صفحه تنظیمات) + نمایش QR این داشبورد زیر آی‌پی در صفحه اصلی هنگام اتصال وای‌فای
+- [X] داشبورد وب جدا از HA (برنچ `feat/web-dashboard`): چراغ/فن، باز کردن درب با رمز یا چهره (دوربین گوشی)، کنترل نحوه‌ی کار ML (سایه/خودکار + آمار)، صفحه‌ی تنظیمات پشت رمز سیستم (بروکر MQTT، تغییر رمزها، لیست/حذف چهره، لینک Enroll، ری‌استارت) + نمایش QR این داشبورد زیر آی‌پی در صفحه‌ی اصلی هنگام اتصال وای‌فای. صفحات `/recognize` و `/enroll` هم با همان استایل داشبورد یکدست شدند؛ «Add New Face» در تنظیمات وب مستقیم صفحه‌ی Enroll را باز می‌کند. session تنظیمات = توکن تصادفی RAM + کوکی Secure با عمر ۱۰ دقیقه
 - ~~کالیبراسیون threshold تشخیص چهره (فعلاً هاردکد `0.70f`)~~ — **صرف‌نظر شد** (تصمیم آگاهانه: همان `0.70f` می‌ماند؛ در دفاع به‌عنوان محدودیت شناخته‌شده اعلام می‌شود)
 
 ### دمو مجازی — LCD شبیه‌سازی‌شده روی لپ‌تاپ (LVGL Simulator + WSL)
@@ -53,7 +53,7 @@
 چون دفاع مجازی است، علاوه بر LCD واقعی، یک نمای شبیه‌سازی‌شده روی لپ‌تاپ لازم است — طوری که هر تعامل در شبیه‌ساز (مثلاً کلیک دکمه‌ی چراغ) از همان مسیر رسمی سیستم (`app_state.c`) روی ESP32 واقعی عبور کند؛ شبیه‌ساز فقط کلاینت ریموت است، نه منبع کنترل مستقل.
 
 - [ ] تست اتصال شبکه‌ای WSL2 ↔ ESP32 (نیاز به `networkingMode=mirrored` در `.wslconfig` یا port proxy)
-- [ ] افزودن endpoint امن `POST /api/lock/unlock` در `http_server.c` (با `password_manager_verify(PASSWORD_KIND_LOCK, ...)`) — چون قفل عمداً روی MQTT فقط `binary_sensor` (read-only) است
+- [ ] افزودن endpoint امن `POST /api/lock/unlock` در `http_server.c` (با `password_manager_verify(PASSWORD_KIND_LOCK, ...)`) — چون قفل عمداً روی MQTT فقط `binary_sensor` (read-only) است — **endpoint ساخته شد** (داشبورد وب، با تأخیر ۱ ثانیه روی رمز غلط)؛ سیمولاتور هنوز مانده
 - [ ] پروژه‌ی جدا (`sim/`) با LVGL 9.5 + SDL2 روی WSL، نمای ساده‌ی صفحه‌ی اصلی (چراغ، قفل با کیبورد رمز، کارت‌های سنسور، وضعیت wifi/mqtt)
 - [ ] کلاینت MQTT سبک (`libmosquitto`) در شبیه‌ساز: subscribe به `smarthome/light/state`, `smarthome/sensor/state`, `smarthome/lock/state`؛ publish روی `smarthome/light/set`
 - [ ] libcurl در شبیه‌ساز برای `/api/status` (polling) و `/api/lock/unlock` (با `CURLOPT_SSL_VERIFYPEER 0L`)
@@ -133,7 +133,8 @@
 - `config.servercert`/`config.servercert_len` نه `cacert_pem`
 - `EMBED_TXTFILES` symbol naming بر اساس مسیر نسبی فایل
 - `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y` برای کمبود DRAM حین handshake
-- `max_uri_handlers` پیش‌فرض ۸ — با هر هندلر جدید هماهنگ نگه دار
+- `max_uri_handlers` پیش‌فرض ۸ — با هر هندلر جدید هماهنگ نگه دار (الان ۱۸ برای داشبورد وب)
+- **درس داشبورد وب — تمام‌شدن حافظه‌ی داخلی حین handshake:** poll هر ۲ ثانیه بدون keep-alive یعنی هر درخواست یک handshake تازه؛ بعد از چند دقیقه `MBEDTLS_ERR_SSL_ALLOC_FAILED (-0x7780)` و `esp-aes: Failed to allocate memory` و سرور دیگر اتصال نمی‌پذیرد. راه‌حل‌ها (سه لایه): ① keep-alive و بازیافت اتصال: `keep_alive_enable=true` (idle 30 / interval 5 / count 3) + `lru_purge_enable=true` + `CONFIG_LWIP_MAX_SOCKETS=16` ② **ریشه‌ی اصلی: دو بافر رندر LVGL (2×320×60×2 ≈ ۷۶KB با `INTERNAL|DMA`) حافظه‌ی داخلی را می‌بلعیدند** — به PSRAM منتقل شدند (`heap_caps_aligned_alloc(64, …, MALLOC_CAP_SPIRAM)`؛ روی S3 با EDMA پشتیبانی می‌شود) به‌علاوه‌ی `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y` و `SPIRAM_MALLOC_ALWAYSINTERNAL=8192` ③ لاگ دوره‌ای heap هر ۳۰ ثانیه در `main.c` برای رصد (اگر largest داخلی به زیر چند KB برسد یعنی بحرانی). ⚠️ `MBEDTLS_SSL_IN_CONTENT_LEN` باید ۱۶KB بماند — مرورگر هنگام آپلود JPEG رکورد ۱۶KB می‌فرستد و بافر ورودی کوچک‌تر decode را می‌شکند؛ فقط `OUT_CONTENT_LEN=4096` امن است
 
 ---
 

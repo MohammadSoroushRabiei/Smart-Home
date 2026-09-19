@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "nvs_flash.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -48,9 +49,15 @@ static void on_wifi_state_change(wifi_state_t state)
             char url[48];
             snprintf(url, sizeof(url), "https://%s/recognize", ip);
             keypad_screen_update_capture_qr(url);
+
+            // QR داشبورد وب زیر لیبل IP
+            char dash_url[40];
+            snprintf(dash_url, sizeof(dash_url), "https://%s/", ip);
+            ui_update_dashboard_qr(dash_url);
         } else {
             mqtt_manager_notify_network_lost();
             keypad_screen_update_capture_qr("");
+            ui_update_dashboard_qr("");
         }
 
         lcd_driver_lvgl_unlock();
@@ -157,11 +164,24 @@ void app_main(void)
 
     http_server_start();
 
+    uint32_t heap_log_ticks = 0;
     while (1)
     {
         if (btn_is_pressed(BTN))
         {
             app_state_set_light(!app_state_get_light());
+        }
+
+        // لاگ دوره‌ای حافظه - برای رصد فشار حافظه‌ی داخلی (ریشه‌ی خطای
+        // esp-aes alloc failed وسط handshake تازه‌ی TLS). اگر «largest»
+        // داخلی به زیر چند KB برسد یعنی fragmentation بحرانی است.
+        if (++heap_log_ticks >= 3000) {   // ~30 ثانیه با تأخیر 10ms
+            heap_log_ticks = 0;
+            ESP_LOGI("main", "heap: internal free=%u largest=%u | psram free=%u largest=%u",
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
