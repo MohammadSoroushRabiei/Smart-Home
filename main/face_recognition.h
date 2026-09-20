@@ -20,9 +20,11 @@ esp_err_t face_recognition_init(void);
  * @param len حجم بایت‌های تصویر
  * @param is_unlocked خروجی: آیا چهره شناسایی و تطابق داشت؟
  * @param detected_id خروجی: شناسه چهره شناسایی شده (در صورت موفقیت)
- * @return esp_err_t 
+ * @param similarity خروجی اختیاری: بالاترین شباهت 0..1 (می‌تواند NULL باشد)
+ * @return esp_err_t
  */
-esp_err_t face_recognition_process(const uint8_t *jpeg_data, size_t len, bool *is_unlocked, int *detected_id);
+esp_err_t face_recognition_process(const uint8_t *jpeg_data, size_t len, bool *is_unlocked,
+                                   int *detected_id, float *similarity);
 
 /**
  * @brief ثبت (Enroll) یک چهره جدید در دیتابیس

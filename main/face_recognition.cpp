@@ -41,7 +41,8 @@ extern "C" esp_err_t face_recognition_init(void)
     return ESP_OK;
 }
 
-static esp_err_t process_image_internal(const uint8_t *jpeg_data, size_t len, bool is_enroll, bool *is_unlocked, int *out_id)
+static esp_err_t process_image_internal(const uint8_t *jpeg_data, size_t len, bool is_enroll,
+                                        bool *is_unlocked, int *out_id, float *out_similarity)
 {
     if (len == 0 || len > 300 * 1024) {
         ESP_LOGE(TAG, "Invalid image size: %zu bytes", len);
@@ -119,13 +120,17 @@ static esp_err_t process_image_internal(const uint8_t *jpeg_data, size_t len, bo
         ESP_LOGI(TAG, "Face enrolled successfully, ID: %d", *out_id);
     } else {
         auto rec_results = face_recognizer->recognize(img, detect_results);
-        if (!rec_results.empty() && rec_results[0].similarity > 0.70f) {
+        float highest = rec_results.empty() ? 0.0f : rec_results[0].similarity;
+        if (out_similarity != nullptr) {
+            *out_similarity = highest;
+        }
+        if (!rec_results.empty() && highest > 0.70f) {
             *is_unlocked = true;
             *out_id = rec_results[0].id;
-            ESP_LOGI(TAG, "Face recognized! ID: %d, Similarity: %.2f", *out_id, rec_results[0].similarity);
+            ESP_LOGI(TAG, "Face recognized! ID: %d, Similarity: %.2f", *out_id, highest);
         } else {
             *is_unlocked = false;
-            ESP_LOGW(TAG, "Unknown face. Highest similarity: %.2f", rec_results.empty() ? 0.0f : rec_results[0].similarity);
+            ESP_LOGW(TAG, "Unknown face. Highest similarity: %.2f", highest);
         }
     }
 
@@ -134,14 +139,15 @@ static esp_err_t process_image_internal(const uint8_t *jpeg_data, size_t len, bo
     return ESP_OK;
 }
 
-extern "C" esp_err_t face_recognition_process(const uint8_t *jpeg_data, size_t len, bool *is_unlocked, int *detected_id)
+extern "C" esp_err_t face_recognition_process(const uint8_t *jpeg_data, size_t len, bool *is_unlocked,
+                                              int *detected_id, float *similarity)
 {
-    return process_image_internal(jpeg_data, len, false, is_unlocked, detected_id);
+    return process_image_internal(jpeg_data, len, false, is_unlocked, detected_id, similarity);
 }
 
 extern "C" esp_err_t face_recognition_enroll(const uint8_t *jpeg_data, size_t len, int *new_id)
 {
-    return process_image_internal(jpeg_data, len, true, nullptr, new_id);
+    return process_image_internal(jpeg_data, len, true, nullptr, new_id, nullptr);
 }
 
 extern "C" esp_err_t face_recognition_delete(uint16_t id)
