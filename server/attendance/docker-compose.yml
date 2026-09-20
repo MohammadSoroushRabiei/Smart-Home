@@ -1,0 +1,12 @@
+# سرویس مستقل — یا همین فایل را بالا بیاور یا فقط بلوک services را به
+# docker-compose.yml خودت (کنار HA و Mosquitto) اضافه کن
+services:
+  attendance-server:
+    build: .
+    container_name: attendance-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"        # فقط داخل LAN استفاده می‌شود
+    env_file: .env
+    volumes:
+      - ./data:/data       # دیتابیس SQLite (فایل gcp دیگر لازم نیست)
