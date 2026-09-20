@@ -13,6 +13,7 @@
 #include "mqtt_manager.h"
 #include "mqtt_setup_screen.h"
 #include "setting_screen.h"
+#include "attendance_screen.h"
 #include "ml_agent.h"
 
 static const char *TAG = "ui_screens";
@@ -51,6 +52,10 @@ static lv_obj_t *s_mqtt_btn;
 // QR داشبورد وب زیر لیبل IP — با اتصال WiFi پر و با قطع آن پنهان می‌شود
 static lv_obj_t *s_dash_qr;
 
+// دکمه‌ی حضور و غیاب روی صفحه‌ی اصلی - صفحه‌ی QR حضور را باز می‌کند
+static lv_obj_t *s_att_btn;
+static lv_obj_t *s_att_btn_label;
+
 // بعد از یک هولد روی دکمه‌ی WiFi، LVGL معمولاً یک CLICKED اضافه هم موقع
 // رهاکردن انگشت می‌فرستد - این فلگ از اجرای اشتباه منطق تپ جلوگیری می‌کند.
 static bool s_wifi_long_press_handled = false;
@@ -67,6 +72,11 @@ static void fan_btn_event_cb(lv_event_t *e)
 {
     // از مسیر رسمی app_state می‌رود: مثل چراغ، نمونه‌ی آموزشی برای مدل ثبت می‌شود
     app_state_set_fan(!app_state_get_fan());
+}
+
+static void attendance_btn_event_cb(lv_event_t *e)
+{
+    attendance_screen_show();
 }
 
 static void ml_popup_close(void)
@@ -280,6 +290,19 @@ void ui_screens_init(void)
     lv_qrcode_set_size(s_dash_qr, 90);
     lv_obj_align(s_dash_qr, LV_ALIGN_TOP_MID, 0, 98);
     lv_obj_add_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
+
+    // دکمه‌ی حضور و غیاب — سمت چپ QR داشبورد؛ باز کردن صفحه‌ی QR حضور
+    // بدون رمز (ثبت حضور برای همه آزاد است؛ ثبت/ویرایش افراد داخل همان
+    // صفحه پشت رمز است)
+    s_att_btn = lv_button_create(scr);
+    lv_obj_set_size(s_att_btn, 100, 45);
+    lv_obj_align(s_att_btn, LV_ALIGN_TOP_LEFT, 8, 130);
+    lv_obj_set_style_bg_color(s_att_btn, lv_palette_main(LV_PALETTE_TEAL), 0);
+    lv_obj_add_event_cb(s_att_btn, attendance_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    s_att_btn_label = lv_label_create(s_att_btn);
+    lv_label_set_text(s_att_btn_label, LV_SYMBOL_LIST " Attend");
+    lv_obj_center(s_att_btn_label);
 
     s_light_btn = lv_button_create(scr);
     lv_obj_set_size(s_light_btn, 140, 70);

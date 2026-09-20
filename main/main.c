@@ -25,7 +25,9 @@
 #include "wifi_config.h"
 #include "wifi_setup_screen.h"
 #include "enroll_token.h"
+#include "attendance.h"
 #include "setting_screen.h"
+#include "attendance_screen.h"
 #include "face_db.h"
 #include "time_sync.h"
 #include "ml_agent.h"
@@ -108,6 +110,7 @@ void app_main(void)
     ESP_ERROR_CHECK(password_manager_init());
     ESP_ERROR_CHECK(enroll_token_init());
     ESP_ERROR_CHECK(face_db_init());
+    ESP_ERROR_CHECK(attendance_init());   // صف NVS + تسک ارسال به Google Sheets
 
     
     bool i2c_ok = i2c_bus_init();
@@ -133,6 +136,7 @@ void app_main(void)
         wifi_setup_screen_init();
         settings_screen_init();
         mqtt_setup_screen_init();
+        attendance_screen_init();   // صفحه‌ی QR حضور - از دکمه‌ی صفحه‌ی اصلی
         lcd_driver_lvgl_unlock();
     }
 

@@ -21,6 +21,7 @@ static lv_timer_t *s_countdown_timer = NULL;
 static int64_t s_token_expiry_us = 0;
 static lv_obj_t *s_faces_view;
 static lv_obj_t *s_faces_list;
+
 // لیست تجمیع‌شده‌ی افراد؛ نامِ در حال حذف بین کلیک و تایید مودال نگه داشته می‌شود
 static face_db_person_t s_persons[FACE_DB_MAX_ENTRIES];
 static char s_pending_delete_name[FACE_DB_NAME_MAX_LEN + 1];
@@ -109,7 +110,7 @@ static void countdown_timer_cb(lv_timer_t *timer)
 static void show_enroll_view(void)
 {
     char token[ENROLL_TOKEN_LEN + 1];
-    enroll_token_generate(token, sizeof(token));
+    enroll_token_generate(ENROLL_TOKEN_PURPOSE_ENROLL, token, sizeof(token));
     // زمان انقضا را همینجا محلی محاسبه می‌کنیم؛ چون از همان لحظه و همان
     // ثابت (ENROLL_TOKEN_VALID_MS) که خود ماژول enroll_token استفاده
     // می‌کند استفاده شده، هیچ‌وقت با انقضای واقعی توکن اختلاف پیدا نمی‌کند
@@ -141,8 +142,8 @@ static void enroll_btn_event_cb(lv_event_t *e)
 static void enroll_back_btn_event_cb(lv_event_t *e)
 {
     // انصراف صریح از QR enrollment - طبق تصمیم طراحی، توکن باطل می‌شود
-    // و کاربر به منوی Settings برمی‌گردد (نه صفحه‌ی اصلی)
-    enroll_token_invalidate();
+    // و کاربر به منوی Settings برمی‌گردد (نه به صفحه‌ی اصلی)
+    enroll_token_invalidate(ENROLL_TOKEN_PURPOSE_ENROLL);
     show_menu_view();
 }
 
@@ -508,8 +509,8 @@ void settings_screen_init(void)
 
     s_countdown_label = lv_label_create(s_enroll_view);
     lv_obj_set_style_text_color(s_countdown_label, lv_color_white(), 0);
-    lv_obj_set_width(s_countdown_label, 220);        
-    lv_obj_set_style_text_align(s_countdown_label,LV_TEXT_ALIGN_CENTER,0); 
+    lv_obj_set_width(s_countdown_label, 220);
+    lv_obj_set_style_text_align(s_countdown_label,LV_TEXT_ALIGN_CENTER,0);
     lv_label_set_text(s_countdown_label, "");
     lv_obj_align_to(s_countdown_label, s_qr_code, LV_ALIGN_OUT_BOTTOM_MID, 0,15);
     lv_obj_add_flag(s_enroll_view, LV_OBJ_FLAG_HIDDEN);
@@ -623,7 +624,10 @@ void settings_screen_hide(void)
         lv_timer_del(s_pw_success_timer);
         s_pw_success_timer = NULL;
     }
-    enroll_token_invalidate();
+    // بستن تنظیمات یعنی QR ثبت‌نام این منو زنده نمی‌ماند
+    // (توکن‌های صفحه‌ی Attendance جدا و مستقل‌اند و خودش هنگام بستن
+    // باطل‌شان می‌کند)
+    enroll_token_invalidate(ENROLL_TOKEN_PURPOSE_ENROLL);
     memset(s_pw_new_value, 0, sizeof(s_pw_new_value));
 
     // بازگشت به نمای منو برای دفعه‌ی بعد که Settings باز می‌شود

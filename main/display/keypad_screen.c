@@ -102,7 +102,9 @@ static void btnm_event_cb(lv_event_t *e)
         // از KEYPAD_PURPOSE_SETTINGS به بعد، رمز تنظیمات و رمز قفل درب دو
         // رمز کاملاً مستقل هستند (هرکدام جداگانه از منوی تنظیمات قابل
         // تغییرند) - پس باید نوع درست را به password_manager بدهیم.
-        password_kind_t kind = (s_current_purpose == KEYPAD_PURPOSE_SETTINGS)
+        // ثبت/ویرایش چهره (ENROLL) هم همان رمز تنظیمات را می‌خواهد.
+        password_kind_t kind = (s_current_purpose == KEYPAD_PURPOSE_SETTINGS ||
+                                s_current_purpose == KEYPAD_PURPOSE_ENROLL)
                                     ? PASSWORD_KIND_SETTINGS
                                     : PASSWORD_KIND_LOCK;
         bool ok = password_manager_verify(kind, s_input_buf);
@@ -247,7 +249,9 @@ void keypad_screen_show(keypad_purpose_t purpose, keypad_result_cb_t on_result)
     s_current_cb = on_result;
 
     lv_label_set_text(s_title_label,
-        purpose == KEYPAD_PURPOSE_UNLOCK ? "Enter Code to Unlock" : "Enter Code for Settings");
+        purpose == KEYPAD_PURPOSE_UNLOCK  ? "Enter Code to Unlock" :
+        purpose == KEYPAD_PURPOSE_ENROLL  ? "Enter Code to Enroll" :
+                                            "Enter Code for Settings");
 
     // QR باز کردن با چهره فقط برای Unlock و فقط اگر وای‌فای وصله (محتوای معتبر دارد)
     if (purpose == KEYPAD_PURPOSE_UNLOCK && s_qr_has_content) {
@@ -259,6 +263,9 @@ void keypad_screen_show(keypad_purpose_t purpose, keypad_result_cb_t on_result)
     }
 
     reset_input();
+    // کیپد باید همیشه بالاترین overlay باشد - مثلاً وقتی از صفحه‌ی Attendance
+    // (که بعد از کیپد ساخته شده و در z-order بالاتر است) درخواست رمز می‌کنیم
+    lv_obj_move_foreground(s_overlay);
     lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 }
 

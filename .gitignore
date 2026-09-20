@@ -79,3 +79,7 @@ Desktop.ini
 *.workspace # General workspace files, can be from various tools
 *.suo       # Visual Studio Solution User Options
 *.sln.docstates # Visual Studio
+
+# Attendance server - secrets & local data (never commit)
+server/attendance/.env
+server/attendance/data/

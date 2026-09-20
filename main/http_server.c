@@ -20,9 +20,11 @@
 #include "mqtt_config.h"
 #include "enroll_token.h"
 #include "face_db.h"
+#include "attendance.h"
 #include "ml_agent.h"
 #include "wifi_manager.h"
 #include "virtual_devices.h"
+#include <time.h>
 
 extern const uint8_t servercert_start[] asm("_binary_servercert_pem_start");
 extern const uint8_t servercert_end[]   asm("_binary_servercert_pem_end");
@@ -36,10 +38,15 @@ static const char *TAG = "HTTP";
 #define FACE_WORKER_PRIORITY    3
 
 #define PASSWORD_FORM_MAX_SIZE  256
+// اکشن attendance_set آدرس سرور لوکال را urlencoded حمل می‌کند - بدنه‌ی
+// تنظیمات به همین دلیل بزرگ‌تر از فرم رمز است
+#define SETTINGS_FORM_MAX_SIZE  1024
 
 typedef enum {
     FACE_OP_RECOGNIZE,
     FACE_OP_ENROLL,
+    FACE_OP_ATTENDANCE,   // ثبت حضور/خروج - مثل recognize ولی بدون بازکردن
+                          // درب و بدون رویداد access
     FACE_OP_DELETE,   // حذف همه‌ی نمونه‌های یک شخص (داشبورد وب) - از صف کارگر
                       // می‌رود تا با recognize/enroll روی همان تشخیص‌دهنده سریالایز شود
 } face_op_t;
@@ -48,6 +55,7 @@ typedef struct {
     httpd_req_t *req;
     face_op_t op;
     char name[FACE_DB_NAME_MAX_LEN + 1];
+    uint8_t att_type;   // attendance_event_t - فقط برای FACE_OP_ATTENDANCE
 } face_work_item_t;
 
 static QueueHandle_t s_face_queue = NULL;
@@ -69,6 +77,13 @@ static int64_t s_settings_session_expiry_us = 0;
 // تک‌نخی است و هندلرها همزمان اجرا نمی‌شوند، static بودن مشکلی ندارد
 static face_db_person_t s_persons[FACE_DB_MAX_ENTRIES];
 static char s_json_buf[3072];
+
+// حضور و غیاب - وضعیت تست سرور و پیش‌اعلان توابعی که هندلرهای تنظیمات
+// (بالاتر در فایل) قبل از تعریف کامل‌شان استفاده می‌کنند
+static volatile int8_t s_att_test_state = -1;   // -1 بی‌کار، 0 در حال اجرا، 1 موفق، 2 ناموفق
+static const char *att_test_state_str(void);
+static void attendance_test_task(void *arg);
+static esp_err_t send_attendance_status(httpd_req_t *req);
 
 static void settings_session_create(void)
 {
@@ -509,6 +524,122 @@ static const char *enroll_html =
     "</script></body></html>";
 
 
+// صفحه‌ی ثبت حضور و غیاب - پشت توکن ۱۰ دقیقه‌ای (منظور ATTENDANCE)؛ عین
+// الگوی enroll/recognize: دوربین موبایل → JPEG → POST به /api/attendance.
+// فارسی و RTL است چون کاربر نهایی آن کارمند شرکت است، نه ادمین.
+static const char *attendance_html =
+    "<!DOCTYPE html><html lang=\"fa\" dir=\"rtl\"><head><meta charset=\"UTF-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+    "<title>ثبت حضور و غیاب</title>"
+    "<style>"
+    ":root{--bg:#111418;--card:#1b2027;--line:#2a313b;--text:#e8eaed;--muted:#8b95a1;"
+    "--accent:#4aa3ff;--green:#34c26b;--orange:#ff9d42;--red:#ff5c5c}"
+    "*{box-sizing:border-box;margin:0;padding:0}"
+    "body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);"
+    "color:var(--text);max-width:420px;margin:0 auto;padding:14px 14px 40px}"
+    "h1{font-size:18px}"
+    ".card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px}"
+    "video,canvas{width:100%;border-radius:10px;background:#000;}"
+    "canvas{display:none;}"
+    ".btn{border:none;border-radius:10px;padding:14px 16px;font-size:15px;font-weight:700;color:#fff;"
+    "background:var(--accent);cursor:pointer;}"
+    ".btn.secondary{background:#2c3540;font-weight:600;font-size:13px;}"
+    ".btn.in{background:var(--green);}"
+    ".btn.out{background:var(--orange);}"
+    ".btn:disabled{opacity:.5;cursor:not-allowed;}"
+    ".btn-row{display:flex;gap:8px;margin:10px 0 0;}"
+    ".btn-row .btn{flex:1;}"
+    ".small{font-size:12px;color:var(--muted);}"
+    "#status{margin-top:14px;font-weight:700;min-height:22px;text-align:center;line-height:1.7;}"
+    "</style></head><body>"
+    "<h1>ثبت حضور و غیاب</h1>"
+    "<p class=\"small\">دوربین را رو به خودتان بگیرید و یکی از دکمه‌ها را بزنید.</p>"
+    "<div class=\"card\">"
+    "<video id=\"video\" autoplay playsinline></video>"
+    "<canvas id=\"canvas\" width=\"320\" height=\"240\"></canvas>"
+    "<div class=\"btn-row\">"
+    "<button class=\"btn secondary\" id=\"btn-flip\">تغییر دوربین</button>"
+    "</div>"
+    "<div class=\"btn-row\">"
+    "<button class=\"btn in\" id=\"btn-in\">ثبت ورود</button>"
+    "<button class=\"btn out\" id=\"btn-out\">ثبت خروج</button>"
+    "</div>"
+    "<div id=\"status\"></div>"
+    "</div>"
+    "<script>"
+    "let stream=null, facingMode='user', busy=false;"
+    "const video=document.getElementById('video');"
+    "const canvas=document.getElementById('canvas');"
+    "const statusEl=document.getElementById('status');"
+    "const btnIn=document.getElementById('btn-in');"
+    "const btnOut=document.getElementById('btn-out');"
+    "const params=new URLSearchParams(window.location.search);"
+    "const token=params.get('token')||'';"
+
+    "const ERRORS={"
+    "invalid_token:'لینک منقضی شده است - از مسئول بخواهید QR را دوباره باز کند.',"
+    "no_face:'چهره‌ای دیده نشد - در نور بهتر و کمی نزدیک‌تر دوباره تلاش کنید.',"
+    "unknown_face:'چهره شناسایی نشد - این چهره ثبت‌نام نکرده است.',"
+    "clock:'ساعت دستگاه هنوز همگام نشده - چند دقیقه بعد تلاش کنید.',"
+    "busy:'دستگاه مشغول پردازش است - چند لحظه بعد تلاش کنید.',"
+    "storage:'خطای ذخیره‌سازی - با مسئول سیستم تماس بگیرید.',"
+    "disabled:'حضور و غیاب غیرفعال است.'"
+    "};"
+
+    "async function startCamera(){"
+    "  if(stream){stream.getTracks().forEach(t=>t.stop());}"
+    "  try{"
+    "    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode}});"
+    "    video.srcObject=stream;"
+    "    video.style.display='block';"
+    "  }catch(err){statusEl.style.color='var(--red)';statusEl.textContent='خطای دوربین: '+err.message;}"
+    "}"
+
+    "document.getElementById('btn-flip').addEventListener('click',()=>{"
+    "  facingMode=(facingMode==='user')?'environment':'user'; startCamera();"
+    "});"
+
+    "function setBusy(b){ btnIn.disabled=b; btnOut.disabled=b; }"
+
+    "function capture(type){"
+    "  if(busy) return;"
+    "  if(!video.videoWidth){statusEl.style.color='var(--red)';statusEl.textContent='دوربین آماده نیست';return;}"
+    "  busy=true; setBusy(true);"
+    "  statusEl.style.color='var(--muted)';"
+    "  statusEl.textContent='در حال پردازش...';"
+    "  const ctx=canvas.getContext('2d');"
+    "  ctx.fillStyle='#000'; ctx.fillRect(0,0,320,240);"
+    "  const s=Math.min(320/video.videoWidth, 240/video.videoHeight);"
+    "  ctx.drawImage(video, (320-video.videoWidth*s)/2, (240-video.videoHeight*s)/2,"
+    "                 video.videoWidth*s, video.videoHeight*s);"
+    "  canvas.toBlob((blob)=>{"
+    "    fetch('/api/attendance?token='+encodeURIComponent(token)+'&type='+type,"
+    "          {method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})"
+    "    .then(r=>r.json().catch(()=>({ok:false})).then(data=>({status:r.status,data})))"
+    "    .then(({status,data})=>{"
+    "      busy=false; setBusy(false);"
+    "      if(status===200 && data.ok){"
+    "        statusEl.style.color='var(--green)';"
+    "        const kind=(data.type==='in')?'ورود':'خروج';"
+    "        statusEl.textContent=(data.duplicate?'به‌تازگی ثبت شده بود: ':'ثبت شد: ')"
+    "                             +data.name+' - ساعت '+data.time+' ('+kind+')';"
+    "      }else{"
+    "        statusEl.style.color='var(--red)';"
+    "        statusEl.textContent=ERRORS[data.error]||('خطا ('+status+')');"
+    "      }"
+    "    })"
+    "    .catch(err=>{busy=false; setBusy(false);"
+    "                 statusEl.style.color='var(--red)';statusEl.textContent='خطای شبکه: '+err.message;});"
+    "  },'image/jpeg',0.85);"
+    "}"
+
+    "btnIn.addEventListener('click',()=>capture('in'));"
+    "btnOut.addEventListener('click',()=>capture('out'));"
+
+    "startCamera();"
+    "</script></body></html>";
+
+
 // صفحه‌ی مستقل تغییر رمز - جدا از صفحه‌ی اصلی، هم‌الگو با /capture
 // از این نسخه به بعد، رمز قفل درب و رمز منوی تنظیمات دو رمز مستقل هستند؛
 // کاربر باید مشخص کند کدام‌یک را می‌خواهد تغییر دهد (فیلد "type").
@@ -871,6 +1002,16 @@ static const char *dashboard_html =
     "<button class=\"btn\" id=\"btn-enroll\" style=\"margin-top:10px\">Add New Face</button>"
     "<div class=\"status-line\" id=\"enroll-line\"></div></div>"
 
+    "<div class=\"card set-section\"><h2>Attendance Server</h2>"
+    "<label style=\"display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px\">"
+    "<input type=\"checkbox\" id=\"att-enabled\" style=\"width:auto\"> Attendance enabled</label>"
+    "<input type=\"text\" id=\"att-url\" placeholder=\"http://192.168.1.50:8000\" style=\"direction:ltr;text-align:left\">"
+    "<input type=\"password\" id=\"att-secret\" placeholder=\"Secret (blank = unchanged)\" style=\"margin-top:8px\">"
+    "<div style=\"display:flex;gap:8px;margin-top:10px\">"
+    "<button class=\"btn\" id=\"btn-att-save\" style=\"width:auto;flex:1\">Save</button>"
+    "<button class=\"btn secondary\" id=\"btn-att-test\" style=\"width:auto;flex:1\">Test Connection</button></div>"
+    "<div class=\"status-line\" id=\"att-line\"></div></div>"
+
     "<div class=\"card set-section\"><h2>System</h2>"
     "<p class=\"small\" id=\"sys-info\" style=\"margin-bottom:10px\"></p>"
     "<button class=\"btn danger\" id=\"btn-restart\">Restart Device</button></div>"
@@ -1004,6 +1145,12 @@ static const char *dashboard_html =
     "$('settings-login').style.display='none';$('settings-panel').style.display='block';"
     "$('mqtt-host').value=d.mqtt_host||'';"
     "$('sys-info').textContent=(d.wifi_ssid?'WiFi: '+d.wifi_ssid+' / ':'')+'IP: '+d.ip;"
+    "if(d.attendance){"
+    "$('att-enabled').checked=!!d.attendance.enabled;"
+    "$('att-url').value=d.attendance.url||'';"
+    "$('att-secret').value='';"
+    "$('att-secret').placeholder='Secret'+(d.attendance.secret_set?' (unchanged if blank)':'');"
+    "$('att-line').textContent=d.attendance.queue?('Queued records: '+d.attendance.queue):'';}"
     "renderFaces(d.faces||[]);}"
     "async function apiSettings(data){"
     "const res=await postForm('/api/settings',data);"
@@ -1042,6 +1189,32 @@ static const char *dashboard_html =
     "}else{$('enroll-line').textContent=res.data.error||'Failed';}"
     "}catch(e){$('enroll-line').textContent='Error: '+e.message;}"
     "$('btn-enroll').disabled=false;});"
+    "$('btn-att-save').addEventListener('click',async function(){"
+    "const url=$('att-url').value.trim(),sec=$('att-secret').value;"
+    "if($('att-enabled').checked&&!url.startsWith('http')){toast('Server URL must start with http:// or https://');return;}"
+    "$('btn-att-save').disabled=true;$('att-line').textContent='Saving...';"
+    "try{"
+    "const res=await apiSettings({action:'attendance_set',enabled:$('att-enabled').checked?1:0,url:url,secret:sec});"
+    "if(res.status===200&&res.data.ok){toast('Attendance settings saved');"
+    "$('att-secret').value='';$('att-line').textContent='Queued records: '+(res.data.queue||0);}"
+    "else{$('att-line').textContent=res.data.error||'Failed';}"
+    "}catch(e){$('att-line').textContent='Error: '+e.message;}"
+    "$('btn-att-save').disabled=false;});"
+    "$('btn-att-test').addEventListener('click',async function(){"
+    "$('btn-att-test').disabled=true;$('att-line').textContent='Testing server...';"
+    "try{"
+    "const res=await apiSettings({action:'attendance_test'});"
+    "if(res.status!==200||!res.data.ok){$('att-line').textContent=res.data.error||'Failed to start test';$('btn-att-test').disabled=false;return;}"
+    "for(let i=0;i<10;i++){"
+    "await new Promise(function(r){setTimeout(r,1500)});"
+    "const st=await apiSettings({action:'attendance_get'});"
+    "if(st.status!==200){continue;}"
+    "if(st.data.test==='ok'){$('att-line').textContent='Test OK - local server reachable';$('btn-att-test').disabled=false;return;}"
+    "if(st.data.test==='fail'){$('att-line').textContent='Test FAILED - check URL, secret and that the server container is running';$('btn-att-test').disabled=false;return;}"
+    "if(st.data.test!=='running'){$('btn-att-test').disabled=false;return;}}"
+    "$('att-line').textContent='Test timed out';"
+    "}catch(e){$('att-line').textContent='Error: '+e.message;}"
+    "$('btn-att-test').disabled=false;});"
     "async function changePw(kind,c,n,cf,line){"
     "const cur=$(c).value,nw=$(n).value,cfv=$(cf).value,el=$(line);"
     "const alnum=/^[A-Za-z0-9]+$/;"
@@ -1121,6 +1294,7 @@ static esp_err_t api_lock_unlock_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "Door unlocked via dashboard password");
         app_state_set_lock(true);
         mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_CODE);
+        attendance_report_event(ATT_EVENT_DOOR_CODE, "", 0, 0.0f);
         return send_ok_json(req, "{\"ok\":true}");
     }
 
@@ -1185,12 +1359,28 @@ static esp_err_t api_settings_unlock_handler(httpd_req_t *req)
     char faces[2048];
     size_t faces_len = faces_json(faces, sizeof(faces));
 
+    char att_url[ATTENDANCE_SERVER_URL_MAX_LEN];
+    char att_secret[ATTENDANCE_SECRET_MAX_LEN + 1];
+    bool att_enabled = false;
+    bool att_configured = attendance_get_config(att_url, sizeof(att_url),
+                                                att_secret, sizeof(att_secret), &att_enabled);
+    char att_url_esc[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 2];
+    json_escape(att_url, att_url_esc, sizeof(att_url_esc));
+
     snprintf(s_json_buf, sizeof(s_json_buf),
              "{\"ok\":true,\"mqtt_host\":\"%s\",\"mqtt_state\":\"%s\","
-             "\"wifi_ssid\":\"%s\",\"ip\":\"%s\",\"faces\":%.*s}",
+             "\"wifi_ssid\":\"%s\",\"ip\":\"%s\",\"faces\":%.*s,"
+             "\"attendance\":{\"configured\":%s,\"enabled\":%s,\"url\":\"%s\","
+             "\"secret_set\":%s,\"queue\":%d,\"test\":\"%s\"}}",
              host_esc, mqtt_state_str(mqtt_manager_get_state()),
              ssid_esc, wifi_conn ? wifi_get_ip_str() : "",
-             (int)faces_len, faces);
+             (int)faces_len, faces,
+             att_configured ? "true" : "false",
+             attendance_is_enabled() ? "true" : "false",
+             att_url_esc,
+             att_secret[0] != '\0' ? "true" : "false",
+             attendance_queue_count(),
+             att_test_state_str());
 
     char cookie_hdr[96];
     snprintf(cookie_hdr, sizeof(cookie_hdr),
@@ -1236,7 +1426,8 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char body[PASSWORD_FORM_MAX_SIZE + 1];
+    // بدنه می‌تواند URL طولانیِ urlencoded (اکشن attendance_set) را حمل کند
+    char body[SETTINGS_FORM_MAX_SIZE + 1];
     char action[24] = {0};
     if (read_form_body(req, body, sizeof(body)) != ESP_OK ||
         !extract_form_value(body, "action", action, sizeof(action))) {
@@ -1292,7 +1483,7 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
             return send_ok_json(req, "{\"ok\":false,\"error\":\"WiFi not connected\"}");
         }
         char token[ENROLL_TOKEN_LEN + 1];
-        enroll_token_generate(token, sizeof(token));
+        enroll_token_generate(ENROLL_TOKEN_PURPOSE_ENROLL, token, sizeof(token));
         char url[64];
         snprintf(url, sizeof(url), "https://%s/enroll?token=%s", wifi_get_ip_str(), token);
         char resp[128];
@@ -1306,6 +1497,61 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
         snprintf(s_json_buf, sizeof(s_json_buf),
                  "{\"ok\":true,\"faces\":%.*s}", (int)faces_len, faces);
         return send_ok_json(req, s_json_buf);
+    }
+
+    if (strcmp(action, "attendance_get") == 0) {
+        return send_attendance_status(req);
+    }
+
+    if (strcmp(action, "attendance_set") == 0) {
+        char enabled_str[8] = {0};
+        // مقدار urlencoded می‌تواند تا ~۳ برابر رشته‌ی اصلی طول شود
+        char url_raw[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 1] = {0};
+        char secret_raw[2 * ATTENDANCE_SECRET_MAX_LEN + 1] = {0};
+        bool has_enabled = extract_form_value(body, "enabled", enabled_str, sizeof(enabled_str));
+        bool has_url = extract_form_value(body, "url", url_raw, sizeof(url_raw));
+        bool has_secret = extract_form_value(body, "secret", secret_raw, sizeof(secret_raw));
+
+        if (!has_enabled) {
+            httpd_resp_set_status(req, "400 Bad Request");
+            return send_ok_json(req, "{\"ok\":false,\"error\":\"Missing enabled\"}");
+        }
+
+        // داشبورد با URLSearchParams می‌فرستد پس decode لازم است
+        char url[ATTENDANCE_SERVER_URL_MAX_LEN] = {0};
+        char secret[ATTENDANCE_SECRET_MAX_LEN + 1] = {0};
+        if (has_url) {
+            url_decode(url, url_raw, sizeof(url));
+        }
+        if (has_secret) {
+            url_decode(secret, secret_raw, sizeof(secret));
+        }
+
+        esp_err_t ret = attendance_set_config(url, has_secret ? secret : NULL,
+                                              strcmp(enabled_str, "1") == 0);
+        if (ret != ESP_OK) {
+            httpd_resp_set_status(req, "400 Bad Request");
+            return send_ok_json(req,
+                "{\"ok\":false,\"error\":\"Invalid server URL (http://IP:port) or secret\"}");
+        }
+        return send_attendance_status(req);
+    }
+
+    if (strcmp(action, "attendance_test") == 0) {
+        if (!attendance_is_enabled()) {
+            httpd_resp_set_status(req, "400 Bad Request");
+            return send_ok_json(req, "{\"ok\":false,\"error\":\"Attendance is not enabled\"}");
+        }
+        if (s_att_test_state == 0) {
+            return send_attendance_status(req);   // تست قبلی هنوز در جریان است
+        }
+        s_att_test_state = 0;
+        if (xTaskCreate(attendance_test_task, "att_test", 12288, NULL, 3, NULL) != pdPASS) {
+            s_att_test_state = 2;
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start test task");
+            return ESP_OK;
+        }
+        return send_attendance_status(req);
     }
 
     httpd_resp_set_status(req, "400 Bad Request");
@@ -1415,7 +1661,8 @@ static void handle_recognize(httpd_req_t *req)
 
     bool is_unlocked = false;
     int detected_id = -1;
-    ret = face_recognition_process(jpeg_buf, len, &is_unlocked, &detected_id);
+    float similarity = 0.0f;
+    ret = face_recognition_process(jpeg_buf, len, &is_unlocked, &detected_id, &similarity);
     heap_caps_free(jpeg_buf);
 
     if (ret == ESP_ERR_NOT_FOUND) {
@@ -1438,6 +1685,11 @@ static void handle_recognize(httpd_req_t *req)
         httpd_resp_sendstr(req, resp);
         app_state_set_lock(true);
         mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_FACE);
+        // گزارش رویداد درب برای سرور لوکال (اعلان بله) - غیربلاک‌کننده؛
+        // اگر سرور کانفیگ/فعال نباشد چیزی ارسال نمی‌شود و به کاربر هم
+        // خطایی نمی‌رسد
+        attendance_report_event(ATT_EVENT_DOOR_FACE, name,
+                                (uint16_t)detected_id, similarity);
     } else {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Access Denied: Unknown Face");
@@ -1485,6 +1737,141 @@ static void handle_enroll(httpd_req_t *req, const char *name)
 }
 
 // ---------------------------------------------------------------------
+// حضور و غیاب - مسیر recognize بدون عوارض درب: نه قفل باز می‌شود و نه
+// رویداد access منتشر می‌شود. رکورد در attendance ماژول صف و ارسال می‌شود.
+// ---------------------------------------------------------------------
+
+// وضعیت تست سرور - متغیر بالای فایل تعریف شده (پیش‌اعلان برای هندلرهای
+// تنظیمات)؛ اینجا فقط تسک اجرای واقعی تست است.
+
+// POST به گوگل تا ~۱۰ ثانیه بلاک می‌کند؛ روی استک ۸KB-ی httpd و وسط
+// منطق face_worker هم خطرناک است - پس تسک مستقل با استک بزرگ
+static void attendance_test_task(void *arg)
+{
+    esp_err_t ret = attendance_test_server();
+    s_att_test_state = (ret == ESP_OK) ? 1 : 2;
+    ESP_LOGI(TAG, "Attendance server test: %s", ret == ESP_OK ? "OK" : "FAILED");
+    vTaskDelete(NULL);
+}
+
+static const char *att_test_state_str(void)
+{
+    switch (s_att_test_state) {
+    case 0:  return "running";
+    case 1:  return "ok";
+    case 2:  return "fail";
+    default: return "idle";
+    }
+}
+
+// پاسخ وضعیت attendance برای تنظیمات داشبورد (خواندن کانفیگ + polling تست)
+static esp_err_t send_attendance_status(httpd_req_t *req)
+{
+    char url[ATTENDANCE_SERVER_URL_MAX_LEN];
+    char secret[ATTENDANCE_SECRET_MAX_LEN + 1];
+    bool enabled = false;
+    bool configured = attendance_get_config(url, sizeof(url), secret, sizeof(secret), &enabled);
+
+    char url_esc[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 2];
+    json_escape(url, url_esc, sizeof(url_esc));
+
+    snprintf(s_json_buf, sizeof(s_json_buf),
+             "{\"ok\":true,\"configured\":%s,\"enabled\":%s,\"url\":\"%s\","
+             "\"secret_set\":%s,\"queue\":%d,\"test\":\"%s\"}",
+             configured ? "true" : "false",
+             attendance_is_enabled() ? "true" : "false",
+             url_esc,
+             secret[0] != '\0' ? "true" : "false",
+             attendance_queue_count(),
+             att_test_state_str());
+    return send_ok_json(req, s_json_buf);
+}
+
+static void handle_attendance(httpd_req_t *req, uint8_t att_type)
+{
+    uint8_t *jpeg_buf = NULL;
+    size_t len = 0;
+
+    esp_err_t ret = receive_jpeg_body(req, &jpeg_buf, &len);
+    if (ret != ESP_OK) {
+        send_receive_body_error(req, ret);
+        return;
+    }
+
+    bool is_matched = false;
+    int detected_id = -1;
+    float similarity = 0.0f;
+    ret = face_recognition_process(jpeg_buf, len, &is_matched, &detected_id, &similarity);
+    heap_caps_free(jpeg_buf);
+
+    // خطاها JSON برمی‌گردند تا صفحه‌ی موبایل پیام فارسی متناسب بگذارد
+    if (ret == ESP_ERR_NOT_FOUND) {
+        httpd_resp_set_status(req, "404 No Face");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"no_face\"}");
+        return;
+    } else if (ret != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"processing\"}");
+        return;
+    }
+
+    if (!is_matched) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"unknown_face\"}");
+        return;
+    }
+
+    char name[FACE_DB_NAME_MAX_LEN + 1];
+    if (!face_db_get_name((uint16_t)detected_id, name, sizeof(name))) {
+        snprintf(name, sizeof(name), "User %d", detected_id);
+    }
+
+    bool duplicate = false;
+    ret = attendance_record(name, (uint16_t)detected_id,
+                            (attendance_event_t)att_type, similarity, &duplicate);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"clock\"}");
+        return;
+    }
+    if (ret == ESP_ERR_NOT_SUPPORTED) {
+        httpd_resp_set_status(req, "404 Not Found");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"disabled\"}");
+        return;
+    }
+    if (ret != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"storage\"}");
+        return;
+    }
+
+    // ساعت محلی برای نمایش فوری روی موبایل (رکورد با همین زمان ثبت شده)
+    char time_str[8] = "??:??";
+    time_t now = time(NULL);
+    struct tm tm_info;
+    if (localtime_r(&now, &tm_info) != NULL) {
+        strftime(time_str, sizeof(time_str), "%H:%M", &tm_info);
+    }
+
+    char name_esc[2 * FACE_DB_NAME_MAX_LEN + 2];
+    json_escape(name, name_esc, sizeof(name_esc));
+
+    char resp[160];
+    snprintf(resp, sizeof(resp),
+             "{\"ok\":true,\"duplicate\":%s,\"name\":\"%s\",\"time\":\"%s\",\"type\":\"%s\"}",
+             duplicate ? "true" : "false", name_esc, time_str,
+             att_type == ATT_EVENT_ATTENDANCE_IN ? "in" : "out");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, resp);
+}
+
+// ---------------------------------------------------------------------
 // Task اختصاصی: تنها مصرف‌کننده‌ی صف کار
 // ---------------------------------------------------------------------
 
@@ -1519,13 +1906,16 @@ static void face_worker_task(void *arg)
     while (1) {
         if (xQueueReceive(s_face_queue, &item, pdMS_TO_TICKS(FACE_WDT_FEED_MS)) == pdTRUE) {
             ESP_LOGI(TAG, "Face worker processing %s request",
-                     item.op == FACE_OP_RECOGNIZE ? "recognize" :
-                     item.op == FACE_OP_ENROLL    ? "enroll" : "delete");
+                     item.op == FACE_OP_RECOGNIZE  ? "recognize" :
+                     item.op == FACE_OP_ENROLL     ? "enroll" :
+                     item.op == FACE_OP_ATTENDANCE ? "attendance" : "delete");
 
             if (item.op == FACE_OP_RECOGNIZE) {
                 handle_recognize(item.req);
             } else if (item.op == FACE_OP_ENROLL) {
                 handle_enroll(item.req, item.name);
+            } else if (item.op == FACE_OP_ATTENDANCE) {
+                handle_attendance(item.req, item.att_type);
             } else {
                 handle_delete_face(item.name);
             }
@@ -1586,7 +1976,7 @@ static esp_err_t face_enroll_handler(httpd_req_t *req)
     }
     url_decode(name, name_raw, sizeof(name));
 
-    if (!enroll_token_validate(token)) {
+    if (!enroll_token_validate(ENROLL_TOKEN_PURPOSE_ENROLL, token)) {
         ESP_LOGW(TAG, "Enroll rejected: invalid or missing token");
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Invalid or expired enrollment token");
@@ -1622,6 +2012,105 @@ static esp_err_t face_enroll_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// POST /api/attendance?token=&type=in|out - بدنه JPEG خام (عین recognize).
+// گیت‌ها به ترتیب: فیچر فعال باشد → توکن معتبر باشد → صف face خالی باشد.
+static esp_err_t api_attendance_handler(httpd_req_t *req)
+{
+    if (!attendance_is_enabled()) {
+        httpd_resp_set_status(req, "404 Not Found");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"disabled\"}");
+        return ESP_OK;
+    }
+
+    char query[96] = {0};
+    char token[ENROLL_TOKEN_LEN + 1] = {0};
+    char type_buf[8] = {0};
+
+    if (httpd_req_get_url_query_len(req) > 0 &&
+        httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        httpd_query_key_value(query, "token", token, sizeof(token));
+        httpd_query_key_value(query, "type", type_buf, sizeof(type_buf));
+    }
+
+    if (!enroll_token_validate(ENROLL_TOKEN_PURPOSE_ATTENDANCE, token)) {
+        ESP_LOGW(TAG, "Attendance rejected: invalid or missing token");
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"invalid_token\"}");
+        return ESP_OK;
+    }
+
+    uint8_t att_type;
+    if (strcmp(type_buf, "in") == 0) {
+        att_type = ATT_EVENT_ATTENDANCE_IN;
+    } else if (strcmp(type_buf, "out") == 0) {
+        att_type = ATT_EVENT_ATTENDANCE_OUT;
+    } else {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"bad_type\"}");
+        return ESP_OK;
+    }
+
+    httpd_req_t *copy = NULL;
+    esp_err_t err = httpd_req_async_handler_begin(req, &copy);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to start async request");
+        return ESP_FAIL;
+    }
+
+    face_work_item_t item = { .req = copy, .op = FACE_OP_ATTENDANCE, .att_type = att_type };
+
+    if (xQueueSend(s_face_queue, &item, 0) != pdTRUE) {
+        httpd_resp_set_status(copy, "503 Server Busy");
+        httpd_resp_set_type(copy, "application/json");
+        httpd_resp_sendstr(copy, "{\"ok\":false,\"error\":\"busy\"}");
+        httpd_req_async_handler_complete(copy);
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "POST /api/attendance received (type=%s, enqueueing)", type_buf);
+    return ESP_OK;
+}
+
+static esp_err_t attendance_page_handler(httpd_req_t *req)
+{
+    // فیچر کانفیگ/فعال نباشد صفحه هم وجود ندارد (QR هم فقط در حالت فعال
+    // روی LCD نشان داده می‌شود)
+    if (!attendance_is_enabled()) {
+        httpd_resp_send_404(req);
+        return ESP_OK;
+    }
+
+    char query[64] = {0};
+    char token[ENROLL_TOKEN_LEN + 1] = {0};
+
+    if (httpd_req_get_url_query_len(req) > 0 &&
+        httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        httpd_query_key_value(query, "token", token, sizeof(token));
+    }
+
+    if (!enroll_token_validate(ENROLL_TOKEN_PURPOSE_ATTENDANCE, token)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        httpd_resp_sendstr(req,
+            "<!DOCTYPE html><html lang=\"fa\" dir=\"rtl\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            "<title>حضور و غیاب</title></head>"
+            "<body style=\"font-family:-apple-system,'Segoe UI',Roboto,sans-serif;"
+            "background:#111418;color:#e8eaed;text-align:center;margin-top:80px;padding:0 20px\">"
+            "<h2>لینک منقضی یا نامعتبر است</h2>"
+            "<p style=\"color:#8b95a1;margin-top:10px\">لینک حضور و غیاب ۱۰ دقیقه اعتبار دارد."
+            " از مسئول بخواهید QR را دوباره باز کند.</p>"
+            "</body></html>");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    return httpd_resp_send(req, attendance_html, HTTPD_RESP_USE_STRLEN);
+}
+
 static esp_err_t recognize_page_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -1638,7 +2127,7 @@ static esp_err_t enroll_page_handler(httpd_req_t *req)
         httpd_query_key_value(query, "token", token, sizeof(token));
     }
 
-    if (!enroll_token_validate(token)) {
+    if (!enroll_token_validate(ENROLL_TOKEN_PURPOSE_ENROLL, token)) {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_set_type(req, "text/html; charset=utf-8");
         httpd_resp_sendstr(req,
@@ -1673,6 +2162,9 @@ static const httpd_uri_t password_page_uri = { .uri = "/password", .method = HTT
 static const httpd_uri_t api_password_uri = { .uri = "/api/password", .method = HTTP_POST, .handler = api_password_handler, .user_ctx = NULL };
 static const httpd_uri_t recognize_page_uri = { .uri = "/recognize", .method = HTTP_GET, .handler = recognize_page_handler, .user_ctx = NULL };
 static const httpd_uri_t enroll_page_uri    = { .uri = "/enroll",    .method = HTTP_GET, .handler = enroll_page_handler,    .user_ctx = NULL };
+// حضور و غیاب
+static const httpd_uri_t attendance_page_uri = { .uri = "/attendance",     .method = HTTP_GET,  .handler = attendance_page_handler,  .user_ctx = NULL };
+static const httpd_uri_t api_attendance_uri  = { .uri = "/api/attendance", .method = HTTP_POST, .handler = api_attendance_handler,   .user_ctx = NULL };
 // داشبورد وب
 static const httpd_uri_t api_light_set_uri      = { .uri = "/api/light/set",       .method = HTTP_POST, .handler = api_light_set_handler,      .user_ctx = NULL };
 static const httpd_uri_t api_fan_set_uri        = { .uri = "/api/fan/set",         .method = HTTP_POST, .handler = api_fan_set_handler,        .user_ctx = NULL };
@@ -1706,7 +2198,8 @@ httpd_handle_t http_server_start(void)
     config.httpd.stack_size        = 8192;
     config.httpd.recv_wait_timeout = 10;
     config.httpd.send_wait_timeout = 10;
-    config.httpd.max_uri_handlers  = 18;
+    // ۱۷ هندلر موجود + صفحه و API حضور و غیاب
+    config.httpd.max_uri_handlers  = 19;
 
     // داشبورد وب مدام poll می‌کند؛ بدون این دو، هر درخواست یک handshake
     // تازه‌ی TLS می‌خواهد و بعد از چند دقیقه حافظه‌ی داخلی وسط handshake
@@ -1735,6 +2228,8 @@ httpd_handle_t http_server_start(void)
         { &face_enroll_uri,      "/api/face/enroll" },
         { &recognize_page_uri,   "/recognize" },
         { &enroll_page_uri,      "/enroll" },
+        { &attendance_page_uri,  "/attendance" },
+        { &api_attendance_uri,   "/api/attendance" },
         { &password_page_uri,    "/password" },
         { &api_password_uri,     "/api/password" },
         { &api_light_set_uri,    "/api/light/set" },

@@ -9,6 +9,8 @@ extern "C" {
 typedef enum {
     KEYPAD_PURPOSE_UNLOCK,     // ورود رمز برای باز کردن قفل
     KEYPAD_PURPOSE_SETTINGS,   // ورود رمز برای دسترسی به صفحه‌ی تنظیمات
+    KEYPAD_PURPOSE_ENROLL,     // ورود رمز تنظیمات برای ثبت/ویرایش چهره
+                               // (از صفحه‌ی Attendance روی صفحه‌ی اصلی)
 } keypad_purpose_t;
 
 /**
