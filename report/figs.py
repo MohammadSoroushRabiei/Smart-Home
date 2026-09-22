@@ -225,4 +225,77 @@ ax.text(5.0, H - 0.13, "Software stack (bottom = hardware, top = user-facing ser
         ha="center", fontsize=10.5, fontweight="bold", color=BLUE)
 save(fig, "fig6_stack.png")
 
+# ----------------------------------------------------------------------------
+# Figure 7: overall project block diagram (chapter 1)
+# ----------------------------------------------------------------------------
+def sub_block(ax, x, y, w, h, text, fill="#FFFFFF", fs=8.8):
+    p = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.05",
+                       linewidth=1.0, edgecolor=INK, facecolor=fill, zorder=3)
+    ax.add_patch(p)
+    ax.text(x + w/2, y + h/2, text, ha="center", va="center", fontsize=fs, color=INK, zorder=4)
+
+fig, ax = canvas(11.5, 8.0)
+H = 10 * 8.0 / 11.5  # ~6.96
+
+ax.text(5.0, H - 0.14, "All intelligence runs on the edge node — the phone only lends its camera, the servers stay local",
+        ha="center", fontsize=10, fontweight="bold", color=BLUE)
+
+# user phone (amber, top-left) — aligned with the Home Server band on the right
+px, py, pw, ph = 0.15, 3.60, 2.05, 2.30
+_ph_box = FancyBboxPatch((px, py), pw, ph, boxstyle="round,pad=0.02,rounding_size=0.06",
+                         linewidth=1.4, edgecolor=INK, facecolor=FILL3, zorder=2)
+ax.add_patch(_ph_box)
+ax.text(px + pw/2, py + ph - 0.28, "User Smartphone", ha="center", va="center",
+        fontsize=10.5, fontweight="bold", color=INK, zorder=3)
+ax.text(px + pw/2, py + ph - 0.80, "Browser + camera (QR)", ha="center", va="center",
+        fontsize=8.8, color="#4A5568", zorder=3)
+ax.text(px + pw/2, py + ph - 1.32, "HA Companion App", ha="center", va="center",
+        fontsize=8.8, color="#4A5568", zorder=3)
+
+# edge node (big block with internal functional sub-blocks)
+box(ax, 3.05, 0.75, 3.30, 5.30, "", (), fill=FILL1, lw=1.8)
+ax.text(4.70, 5.78, "ESP32-S3  —  Edge Node", ha="center", va="center",
+        fontsize=11.5, fontweight="bold", color=INK)
+subs = [
+    ("LVGL UI Engine", 5.00),
+    ("Face Recognition (ESP-DL)", 4.32),
+    ("Behavior-Learning Agent", 3.64),
+    ("HTTPS Server (TLS)", 2.96),
+    ("MQTT Client", 2.28),
+    ("State + NVS / SPIFFS", 1.60),
+]
+for txt, yy in subs:
+    sub_block(ax, 3.25, yy, 2.90, 0.55, txt)
+
+# peripherals (left column, below the phone) — horizontal arrows into the node edge
+per = [
+    ("Touch LCD + GT911 (I2C)", 2.85),
+    ("BME280 Sensor (I2C)", 2.16),
+    ("Door-Lock Relay", 1.47),
+    ("LED + Button", 0.78),
+]
+for txt, yy in per:
+    sub_block(ax, 0.15, yy, 2.45, 0.55, txt, fill="#F3F4F6", fs=8.4)
+    arrow(ax, (2.60, yy + 0.275), (3.05, yy + 0.275), color=GRAY, lw=1.2)
+
+# home server (green)
+box(ax, 6.85, 3.60, 2.95, 2.30, "Home Server (Docker)",
+    ("Mosquitto (MQTT)", "Home Assistant", "Attendance server", "(FastAPI + SQLite)"), fill=FILL2, title_size=10.5)
+
+# optional internet (amber dashed)
+box(ax, 6.85, 1.35, 2.95, 1.70, "Optional Internet",
+    ("Google Sheets archive", "Bale notifications"), fill="#FDF8EE", ec=DASH, dashed=True, title_size=10)
+
+# arrows
+arrow(ax, (2.20, 4.78), (3.05, 4.78), color=BLUE, lw=1.8)
+ax.text(2.625, 5.50, "QR", ha="center", va="top", fontsize=8.2, color=BLUE, zorder=5)
+ax.text(2.625, 5.22, "HTTPS", ha="center", va="top", fontsize=8.2, color=BLUE, zorder=5)
+ax.text(2.625, 4.97, "face JPEG", ha="center", va="top", fontsize=8.2, color=BLUE, zorder=5)
+arrow(ax, (6.35, 4.85), (6.85, 4.85), "MQTT", lab_dy=0.10, lab_size=8.5)
+arrow(ax, (6.35, 3.95), (6.85, 3.95), "HTTPS", lab_dy=0.10, lab_size=8.5)
+arrow(ax, (8.30, 3.60), (8.30, 3.05), "sync / notify", color=DASH, ls="dashed", lab_dx=0.78, lab_dy=0.02, lab_size=8.5)
+ax.text(6.60, 6.15, "Wi-Fi LAN", fontsize=9, style="italic", color=GRAY, ha="center")
+
+save(fig, "fig7_block_diagram.png")
+
 print("all figures done")
