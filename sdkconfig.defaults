@@ -4,3 +4,8 @@
 CONFIG_ESP_TASK_WDT_PANIC=y
 # بزرگ‌تر از recv_wait_timeout وب‌سرور (10s) تا آپلود کندِ کاربر panic کاذب نسازد
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=15
+
+# LVGL حافظه را از heap سیستم بگیرد نه pool داخلی 64KB — تخصیص‌های بزرگ (بافرهای
+# لایه‌ی رندر) به PSRAM می‌روند. pool داخلی بافر لایه را نمی‌گرفت و حلقه‌ی رندر
+# برای همیشه گیر می‌کرد (قفل LCD/تاچ + TWDT panic در ۲۱ سپتامبر)
+CONFIG_LV_USE_CLIB_MALLOC=y
