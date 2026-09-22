@@ -1,2 +1,4 @@
 node_modules/
 ~$*
+render/pages/
+render/png/
