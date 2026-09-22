@@ -26,7 +26,7 @@ plt.rcParams.update({
     "axes.edgecolor": INK,
 })
 
-def box(ax, x, y, w, h, title, lines=(), fill=FILL1, ec=INK, lw=1.4, title_size=10.5, dashed=False, ls=None):
+def box(ax, x, y, w, h, title, lines=(), fill=FILL1, ec=INK, lw=1.4, title_size=10.5, dashed=False, ls=None, gap=0.145):
     ls = "dashed" if dashed else (ls or "solid")
     p = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.06",
                        linewidth=lw, edgecolor=ec, facecolor=fill, linestyle=ls, zorder=2)
@@ -35,10 +35,10 @@ def box(ax, x, y, w, h, title, lines=(), fill=FILL1, ec=INK, lw=1.4, title_size=
     if title:
         ax.text(x + w/2, cy, title, ha="center", va="top", fontsize=title_size,
                 fontweight="bold", color=INK, zorder=3)
-        cy -= 0.17 + 0.145
+        cy -= 0.17 + gap
     for ln in lines:
         ax.text(x + w/2, cy, ln, ha="center", va="top", fontsize=9.2, color="#4A5568", zorder=3)
-        cy -= 0.145
+        cy -= gap
     return (x, y, w, h)
 
 def arrow(ax, p1, p2, label="", color=BLUE, lw=1.6, style="-|>", ls="solid", lab_dx=0.0, lab_dy=0.10, lab_size=8.8):
@@ -279,12 +279,13 @@ for txt, yy in per:
     arrow(ax, (2.60, yy + 0.275), (3.05, yy + 0.275), color=GRAY, lw=1.2)
 
 # home server (green)
-box(ax, 6.85, 3.60, 2.95, 2.30, "Home Server (Docker)",
-    ("Mosquitto (MQTT)", "Home Assistant", "Attendance server", "(FastAPI + SQLite)"), fill=FILL2, title_size=10.5)
+box(ax, 6.85, 3.60, 2.95, 2.00, "Home Server (Docker)",
+    ("Mosquitto (MQTT)", "Home Assistant", "Attendance server", "(FastAPI + SQLite)"),
+    fill=FILL2, title_size=10.5, gap=0.22)
 
 # optional internet (amber dashed)
-box(ax, 6.85, 1.35, 2.95, 1.70, "Optional Internet",
-    ("Google Sheets archive", "Bale notifications"), fill="#FDF8EE", ec=DASH, dashed=True, title_size=10)
+box(ax, 6.85, 1.55, 2.95, 1.40, "Optional Internet",
+    ("Google Sheets archive", "Bale notifications"), fill="#FDF8EE", ec=DASH, dashed=True, title_size=10, gap=0.24)
 
 # arrows
 arrow(ax, (2.20, 4.78), (3.05, 4.78), color=BLUE, lw=1.8)
@@ -293,7 +294,7 @@ ax.text(2.625, 5.22, "HTTPS", ha="center", va="top", fontsize=8.2, color=BLUE, z
 ax.text(2.625, 4.97, "face JPEG", ha="center", va="top", fontsize=8.2, color=BLUE, zorder=5)
 arrow(ax, (6.35, 4.85), (6.85, 4.85), "MQTT", lab_dy=0.10, lab_size=8.5)
 arrow(ax, (6.35, 3.95), (6.85, 3.95), "HTTPS", lab_dy=0.10, lab_size=8.5)
-arrow(ax, (8.30, 3.60), (8.30, 3.05), "sync / notify", color=DASH, ls="dashed", lab_dx=0.78, lab_dy=0.02, lab_size=8.5)
+arrow(ax, (8.30, 3.60), (8.30, 2.95), "sync / notify", color=DASH, ls="dashed", lab_dx=0.78, lab_dy=0.02, lab_size=8.5)
 ax.text(6.60, 6.15, "Wi-Fi LAN", fontsize=9, style="italic", color=GRAY, ha="center")
 
 save(fig, "fig7_block_diagram.png")
