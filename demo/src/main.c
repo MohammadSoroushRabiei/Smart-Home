@@ -186,7 +186,11 @@ int main(int argc, char **argv)
     printf("demo ready - keys: F fullscreen, D start scenario | quit: window close\n");
 
     while (!s_quit) {
+        // دقیقاً مثل lvgl_port_task برد: رندر هم زیر قفل LVGL — بدون این
+        // قفل، ترد‌های بک‌اند (WiFi/ML/سنسور) همزمان با رندر race می‌دهند
+        lcd_driver_lvgl_lock();
         lv_timer_handler();
+        lcd_driver_lvgl_unlock();
         usleep(5000);
     }
     return 0;

@@ -16,6 +16,7 @@
 #include "ml_agent.h"
 #include "mqtt_manager.h"
 #include "lcd_driver.h"
+#include "wifi_setup_screen.h"
 #include "attendance_screen.h"
 #include "scenario.h"
 
@@ -100,6 +101,21 @@ static void ml_auto_off(void)
     ml_agent_set_autonomy(false);
 }
 
+static void wifi_list_show(void)
+{
+    ESP_LOGI(TAG, "[script] open WiFi setup (live scan)");
+    lcd_driver_lvgl_lock();
+    wifi_setup_screen_show();
+    lcd_driver_lvgl_unlock();
+}
+
+static void wifi_list_hide(void)
+{
+    lcd_driver_lvgl_lock();
+    wifi_setup_screen_hide();
+    lcd_driver_lvgl_unlock();
+}
+
 static void att_show(void)
 {
     ESP_LOGI(TAG, "[script] attendance QR screen");
@@ -127,12 +143,14 @@ static const demo_step_t s_steps[] = {
     { 12000, ha_fan_on,    "HA turns the fan ON" },
     { 20000, ml_auto_on,   "ML Autonomy -> AUTO (HA switch)" },
     { 35000, ha_light_off, "HA turns the light OFF (watch ML AUTO react)" },
-    { 50000, att_show,     "attendance QR screen" },
-    { 58000, att_hide,     NULL },
-    { 65000, ha_fan_off,   "HA turns the fan OFF" },
-    { 72000, ml_auto_off,  "ML Autonomy -> SHADOW" },
-    { 78000, ha_light_on,  "HA turns the light ON (finale)" },
-    { 85000, NULL,         NULL },   // پایان سناریو
+    { 45000, wifi_list_show, "WiFi setup screen - live scan of virtual networks" },
+    { 55000, wifi_list_hide, NULL },
+    { 60000, att_show,     "attendance QR screen" },
+    { 68000, att_hide,     NULL },
+    { 75000, ha_fan_off,   "HA turns the fan OFF" },
+    { 82000, ml_auto_off,  "ML Autonomy -> SHADOW" },
+    { 88000, ha_light_on,  "HA turns the light ON (finale)" },
+    { 95000, NULL,         NULL },   // پایان سناریو
 };
 
 static void *scenario_thread(void *arg)
@@ -148,7 +166,9 @@ static void *scenario_thread(void *arg)
             ESP_LOGI(TAG, "scenario finished");
             break;
         }
-        ESP_LOGI(TAG, "step: %s", s->desc);
+        if (s->desc != NULL) {
+            ESP_LOGI(TAG, "step: %s", s->desc);
+        }
         s->fn();
     }
     return NULL;

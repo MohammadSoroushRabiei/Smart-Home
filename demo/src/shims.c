@@ -40,7 +40,7 @@ void demo_log(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    fputs("[demo] ", stdout);
+    printf("[demo %7.2fs] ", esp_timer_get_time() / 1000000.0);
     vprintf(fmt, ap);
     putchar('\n');
     va_end(ap);
@@ -233,6 +233,9 @@ static BaseType_t task_spawn(TaskFunction_t fn, const char *name,
     pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
     pthread_t th;
     int rc = pthread_create(&th, &a, sim_task_trampoline, t);
+    if (rc == 0) {
+        pthread_setname_np(th, name);   // برای دیباگ در /proc/<pid>/task
+    }
     pthread_attr_destroy(&a);
     if (rc != 0) {
         free(t);
@@ -425,6 +428,7 @@ int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
         n = max_results;
     }
     memcpy(out, nets, (size_t)n * sizeof(nets[0]));
+    demo_log("wifi scan requested -> %d networks", n);
     return n;
 }
 

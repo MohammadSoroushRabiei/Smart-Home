@@ -26,6 +26,8 @@ include(FetchContent)
 set(ENV{GIT_CONFIG_GLOBAL} "/dev/null")
 
 add_compile_definitions(LV_CONF_INCLUDE_SIMPLE)
+# M_PI و pthread_setname_np روی glibc به _GNU_SOURCE نیاز دارند
+add_compile_definitions(_GNU_SOURCE)
 # بعضی هدرهای برد bool را بدون stdbool.h استفاده می‌کنند (روی IDF ترانزیتور
 # می‌آید) - اجباری سراسری می‌کنیم
 add_compile_options(-include stdbool.h)
