@@ -66,6 +66,7 @@ static void on_wifi_state_change(wifi_state_t state)
     wifi_setup_screen_notify_state_change();
 
     if (state == WIFI_STATE_CONNECTED) {
+        mqtt_manager_notify_network_available();
         const char *ip = wifi_get_ip_str();
         char url[48];
         snprintf(url, sizeof(url), "https://%s/recognize", ip);
@@ -75,6 +76,7 @@ static void on_wifi_state_change(wifi_state_t state)
         snprintf(dash_url, sizeof(dash_url), "https://%s/", ip);
         ui_update_dashboard_qr(dash_url);
     } else {
+        mqtt_manager_notify_network_lost();
         keypad_screen_update_capture_qr("");
         ui_update_dashboard_qr("");
     }

@@ -454,11 +454,15 @@ const char *wifi_get_connected_ssid(void)
 }
 
 // =====================================================================
-// MQTT مجازی - بروکری که publish ها را لاگ می‌کند و دنباله‌ی اتصال دارد
+// MQTT مجازی - بروکری که publish ها را لاگ می‌کند + همان رفتار اتصال/قطع
+// برد: دکمه‌ی خانه قطع/وصل می‌کند، قطع وای‌فای خودش MQTT را هم قطع می‌کند
+// و با وصل‌شدن دوباره‌ی WiFi (مگر کاربر دستی قطع کرده باشد) برمی‌گردد
 // =====================================================================
 static mqtt_manager_state_change_cb_t s_mqtt_state_cb = NULL;
 static volatile mqtt_manager_state_t s_mqtt_state = MQTT_MGR_STATE_UNCONFIGURED;
 static char s_mqtt_host[65] = "demo-broker.local";
+static volatile bool s_user_disabled = false;
+static volatile bool s_connect_pending = false;
 
 static void mqtt_set_state(mqtt_manager_state_t st)
 {
@@ -471,19 +475,37 @@ static void mqtt_set_state(mqtt_manager_state_t st)
 static void *mqtt_connect_seq(void *arg)
 {
     (void)arg;
-    usleep(2000 * 1000);
+    // مثل برد: MQTT منتظر وای‌فای می‌ماند
+    while (!wifi_is_connected()) {
+        usleep(200 * 1000);
+    }
     mqtt_set_state(MQTT_MGR_STATE_CONNECTING);
     usleep(2500 * 1000);
+    if (s_user_disabled) {
+        mqtt_set_state(MQTT_MGR_STATE_DISABLED);
+        return NULL;
+    }
+    s_connect_pending = false;
     mqtt_set_state(MQTT_MGR_STATE_CONNECTED);
     demo_log("MQTT connected to %s (virtual broker)", s_mqtt_host);
     return NULL;
 }
 
-void mqtt_manager_init(void)
+static void mqtt_spawn_connect(void)
 {
+    if (s_connect_pending) {
+        return;   // یک تلاش اتصال از قبل در جریان است
+    }
+    s_connect_pending = true;
+    demo_log("mqtt: connecting to broker");
     pthread_t th;
     pthread_create(&th, NULL, mqtt_connect_seq, NULL);
     pthread_detach(th);
+}
+
+void mqtt_manager_init(void)
+{
+    mqtt_spawn_connect();
 }
 
 void mqtt_manager_register_state_change_cb(mqtt_manager_state_change_cb_t cb)
@@ -501,14 +523,55 @@ bool mqtt_manager_connect_and_save(const char *host)
     return true;
 }
 
-void mqtt_manager_enable(void) { demo_log("mqtt: enable (virtual)"); }
-void mqtt_manager_disable(void) { demo_log("mqtt: disable (virtual)"); }
-void mqtt_manager_prepare_for_network_loss(void) {}
-void mqtt_manager_notify_network_lost(void) {}
-void mqtt_manager_notify_network_available(void) {}
+void mqtt_manager_enable(void)
+{
+    s_user_disabled = false;
+    if (s_mqtt_state == MQTT_MGR_STATE_CONNECTED ||
+        s_mqtt_state == MQTT_MGR_STATE_CONNECTING) {
+        return;
+    }
+    demo_log("mqtt: enable");
+    mqtt_spawn_connect();
+}
 
+void mqtt_manager_disable(void)
+{
+    s_user_disabled = true;
+    mqtt_set_state(MQTT_MGR_STATE_DISABLED);
+    demo_log("mqtt: disabled by user");
+}
+
+void mqtt_manager_prepare_for_network_loss(void)
+{
+    if (s_mqtt_state == MQTT_MGR_STATE_CONNECTED ||
+        s_mqtt_state == MQTT_MGR_STATE_CONNECTING) {
+        mqtt_set_state(MQTT_MGR_STATE_DISABLED);
+        demo_log("mqtt: offline published (network loss)");
+    }
+}
+
+void mqtt_manager_notify_network_lost(void)
+{
+    mqtt_manager_prepare_for_network_loss();
+}
+
+void mqtt_manager_notify_network_available(void)
+{
+    if (s_user_disabled) {
+        return;   // کاربر دستی قطع کرده - مثل برد خودکار برنمی‌گردد
+    }
+    if (s_mqtt_state == MQTT_MGR_STATE_CONNECTED ||
+        s_mqtt_state == MQTT_MGR_STATE_CONNECTING) {
+        return;
+    }
+    mqtt_spawn_connect();   // لاگ داخل spawn - فقط وقتی تلاش تازه‌ای شروع شود
+}
 static void broker_log(const char *topic, const char *payload, bool retained)
 {
+    if (s_mqtt_state != MQTT_MGR_STATE_CONNECTED) {
+        demo_log("[broker] %s (offline - dropped)", topic);
+        return;
+    }
     demo_log("[broker] %s <- %s%s", topic, payload, retained ? " (retained)" : "");
 }
 

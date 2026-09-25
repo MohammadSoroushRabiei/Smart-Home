@@ -122,7 +122,7 @@ typedef struct {
 } demo_step_t;
 
 static const demo_step_t s_steps[] = {
-    {  4000, ha_light_on,  "HA turns the light ON" },
+    {  8000, ha_light_on,  "HA turns the light ON (after broker up)" },
     { 10000, face_unlock,  "known face at the door - door opens (auto relock 5s)" },
     { 12000, ha_fan_on,    "HA turns the fan ON" },
     { 20000, ml_auto_on,   "ML Autonomy -> AUTO (HA switch)" },
