@@ -399,8 +399,9 @@ HELP_TEXT = (
     "با دکمه‌های منو (یا دستورها) چراغ، فن و درب را کنترل کنید:\n"
     "/status — وضعیت کامل\n"
     "/open — باز کردن درب (با رمز)\n"
-    "/light on|off — چراغ\n"
-    "/fan on|off — فن\n"
+    "/light_on و /light_off — چراغ\n"
+    "/fan_on و /fan_off — فن\n"
+    "(شکل /light on یا /fan off هم کار می‌کند)\n"
     "/cancel — لغو عملیات درب\n\n"
     "باز کردن درب: بعد از /open رمز را در چت بفرستید — خودِ رمز تأیید است."
 )
@@ -410,8 +411,10 @@ BOT_COMMANDS = [
     {"command": "start", "description": "راهنما و منوی کنترل"},
     {"command": "status", "description": "وضعیت کامل خانه هوشمند"},
     {"command": "open", "description": "باز کردن درب با رمز"},
-    {"command": "light", "description": "چراغ: on یا off"},
-    {"command": "fan", "description": "فن: on یا off"},
+    {"command": "light_on", "description": "چراغ روشن"},
+    {"command": "light_off", "description": "چراغ خاموش"},
+    {"command": "fan_on", "description": "فن روشن"},
+    {"command": "fan_off", "description": "فن خاموش"},
     {"command": "cancel", "description": "لغو عملیات درب"},
 ]
 
@@ -488,6 +491,9 @@ def handle_command(chat_id: str, text: str) -> None:
         start_door_flow(chat_id)
     elif cmd == "cancel":
         door_cancelled(chat_id)
+    elif cmd in ("light_on", "light_off", "fan_on", "fan_off"):
+        kind, state = cmd.split("_")
+        device_command(chat_id, kind, state == "on")
     elif cmd in ("light", "fan"):
         state = args[0].lower() if args else ""
         if state in ("on", "1", "روشن"):
