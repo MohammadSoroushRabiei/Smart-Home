@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""ربات کنترلی بله برای خانه هوشمند — سرویس مستقل از سرور attendance.
+"""ربات کنترلی و مرکز رویدادهای بله — سرویس مستقل از سرور attendance.
 
-اعلان‌های ورود/خروج همچنان از سرور attendance می‌آیند (integrations.py همان
-بات و همان چت را استفاده می‌کند)؛ این سرویس فقط «کنترل» است و عمداً از MQTT
-استفاده نمی‌کند تا با قطع بودن بروکر هم کار کند:
+تقسیم کار:
+- سرور attendance: فقط حضور و غیاب (دیتابیس + Google Sheets).
+- این سرویس: کنترل + اعلان‌های بله + دیتابیس (لاگ امنیتی + داده‌ی تحلیل).
 
-- چراغ/فن: POST مستقیم روی HTTPS خود برد (/api/light/set و /api/fan/set)
-- درب:     تأیید دوم با دکمه + رمزی که کاربر در چت می‌فرستد
-           → POST /api/lock/unlock (رمز در هیچ فایلی ذخیره نمی‌شود؛
-           مستقیم به برد می‌رود و در پاسخ ۴۰۳ برد یک ثانیه تأخیر ضد brute-force هست)
-- وضعیت:   GET /api/status برد
+- کنترل: چراغ/فن/درب/وضعیت مستقیم روی HTTPS خود برد — بدون MQTT، تا با
+  قطع بودن بروکر هم کار کند.
+- رویدادها: برد رویدادهای درب (موفق/ناموفق) و ورود/خروج را به
+  POST /api/event همین سرویس می‌فرستد؛ همه در SQLite ثبت و به بله اعلام
+  می‌شوند (لاگ امنیتی: باز شدن درب، رمز اشتباه، چهره‌ی ناشناس و …).
+- تحلیل: هر BALE_SNAPSHOT_INTERVAL_S ثانیه وضعیت کامل برد از /api/status
+  خوانده و در جدول snapshots ذخیره می‌شود (برای تحلیل داده‌ی آینده).
 
 گواهی برد self-signed است؛ تأیید گواهی عمداً خاموش می‌شود.
 متغیرهای محیطی و راهنمای اجرا: README.md
@@ -19,12 +21,18 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import requests
 import urllib3
+
+import jdate
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -69,6 +77,14 @@ POLL_TIMEOUT_S = int(os.environ.get("BALE_POLL_TIMEOUT_S", "25"))
 _DEFAULT_OFFSET_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "bale_state.json")
 OFFSET_FILE = os.environ.get("BALE_OFFSET_FILE", _DEFAULT_OFFSET_FILE)
+
+# دریافت رویداد از برد + دیتابیس + snapshot تحلیلی
+BALE_BOT_SECRET = os.environ.get("BALE_BOT_SECRET", "").strip()
+BALE_EVENT_PORT = int(os.environ.get("BALE_EVENT_PORT", "8001"))
+BALE_SNAPSHOT_INTERVAL_S = int(os.environ.get("BALE_SNAPSHOT_INTERVAL_S", "600"))
+_DEFAULT_DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "bale_bot.db")
+DB_PATH = os.environ.get("BALE_DB_PATH", _DEFAULT_DB_PATH)
 
 BALE_API = "https://tapi.bale.ai/bot{token}/{method}"
 
@@ -145,7 +161,7 @@ def board_unlock(password: str) -> tuple[int, str]:
     """باز کردن درب. خروجی: (کد HTTP، پیام نتیجه برای کاربر)."""
     try:
         resp = http.post(f"{BOARD_URL}/api/lock/unlock",
-                         data={"password": password}, timeout=10)
+                         data={"password": password, "source": "bot"}, timeout=10)
     except requests.RequestException:
         return 0, "⚠️ برد در دسترس نیست (وای‌فای برد و BOARD_URL را چک کنید)."
     if resp.status_code == 200:
@@ -186,6 +202,183 @@ def status_text(data: dict) -> str:
         f"🤖 عامل ML: {'خودکار (AUTO)' if (data.get('ml') or {}).get('auto') else 'مشاور (SHADOW)'}",
         f"📡 MQTT: {(data.get('mqtt') or {}).get('state', '—')} — کنترل از بله مستقل از MQTT کار می‌کند",
     ])
+
+
+# ---------------------------------------------------------------------------
+# دیتابیس: لاگ رویدادها (امنیتی) + snapshots تحلیل داده
+# ---------------------------------------------------------------------------
+
+def _db_connect() -> sqlite3.Connection:
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    return sqlite3.connect(DB_PATH, timeout=10)
+
+
+def db_init() -> None:
+    conn = _db_connect()
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        with conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS events (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    received_at TEXT NOT NULL,
+                    event       TEXT NOT NULL,
+                    name        TEXT NOT NULL DEFAULT '',
+                    person_id   INTEGER NOT NULL DEFAULT 0,
+                    similarity  INTEGER NOT NULL DEFAULT 0,
+                    device_ts   TEXT NOT NULL DEFAULT '',
+                    source      TEXT NOT NULL DEFAULT ''
+                )""")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS snapshots (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts          TEXT NOT NULL,
+                    temperature REAL, humidity REAL, pressure REAL,
+                    lux         REAL, presence INTEGER,
+                    light INTEGER, fan INTEGER, "lock" INTEGER,
+                    ml_auto INTEGER, p_light REAL, p_fan REAL,
+                    mqtt_state  TEXT
+                )""")
+    finally:
+        conn.close()
+
+
+def db_insert_event(event: str, name: str, person_id: int, similarity: int,
+                    device_ts: str, source: str) -> None:
+    conn = _db_connect()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO events (received_at, event, name, person_id,"
+                " similarity, device_ts, source)"
+                " VALUES (datetime('now','localtime'),?,?,?,?,?,?)",
+                (event, name, person_id, similarity, device_ts, source))
+    finally:
+        conn.close()
+
+
+def db_insert_snapshot(data: dict) -> None:
+    sensor = data.get("sensor") or {}
+    ml = data.get("ml") or {}
+    conn = _db_connect()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO snapshots (ts, temperature, humidity, pressure,"
+                " lux, presence, light, fan, \"lock\", ml_auto, p_light,"
+                " p_fan, mqtt_state)"
+                " VALUES (datetime('now','localtime'),?,?,?,?,?,?,?,?,?,?,?,?)",
+                (sensor.get("temperature"), sensor.get("humidity"),
+                 sensor.get("pressure"), data.get("lux"),
+                 1 if data.get("presence") else 0,
+                 1 if data.get("light") else 0, 1 if data.get("fan") else 0,
+                 1 if data.get("lock") else 0, 1 if ml.get("auto") else 0,
+                 ml.get("p_light"), ml.get("p_fan"),
+                 (data.get("mqtt") or {}).get("state", "")))
+    finally:
+        conn.close()
+
+
+def _snapshot_loop() -> None:
+    while True:
+        time.sleep(BALE_SNAPSHOT_INTERVAL_S)
+        if not BOARD_URL:
+            continue
+        data, _error = board_status()
+        if data is None:
+            log.warning("Snapshot skipped - board not reachable")
+            continue
+        try:
+            db_insert_snapshot(data)
+            log.info("Snapshot stored")
+        except sqlite3.Error:
+            log.exception("Snapshot insert failed")
+
+
+# ---------------------------------------------------------------------------
+# دریافت رویداد از برد (HTTP) + اعلان بله
+# ---------------------------------------------------------------------------
+
+# متن اعلان هر رویداد - همان واژگانی که برد می‌فرستد
+_EVENT_TEXT = {
+    "door_unlocked_by_face": "🚪 باز شدن درب با چهره",
+    "door_unlocked_by_code": "🔑 باز شدن درب با رمز",
+    "face_not_recognized": "⛔ چهره‌ی ناشناس - دسترسی داده نشد",
+    "wrong_code_entered": "⛔ رمز اشتباه - دسترسی داده نشد",
+    "attendance_in": "🟢 ورود",
+    "attendance_out": "🔴 خروج",
+}
+
+
+def notify_event(event: str, name: str, device_ts: str) -> None:
+    title = _EVENT_TEXT.get(event, f"📣 {event}")
+    who = f": {name}" if name else ""
+    when = f"\n🕒 {jdate.to_jalali_str(device_ts)}" if device_ts else ""
+    for chat_id in sorted(ALLOWED_CHATS):
+        send_message(chat_id, f"{title}{who}{when}")
+
+
+class _EventReceiver(BaseHTTPRequestHandler):
+    """POST /api/event — همان قرارداد payload سرور attendance + فیلد source؛
+    GET /health?secret=... — تست اتصال از برد/داشبورد."""
+
+    def do_POST(self) -> None:
+        if self.path != "/api/event":
+            self._json(404, {"ok": False, "error": "not found"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, json.JSONDecodeError):
+            self._json(400, {"ok": False, "error": "bad json"})
+            return
+        if not BALE_BOT_SECRET or body.get("secret") != BALE_BOT_SECRET:
+            self._json(403, {"ok": False, "error": "bad secret"})
+            return
+
+        event = str(body.get("event", ""))
+        if event == "test":
+            self._json(200, {"ok": True, "test": True})
+            return
+        if event not in _EVENT_TEXT:
+            self._json(400, {"ok": False, "error": "unknown event"})
+            return
+
+        name = str(body.get("name", "")).strip()[:64]
+        try:
+            person_id = int(body.get("id", 0))
+            similarity = int(body.get("similarity", 0))
+        except (TypeError, ValueError):
+            person_id, similarity = 0, 0
+        device_ts = str(body.get("ts", ""))[:32]
+        source = str(body.get("source", ""))[:16]
+
+        db_insert_event(event, name, person_id, similarity, device_ts, source)
+        log.info("event stored: %s name=%r source=%r ts=%r",
+                 event, name, source, device_ts)
+        notify_event(event, name, device_ts)
+        self._json(200, {"ok": True})
+
+    def do_GET(self) -> None:
+        if self.path.startswith("/health"):
+            qs = parse_qs(urlparse(self.path).query)
+            if not BALE_BOT_SECRET or qs.get("secret", [""])[0] != BALE_BOT_SECRET:
+                self._json(403, {"ok": False, "error": "bad secret"})
+                return
+            self._json(200, {"ok": True, "service": "bale-bot"})
+            return
+        self._json(404, {"ok": False, "error": "not found"})
+
+    def _json(self, code: int, obj: dict) -> None:
+        payload = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        log.debug("%s %s", self.address_string(), fmt % args)
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +615,19 @@ def main() -> None:
                     "and refuse every command until a chat is whitelisted")
     log.info("Bale control bot starting (board=%s, allowed_chats=%d, MQTT not used)",
              BOARD_URL or "<unset>", len(ALLOWED_CHATS))
+
+    db_init()
+    try:
+        receiver = ThreadingHTTPServer(("0.0.0.0", BALE_EVENT_PORT), _EventReceiver)
+        threading.Thread(target=receiver.serve_forever, name="event-receiver",
+                         daemon=True).start()
+        log.info("Event receiver listening on 0.0.0.0:%d (db=%s, secret=%s)",
+                 BALE_EVENT_PORT, DB_PATH, "set" if BALE_BOT_SECRET else "NOT SET")
+    except OSError:
+        log.exception("Failed to start event receiver on port %d", BALE_EVENT_PORT)
+    threading.Thread(target=_snapshot_loop, name="snapshots",
+                     daemon=True).start()
+    log.info("Analysis snapshots every %d s", BALE_SNAPSHOT_INTERVAL_S)
 
     try:
         bale_call("setMyCommands", commands=BOT_COMMANDS)

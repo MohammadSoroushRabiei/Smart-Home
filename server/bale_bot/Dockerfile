@@ -10,6 +10,6 @@ COPY requirements.txt .
 ARG PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple
 RUN pip install --no-cache-dir --index-url ${PIP_INDEX_URL} -r requirements.txt
 
-COPY bot.py .
+COPY bot.py jdate.py ./
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "bot.py"]
