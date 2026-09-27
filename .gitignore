@@ -83,3 +83,4 @@ Desktop.ini
 # Attendance server - secrets & local data (never commit)
 server/attendance/.env
 server/attendance/data/
+.vscode/settings.json
