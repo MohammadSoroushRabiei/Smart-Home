@@ -14,6 +14,7 @@
 #include "mqtt_setup_screen.h"
 #include "setting_screen.h"
 #include "attendance_screen.h"
+#include "attendance.h"
 #include "ml_agent.h"
 
 static const char *TAG = "ui_screens";
@@ -121,8 +122,11 @@ static void on_keypad_result(keypad_purpose_t purpose, bool success)
         if (success) {
             ESP_LOGI(TAG, "Unlock code correct - ACCESS GRANTED");
             app_state_set_lock(true);
+            // لاگ امنیتی + اعلان بله: باز شدن درب با رمز از صفحه‌کلید
+            attendance_report_event_src(ATT_EVENT_DOOR_CODE, "", 0, 0.0f, "keypad");
         } else {
             ESP_LOGW(TAG, "Unlock code incorrect - ACCESS DENIED");
+            attendance_report_event_src(ATT_EVENT_DOOR_DENIED_CODE, "", 0, 0.0f, "keypad");
         }
     } else if (purpose == KEYPAD_PURPOSE_SETTINGS) {
         if (success) {

@@ -22,11 +22,16 @@ static const char *TAG = "attendance";
 
 #define NVS_NAMESPACE       "attendance"
 #define NVS_KEY_URL         "server_url"
+#define NVS_KEY_BALE_URL    "bale_url"
 #define NVS_KEY_SECRET      "secret"
 #define NVS_KEY_ENABLED     "enabled"
 #define NVS_KEY_Q_COUNT     "q_count"
 #define NVS_KEY_Q_TAIL      "q_tail"
 #define NVS_KEY_SLOT_FMT    "q%d"
+
+// مقصد هر رکورد صف - سرور attendance (دیتابیس+شیت) یا سرور بله (اعلان+لاگ)
+#define ATT_DEST_ATTENDANCE 0
+#define ATT_DEST_BALE       1
 
 // ظرفیت صف معوق در NVS - با پر شدن، قدیمی‌ترین رکورد قربانی می‌شود
 #define QUEUE_SLOTS         32
@@ -48,6 +53,8 @@ typedef struct __attribute__((packed)) {
     uint16_t person_id;
     uint8_t  event;                 // attendance_event_t
     uint8_t  similarity_pct;        // 0..100
+    uint8_t  dest;                  // ATT_DEST_* - کدام سرور
+    char     source[8];             // face/keypad/http/bot/manual (لاگ امنیتی)
 } attendance_record_t;
 
 // ---------------------------------------------------------------------
@@ -58,6 +65,7 @@ static SemaphoreHandle_t s_mutex;        // محافظ کانفیگ + صف + ض�
 static SemaphoreHandle_t s_flush_sem;    // بیدار کردن تسک ارسال
 
 static char s_url[ATTENDANCE_SERVER_URL_MAX_LEN];   // آدرس پایه (بدون مسیر)
+static char s_bale_url[ATTENDANCE_SERVER_URL_MAX_LEN]; // سرور بله (اعلان+لاگ)
 static char s_secret[ATTENDANCE_SECRET_MAX_LEN + 1];
 static bool s_enabled;
 
@@ -101,6 +109,41 @@ static const char *event_str(uint8_t event)
     case ATT_EVENT_DOOR_CODE:      return "door_code";
     case ATT_EVENT_TEST:           return "test";
     default:                       return "unknown";
+    }
+}
+
+// نام رویداد در payload - برای سرور بله همان واژگان یک‌دست با MQTT/دیتابیس
+// است؛ سرور attendance فقط ورود/خروج می‌گیرد
+static const char *event_str_dest(uint8_t event, uint8_t dest)
+{
+    if (dest == ATT_DEST_BALE) {
+        switch ((attendance_event_t)event) {
+        case ATT_EVENT_ATTENDANCE_IN:      return "attendance_in";
+        case ATT_EVENT_ATTENDANCE_OUT:     return "attendance_out";
+        case ATT_EVENT_DOOR_FACE:          return "door_unlocked_by_face";
+        case ATT_EVENT_DOOR_CODE:          return "door_unlocked_by_code";
+        case ATT_EVENT_DOOR_DENIED_FACE:   return "face_not_recognized";
+        case ATT_EVENT_DOOR_DENIED_CODE:   return "wrong_code_entered";
+        case ATT_EVENT_TEST:               return "test";
+        default:                           return "unknown";
+        }
+    }
+    switch ((attendance_event_t)event) {
+    case ATT_EVENT_ATTENDANCE_IN:  return "attendance_in";
+    case ATT_EVENT_ATTENDANCE_OUT: return "attendance_out";
+    default:                       return "unknown";
+    }
+}
+
+// اگر caller منبعی نداد، برچسب پیش‌فرض بر اساس نوع رویداد
+static const char *default_source(uint8_t event)
+{
+    switch ((attendance_event_t)event) {
+    case ATT_EVENT_DOOR_FACE:
+    case ATT_EVENT_DOOR_DENIED_FACE: return "face";
+    case ATT_EVENT_DOOR_CODE:
+    case ATT_EVENT_DOOR_DENIED_CODE: return "http";
+    default:                         return "manual";
     }
 }
 
@@ -271,9 +314,10 @@ static void build_payload(const attendance_record_t *rec, const char *secret,
 
     snprintf(payload, payload_size,
              "{\"secret\":\"%s\",\"event\":\"%s\",\"ts\":\"%s\",\"name\":\"%s\","
-             "\"id\":%u,\"similarity\":%u}",
-             secret, event_str(rec->event), ts_str, name_esc,
-             (unsigned)rec->person_id, (unsigned)rec->similarity_pct);
+             "\"id\":%u,\"similarity\":%u,\"source\":\"%s\"}",
+             secret, event_str_dest(rec->event, rec->dest), ts_str, name_esc,
+             (unsigned)rec->person_id, (unsigned)rec->similarity_pct,
+             rec->source[0] ? rec->source : default_source(rec->event));
 }
 
 // POST کردن payload به {base}/api/event. معیار موفقیت: پاسخ 2xx.
@@ -340,7 +384,10 @@ static void attendance_task(void *arg)
             xSemaphoreTake(s_mutex, portMAX_DELAY);
             esp_err_t peek = queue_peek_locked(&rec);
             if (peek == ESP_OK) {
-                copy_str(url, sizeof(url), s_url);
+                // مقصد رکورد تعیین‌کننده‌ی سرور است؛ رکورد حضور به هر دو سرور
+                // می‌رود پس دو رکورد با dest متفاوت در صف می‌نشیند
+                copy_str(url, sizeof(url),
+                         rec.dest == ATT_DEST_BALE ? s_bale_url : s_url);
                 copy_str(secret, sizeof(secret), s_secret);
             }
             xSemaphoreGive(s_mutex);
@@ -352,6 +399,16 @@ static void attendance_task(void *arg)
                 // رکورد خراب - اسلاتش را بی‌قید و شرط آزاد کن تا صف گیر نکند
                 xSemaphoreTake(s_mutex, portMAX_DELAY);
                 queue_drop_head_locked();
+                xSemaphoreGive(s_mutex);
+                continue;
+            }
+
+            if (url[0] == '\0') {
+                // مقصدش پاک شده (یا هنوز ست نشده) - رکورد بی‌مقصد دور ریخته می‌شود
+                ESP_LOGW(TAG, "No server URL for dest=%u - dropping record (%s)",
+                         rec.dest, event_str(rec.event));
+                xSemaphoreTake(s_mutex, portMAX_DELAY);
+                queue_advance_locked(&rec);
                 xSemaphoreGive(s_mutex);
                 continue;
             }
@@ -390,6 +447,8 @@ esp_err_t attendance_init(void)
     if (ret == ESP_OK) {
         size_t len = sizeof(s_url);
         nvs_get_str(handle, NVS_KEY_URL, s_url, &len);
+        len = sizeof(s_bale_url);
+        nvs_get_str(handle, NVS_KEY_BALE_URL, s_bale_url, &len);
         len = sizeof(s_secret);
         nvs_get_str(handle, NVS_KEY_SECRET, s_secret, &len);
         uint8_t en = 0;
@@ -512,6 +571,64 @@ esp_err_t attendance_set_config(const char *url, const char *secret, bool enable
     return ret;
 }
 
+bool attendance_get_bale_url(char *url, size_t url_size)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    if (url != NULL && url_size > 0) {
+        copy_str(url, url_size, s_bale_url);
+    }
+    bool configured = (s_bale_url[0] != '\0');
+    xSemaphoreGive(s_mutex);
+    return configured;
+}
+
+esp_err_t attendance_set_bale_url(const char *url)
+{
+    if (url == NULL) {
+        url = "";
+    }
+    char clean[ATTENDANCE_SERVER_URL_MAX_LEN];
+    copy_str(clean, sizeof(clean), url);
+    size_t url_len = strlen(clean);
+    while (url_len > 0 && clean[url_len - 1] == '/') {
+        clean[--url_len] = '\0';
+    }
+    if (url_len >= ATTENDANCE_SERVER_URL_MAX_LEN) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    // خالی = پاک کردن؛ غیرخالی باید آدرسِ پایه با پروتکل صریح باشد
+    if (url_len > 0) {
+        bool http = (url_len >= 7 && strncmp(clean, "http://", 7) == 0);
+        bool https = (url_len >= 8 && strncmp(clean, "https://", 8) == 0);
+        if (!http && !https) {
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret == ESP_OK) {
+        ret = nvs_set_str(handle, NVS_KEY_BALE_URL, clean);
+        if (ret == ESP_OK) {
+            ret = nvs_commit(handle);
+        }
+        nvs_close(handle);
+    }
+
+    if (ret == ESP_OK) {
+        copy_str(s_bale_url, sizeof(s_bale_url), clean);
+        ESP_LOGI(TAG, "Bale server URL saved (%s)",
+                 url_len ? clean : "<cleared>");
+    } else {
+        ESP_LOGE(TAG, "Failed to save Bale server URL: %s", esp_err_to_name(ret));
+    }
+
+    xSemaphoreGive(s_mutex);
+    return ret;
+}
+
 int attendance_queue_count(void)
 {
     xSemaphoreTake(s_mutex, portMAX_DELAY);
@@ -543,7 +660,22 @@ esp_err_t attendance_record(const char *name, uint16_t person_id,
 esp_err_t attendance_report_event(attendance_event_t event, const char *name,
                                   uint16_t person_id, float similarity)
 {
-    if (event != ATT_EVENT_TEST && !attendance_is_enabled()) {
+    return attendance_report_event_src(event, name, person_id, similarity, "");
+}
+
+esp_err_t attendance_report_event_src(attendance_event_t event, const char *name,
+                                      uint16_t person_id, float similarity,
+                                      const char *source)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    // ورود/خروج → سرور attendance (دیتابیس+شیت، اگر فعال) + سرور بله (اعلان)؛
+    // رویدادهای درب و تلاش ناموفق → فقط سرور بله
+    bool is_att = is_attendance_event((uint8_t)event);
+    bool to_attendance = is_att && s_enabled && s_url[0] != '\0';
+    bool to_bale = (s_bale_url[0] != '\0');
+    xSemaphoreGive(s_mutex);
+
+    if (event != ATT_EVENT_TEST && !to_attendance && !to_bale) {
         return ESP_ERR_NOT_SUPPORTED;
     }
 
@@ -554,7 +686,7 @@ esp_err_t attendance_report_event(attendance_event_t event, const char *name,
     xSemaphoreTake(s_mutex, portMAX_DELAY);
 
     // ضدانتشار فقط برای ورود/خروج - درب ممکن است پشت‌سرهم باز شود
-    dup = (is_attendance_event((uint8_t)event) &&
+    dup = (is_att &&
            person_id == s_last_id && (uint8_t)event == s_last_event &&
            now_ms - s_last_ms < DEDUP_WINDOW_MS &&
            now_ms >= s_last_ms);
@@ -565,6 +697,9 @@ esp_err_t attendance_report_event(attendance_event_t event, const char *name,
         copy_str(rec.name, sizeof(rec.name), name ? name : "");
         rec.person_id = person_id;
         rec.event = (uint8_t)event;
+        copy_str(rec.source, sizeof(rec.source),
+                 (source != NULL && source[0] != '\0')
+                     ? source : default_source((uint8_t)event));
         float pct = similarity * 100.0f;
         if (pct < 0.0f) {
             pct = 0.0f;
@@ -574,14 +709,29 @@ esp_err_t attendance_report_event(attendance_event_t event, const char *name,
         }
         rec.similarity_pct = (uint8_t)(pct + 0.5f);
 
-        ret = queue_append_locked(&rec);
+        esp_err_t r;
+        if (to_attendance) {
+            rec.dest = ATT_DEST_ATTENDANCE;
+            r = queue_append_locked(&rec);
+            if (r != ESP_OK) {
+                ret = r;
+            }
+        }
+        if (to_bale && (is_att || !to_attendance)) {
+            rec.dest = ATT_DEST_BALE;
+            r = queue_append_locked(&rec);
+            if (r != ESP_OK) {
+                ret = r;
+            }
+        }
+
         if (ret == ESP_OK) {
             s_last_id = person_id;
             s_last_event = (uint8_t)event;
             s_last_ms = now_ms;
-            ESP_LOGI(TAG, "Queued %s (%s) id=%u sim=%u%%",
+            ESP_LOGI(TAG, "Queued %s (%s) id=%u sim=%u%% -> att=%d bale=%d",
                      rec.name, event_str(rec.event), person_id,
-                     (unsigned)rec.similarity_pct);
+                     (unsigned)rec.similarity_pct, to_attendance, to_bale);
         }
     } else {
         ESP_LOGI(TAG, "Duplicate %s suppressed (id=%u)", event_str((uint8_t)event), person_id);
