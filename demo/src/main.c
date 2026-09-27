@@ -35,6 +35,7 @@
 #include "setting_screen.h"
 #include "mqtt_setup_screen.h"
 #include "attendance_screen.h"
+#include "dashboard_screen.h"
 #include "led.h"
 #include "lock.h"
 
@@ -74,11 +75,11 @@ static void on_wifi_state_change(wifi_state_t state)
 
         char dash_url[40];
         snprintf(dash_url, sizeof(dash_url), "https://%s/", ip);
-        ui_update_dashboard_qr(dash_url);
+        dashboard_screen_set_url(dash_url);
     } else {
         mqtt_manager_notify_network_lost();
         keypad_screen_update_capture_qr("");
-        ui_update_dashboard_qr("");
+        dashboard_screen_set_url(NULL);
     }
     lcd_driver_lvgl_unlock();
 }
@@ -163,6 +164,7 @@ int main(int argc, char **argv)
     settings_screen_init();
     mqtt_setup_screen_init();
     attendance_screen_init();
+    dashboard_screen_init();
     lcd_driver_lvgl_unlock();
 
     led_init();
