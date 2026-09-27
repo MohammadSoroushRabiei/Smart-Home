@@ -6,6 +6,11 @@ services:
     container_name: bale-bot
     restart: unless-stopped
     env_file: .env
+    # DNS داکر روی ویندوز گاهی گیر می‌کند (NameResolutionError برای tapi.bale.ai)؛
+    # resolver صریح این را پایدار می‌کند
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       - BALE_OFFSET_FILE=/data/bale_state.json
     volumes:

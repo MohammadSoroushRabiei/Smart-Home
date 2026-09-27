@@ -201,21 +201,26 @@ MENU = {"inline_keyboard": [
      {"text": "📊 وضعیت", "callback_data": "status"}],
 ]}
 
-CONFIRM_DOOR = {"inline_keyboard": [[
-    {"text": "✅ بله، باز کن", "callback_data": "door_confirm"},
-    {"text": "❌ لغو", "callback_data": "door_cancel"},
-]]}
-
 HELP_TEXT = (
     "🤖 ربات کنترل خانه هوشمند\n\n"
     "با دکمه‌های منو (یا دستورها) چراغ، فن و درب را کنترل کنید:\n"
     "/status — وضعیت کامل\n"
-    "/open — باز کردن درب (تأیید + رمز)\n"
+    "/open — باز کردن درب (با رمز)\n"
     "/light on|off — چراغ\n"
     "/fan on|off — فن\n"
-    "/cancel — لغو جریان درب\n\n"
-    "درب دو مرحله دارد: اول تأیید با دکمه، بعد رمز که باید در چت بفرستید."
+    "/cancel — لغو عملیات درب\n\n"
+    "باز کردن درب: بعد از /open رمز را در چت بفرستید — خودِ رمز تأیید است."
 )
+
+# منوی دکمه‌ی «منو/دستورها» پایین چت (به‌جای فقط «شروع مجدد»)
+BOT_COMMANDS = [
+    {"command": "start", "description": "راهنما و منوی کنترل"},
+    {"command": "status", "description": "وضعیت کامل خانه هوشمند"},
+    {"command": "open", "description": "باز کردن درب با رمز"},
+    {"command": "light", "description": "چراغ: on یا off"},
+    {"command": "fan", "description": "فن: on یا off"},
+    {"command": "cancel", "description": "لغو عملیات درب"},
+]
 
 
 # ---------------------------------------------------------------------------
@@ -258,17 +263,9 @@ def start_door_flow(chat_id: str) -> None:
     if problem:
         send_message(chat_id, f"⚠️ {problem}")
         return
-    _flow = {"chat_id": chat_id, "stage": "confirm", "expires": time.time() + FLOW_TTL_S}
-    send_message(chat_id, "🚪 باز کردن درب تأیید می‌خواهد:", CONFIRM_DOOR)
-
-
-def door_confirmed(chat_id: str) -> None:
-    global _flow
-    if not _flow or _flow["chat_id"] != chat_id or _flow["stage"] != "confirm":
-        send_message(chat_id, "برای باز کردن درب دوباره /open را بزنید.")
-        return
     _flow = {"chat_id": chat_id, "stage": "password", "expires": time.time() + FLOW_TTL_S}
-    send_message(chat_id, "🔐 رمز درب را بفرستید (۲ دقیقه فرصت دارید).\nلغو: /cancel")
+    send_message(chat_id, "🔐 رمز درب را بفرستید (۲ دقیقه فرصت دارید).\n"
+                          "خودِ رمز تأیید است — لغو: /cancel")
 
 
 def door_cancelled(chat_id: str) -> None:
@@ -331,10 +328,6 @@ def handle_callback(query: dict) -> None:
         device_command(chat_id, "fan", False)
     elif data == "door_open":
         start_door_flow(chat_id)
-    elif data == "door_confirm":
-        door_confirmed(chat_id)
-    elif data == "door_cancel":
-        door_cancelled(chat_id)
     elif data == "status":
         show_status(chat_id)
     else:
@@ -429,6 +422,13 @@ def main() -> None:
                     "and refuse every command until a chat is whitelisted")
     log.info("Bale control bot starting (board=%s, allowed_chats=%d, MQTT not used)",
              BOARD_URL or "<unset>", len(ALLOWED_CHATS))
+
+    try:
+        bale_call("setMyCommands", commands=BOT_COMMANDS)
+        log.info("Bot command menu registered (%d commands)", len(BOT_COMMANDS))
+    except Exception:  # noqa: BLE001 - منوی دستورها حیاتی نیست
+        log.warning("setMyCommands failed - menu button falls back to /start only",
+                    exc_info=True)
 
     for chat_id in sorted(ALLOWED_CHATS):
         send_message(chat_id, "🤖 ربات کنترل خانه هوشمند آنلاین شد.", MENU)
