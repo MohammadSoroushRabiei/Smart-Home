@@ -28,6 +28,7 @@
 #include "attendance.h"
 #include "setting_screen.h"
 #include "attendance_screen.h"
+#include "dashboard_screen.h"
 #include "face_db.h"
 #include "time_sync.h"
 #include "ml_agent.h"
@@ -52,14 +53,14 @@ static void on_wifi_state_change(wifi_state_t state)
             snprintf(url, sizeof(url), "https://%s/recognize", ip);
             keypad_screen_update_capture_qr(url);
 
-            // QR داشبورد وب زیر لیبل IP
+            // URL داشبورد وب - صفحه‌ی Web Dashboard آن را به‌صورت QR + IP نشان می‌دهد
             char dash_url[40];
             snprintf(dash_url, sizeof(dash_url), "https://%s/", ip);
-            ui_update_dashboard_qr(dash_url);
+            dashboard_screen_set_url(dash_url);
         } else {
             mqtt_manager_notify_network_lost();
             keypad_screen_update_capture_qr("");
-            ui_update_dashboard_qr("");
+            dashboard_screen_set_url(NULL);
         }
 
         lcd_driver_lvgl_unlock();
@@ -137,6 +138,7 @@ void app_main(void)
         settings_screen_init();
         mqtt_setup_screen_init();
         attendance_screen_init();   // صفحه‌ی QR حضور - از دکمه‌ی صفحه‌ی اصلی
+        dashboard_screen_init();    // صفحه‌ی QR/IP داشبورد وب - از دکمه‌ی Web Dashboard
         lcd_driver_lvgl_unlock();
     }
 

@@ -14,13 +14,13 @@
 #include "mqtt_setup_screen.h"
 #include "setting_screen.h"
 #include "attendance_screen.h"
+#include "dashboard_screen.h"
 #include "ml_agent.h"
 
 static const char *TAG = "ui_screens";
 
 static lv_obj_t *s_wifi_btn;
 static lv_obj_t *s_wifi_label;
-static lv_obj_t *s_wifi_ip_label;
 static lv_obj_t *s_light_btn;
 static lv_obj_t *s_light_label;
 static lv_obj_t *s_unlock_btn;
@@ -49,8 +49,8 @@ static lv_obj_t *s_hum_value_label;
 static lv_obj_t *s_press_value_label;
 static lv_obj_t *s_mqtt_btn;
 
-// QR داشبورد وب زیر لیبل IP — با اتصال WiFi پر و با قطع آن پنهان می‌شود
-static lv_obj_t *s_dash_qr;
+// دکمه‌ی Web Dashboard روی صفحه‌ی اصلی - صفحه‌ی QR/IP داشبورد وب را باز می‌کند
+static lv_obj_t *s_dash_btn;
 
 // دکمه‌ی حضور و غیاب روی صفحه‌ی اصلی - صفحه‌ی QR حضور را باز می‌کند
 static lv_obj_t *s_att_btn;
@@ -77,6 +77,11 @@ static void fan_btn_event_cb(lv_event_t *e)
 static void attendance_btn_event_cb(lv_event_t *e)
 {
     attendance_screen_show();
+}
+
+static void dashboard_btn_event_cb(lv_event_t *e)
+{
+    dashboard_screen_show();
 }
 
 static void ml_popup_close(void)
@@ -269,27 +274,32 @@ void ui_screens_init(void)
     lv_obj_center(mqtt_icon);
 
     s_wifi_btn = lv_button_create(scr);
-    lv_obj_set_size(s_wifi_btn, 130, 45);
+    lv_obj_set_size(s_wifi_btn, 200, 45);
     lv_obj_align(s_wifi_btn, LV_ALIGN_TOP_MID, 0, 10);
     lv_obj_set_style_bg_color(s_wifi_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_wifi_btn, wifi_btn_click_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_wifi_btn, wifi_btn_hold_cb, LV_EVENT_LONG_PRESSED, NULL);
 
+    // متن خود دکمه وضعیت را نشان می‌دهد: وصل = « WiFi: <ssid>» (با SSID طولانی
+    // «..» کوتاه می‌شود)؛ لیبل جداگانه‌ی Connected to حذف شده است
     s_wifi_label = lv_label_create(s_wifi_btn);
+    lv_label_set_long_mode(s_wifi_label, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(s_wifi_label, 180);
+    lv_obj_set_style_text_align(s_wifi_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(s_wifi_label, LV_SYMBOL_WIFI " WiFi");
     lv_obj_center(s_wifi_label);
 
-    s_wifi_ip_label = lv_label_create(scr);
-    lv_obj_set_style_text_align(s_wifi_ip_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(s_wifi_ip_label, "Offline");
-    lv_obj_align(s_wifi_ip_label, LV_ALIGN_TOP_MID, 0, 62);
+    // دکمه‌ی Web Dashboard — قرینه‌ی دکمه‌ی حضور در همان ردیف؛ QR و IP دیگر
+    // روی صفحه‌ی اصلی نیستند و داخل همان صفحه نشان داده می‌شوند
+    s_dash_btn = lv_button_create(scr);
+    lv_obj_set_size(s_dash_btn, 130, 45);
+    lv_obj_align(s_dash_btn, LV_ALIGN_TOP_RIGHT, -8, 130);
+    lv_obj_set_style_bg_color(s_dash_btn, lv_palette_main(LV_PALETTE_LIGHT_BLUE), 0);
+    lv_obj_add_event_cb(s_dash_btn, dashboard_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
-    // QR داشبورد وب — زیر لیبل IP؛ فقط وقتی WiFi وصل است نشان داده می‌شود.
-    // پهنای آزاد بین لیبل IP (تا ~y=96) و ردیف دکمه‌ها (از ~y=205) است.
-    s_dash_qr = lv_qrcode_create(scr);
-    lv_qrcode_set_size(s_dash_qr, 90);
-    lv_obj_align(s_dash_qr, LV_ALIGN_TOP_MID, 0, 98);
-    lv_obj_add_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *dash_label = lv_label_create(s_dash_btn);
+    lv_label_set_text(dash_label, "Web Dashboard");
+    lv_obj_center(dash_label);
 
     // دکمه‌ی حضور و غیاب — سمت چپ QR داشبورد؛ باز کردن صفحه‌ی QR حضور
     // بدون رمز (ثبت حضور برای همه آزاد است؛ ثبت/ویرایش افراد داخل همان
@@ -438,7 +448,7 @@ void ui_screens_init(void)
 
 void ui_update_wifi_status(wifi_state_t state)
 {
-    if (s_wifi_btn == NULL || s_wifi_label == NULL || s_wifi_ip_label == NULL) {
+    if (s_wifi_btn == NULL || s_wifi_label == NULL) {
         return;
     }
 
@@ -448,23 +458,23 @@ void ui_update_wifi_status(wifi_state_t state)
     switch (state) {
         case WIFI_STATE_CONNECTED: {
             color = lv_palette_main(LV_PALETTE_BLUE);
-            snprintf(status_text, sizeof(status_text), "Connected to: %s\n%s",
-                     wifi_get_connected_ssid(), wifi_get_ip_str());
+            snprintf(status_text, sizeof(status_text), LV_SYMBOL_WIFI " WiFi: %s",
+                     wifi_get_connected_ssid());
             break;
         }
         case WIFI_STATE_CONNECTING:
             color = lv_palette_main(LV_PALETTE_ORANGE);
-            snprintf(status_text, sizeof(status_text), "Connecting...");
+            snprintf(status_text, sizeof(status_text), LV_SYMBOL_WIFI " WiFi: Connecting...");
             break;
         case WIFI_STATE_OFFLINE:
         default:
             color = lv_palette_main(LV_PALETTE_GREY);
-            snprintf(status_text, sizeof(status_text), "Offline");
+            snprintf(status_text, sizeof(status_text), LV_SYMBOL_WIFI " WiFi");
             break;
     }
 
     lv_obj_set_style_bg_color(s_wifi_btn, color, 0);
-    lv_label_set_text(s_wifi_ip_label, status_text);
+    lv_label_set_text(s_wifi_label, status_text);
 }
 
 void ui_update_light_status(bool on)
@@ -554,21 +564,6 @@ void ui_update_virtual_env(bool presence, float lux)
     snprintf(buf, sizeof(buf), "In Home: %s\nRoom luminance: %s (%.0f lx)",
              presence ? "Yes" : "No", room, lux);
     lv_label_set_text(s_ml_pop_env, buf);
-}
-
-void ui_update_dashboard_qr(const char *url)
-{
-    if (s_dash_qr == NULL) {
-        return;
-    }
-
-    if (url == NULL || url[0] == '\0') {
-        lv_obj_add_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
-        return;
-    }
-
-    lv_qrcode_update(s_dash_qr, url, strlen(url));
-    lv_obj_clear_flag(s_dash_qr, LV_OBJ_FLAG_HIDDEN);
 }
 
 void ui_update_sensor_status(float temp, float hum, float pressure)

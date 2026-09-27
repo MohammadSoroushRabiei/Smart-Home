@@ -59,7 +59,8 @@ add_executable(smartdemo
     ${MAIN}/display/setting_screen.c
     ${MAIN}/display/wifi_setup_screen.c
     ${MAIN}/display/mqtt_setup_screen.c
-    ${MAIN}/display/attendance_screen.c)
+    ${MAIN}/display/attendance_screen.c
+    ${MAIN}/display/dashboard_screen.c)
 
 target_include_directories(smartdemo PRIVATE
     src
