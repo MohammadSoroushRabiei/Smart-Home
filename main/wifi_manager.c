@@ -265,6 +265,11 @@ void wifi_manager_enable(void)
     connect_to_index(0);
 }
 
+// بعد از esp_wifi_disconnect() قطع‌شدن event محور است و ناهمگام؛ کوتاه صبر
+// می‌کنیم تا درایور واقعاً idle شود وگرنه esp_wifi_set_config بلافاصله بعدش
+// ESP_ERR_WIFI_STATE می‌دهد
+static void wifi_wait_radio_idle(void);
+
 void wifi_manager_reconnect_from_list(void)
 {
     s_user_disabled = false;
@@ -278,6 +283,7 @@ void wifi_manager_reconnect_from_list(void)
         // (مثلاً کاربر آن را از لیست شناخته‌شده فراموش کرده).
         s_expect_disconnect = true;
         esp_wifi_disconnect();
+        wifi_wait_radio_idle();
     }
 
     s_try_count = wifi_config_get_all(s_try_list, WIFI_CONFIG_MAX_NETWORKS);
@@ -338,11 +344,21 @@ int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
     }
 
     wifi_scan_config_t scan_config = { .show_hidden = false };
-    esp_err_t err = esp_wifi_scan_start(&scan_config, true);   // بلاک‌کننده
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Scan failed: %s", esp_err_to_name(err));
-        return 0;
-    }
+    esp_err_t err;
+    int attempts = 0;
+    do {
+        err = esp_wifi_scan_start(&scan_config, true);   // بلاک‌کننده
+        if (err == ESP_OK) {
+            break;
+        }
+        // حین تلاشِ اتصال خودکار، اسکن ESP_ERR_WIFI_STATE می‌دهد - کوتاه صبر
+        // و retry تا وقتی ماشین وضعیت جا باز کند (لیست خالی نشود)
+        if (++attempts >= 8) {
+            ESP_LOGW(TAG, "Scan failed after %d attempts: %s", attempts, esp_err_to_name(err));
+            return 0;
+        }
+        vTaskDelay(pdMS_TO_TICKS(300));
+    } while (true);
 
     uint16_t ap_count = 0;
     esp_wifi_scan_get_ap_num(&ap_count);
@@ -394,6 +410,14 @@ int wifi_manager_scan(wifi_scan_result_t *out, int max_results)
     return count;
 }
 
+// بعد از esp_wifi_disconnect() قطع‌شدن event محور است و ناهمگام؛ کوتاه صبر
+// می‌کنیم تا درایور واقعاً idle شود وگرنه esp_wifi_set_config بلافاصله بعدش
+// ESP_ERR_WIFI_STATE می‌دهد
+static void wifi_wait_radio_idle(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(300));
+}
+
 esp_err_t wifi_manager_connect_and_save(const char *ssid, const char *password)
 {
     if (ssid == NULL || ssid[0] == '\0') {
@@ -414,19 +438,37 @@ esp_err_t wifi_manager_connect_and_save(const char *ssid, const char *password)
     if (!s_radio_started) {
         ESP_ERROR_CHECK(esp_wifi_start());
         s_radio_started = true;
-    } else if (wifi_is_connected()) {
-        s_expect_disconnect = true;
-        esp_wifi_disconnect();
+    } else {
+        // هر وضعیتی که رادیو دارد (متصل یا وسط تلاشِ اتصال خودکار) باید idle شود -
+        // esp_wifi_set_config حین connect/قطعِ ناتمام ESP_ERR_WIFI_STATE می‌دهد
+        // و ESP_ERROR_CHECK پایین کل برد را ریبوت می‌کرد
+        wifi_state_t st = wifi_get_state();
+        if (st == WIFI_STATE_CONNECTED || st == WIFI_STATE_CONNECTING) {
+            s_expect_disconnect = true;
+            esp_wifi_disconnect();
+            wifi_wait_radio_idle();
+        }
     }
 
     wifi_config_t wifi_config = { 0 };
     strncpy((char *)wifi_config.sta.ssid, s_manual_ssid, sizeof(wifi_config.sta.ssid) - 1);
     strncpy((char *)wifi_config.sta.password, s_manual_pass, sizeof(wifi_config.sta.password) - 1);
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    esp_err_t cfg_err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (cfg_err != ESP_OK) {
+        // به‌جای ریبوتِ کل برد: شکست را به UI برگردان («Connection failed»)
+        ESP_LOGE(TAG, "esp_wifi_set_config failed: %s", esp_err_to_name(cfg_err));
+        wifi_set_state(WIFI_STATE_OFFLINE);
+        return cfg_err;
+    }
 
     xSemaphoreTake(s_manual_connect_sem, 0);   // هر سیگنال باقی‌مانده از قبل را خالی کن
     wifi_set_state(WIFI_STATE_CONNECTING);
-    esp_wifi_connect();
+    esp_err_t conn_err = esp_wifi_connect();
+    if (conn_err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_connect failed: %s", esp_err_to_name(conn_err));
+        wifi_set_state(WIFI_STATE_OFFLINE);
+        return conn_err;
+    }
 
     BaseType_t got_signal = xSemaphoreTake(s_manual_connect_sem, pdMS_TO_TICKS(WIFI_MANUAL_TIMEOUT_MS));
     s_manual_mode = false;
