@@ -230,7 +230,8 @@ static void add_list_item(int idx, bool highlight_connected)
 {
     char buf[48];
     const char *lock_mark = (s_scan_results[idx].authmode == WIFI_AUTH_OPEN) ? "" : LV_SYMBOL_SETTINGS " ";
-    snprintf(buf, sizeof(buf), "%s%s (%d dBm)", lock_mark, s_scan_results[idx].ssid, s_scan_results[idx].rssi);
+    // قدرت سیگنال جلوی اسم نمی‌آید - لیست از قبل بر اساس RSSI نزولی مرتب شده
+    snprintf(buf, sizeof(buf), "%s%s", lock_mark, s_scan_results[idx].ssid);
 
     lv_obj_t *btn = lv_list_add_button(s_list, LV_SYMBOL_WIFI, buf);
     lv_obj_add_event_cb(btn, ssid_btn_event_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)idx);
