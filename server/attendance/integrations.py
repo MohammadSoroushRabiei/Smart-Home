@@ -1,11 +1,14 @@
-"""Integrations: Google Sheets (via Apps Script webhook) + Bale bot.
+"""Integrations: ارسال رکوردهای حضور و غیاب به Google Sheets (Apps Script webhook).
 
-هر دو اختیاری‌اند؛ اگر متغیرهای محیطی مربوطه ست نشده باشند، تابع مربوطه
-False برمی‌گرداند و رکورد در outbox می‌ماند تا روزی کانفیگ شد ارسال شود.
+این سرور از الان فقط حضور و غیاب است: دیتابیس + شیت. اعلان‌های بله (ورود/خروج
+و رویدادهای درب) به سرور بله (`server/bale_bot`) منتقل شده‌اند و رویدادهای درب
+هم دیگر به این سرور نمی‌آیند.
 
-گوگل از طریق Apps Script کار می‌کند (نه service account) تا نیازی به دسترسی
-Google Cloud Console نباشد: یک شیت بساز، اسکریپت docs/attendance/attendance-webhook.gs
-را در آن Deploy کن و آدرس /exec را در GOOGLE_SCRIPT_URL بگذار.
+اگر متغیر محیطی GOOGLE_SCRIPT_URL ست نشده باشد، تابع False برمی‌گرداند و رکورد
+در outbox می‌ماند تا روزی کانفیگ شد ارسال شود.
+
+یک شیت بساز، اسکریپت docs/attendance/attendance-webhook.gs را در آن Deploy کن
+و آدرس /exec را در GOOGLE_SCRIPT_URL بگذار.
 """
 import logging
 import os
@@ -15,12 +18,6 @@ import requests
 import jdate
 
 log = logging.getLogger("attendance.integrations")
-
-# ---------------------------------------------------------------------
-# Google Sheets — از طریق Apps Script webhook
-# ---------------------------------------------------------------------
-
-_BALE_API = "https://tapi.bale.ai/bot{token}/sendMessage"
 
 
 def _script_config() -> tuple[str, str] | None:
@@ -40,8 +37,6 @@ def send_to_sheet(event: str, name: str, similarity: int, device_ts: str) -> boo
     url, secret = cfg
 
     jdate_str, jtime_str = jdate.to_jalali_parts(device_ts)
-    # شباهت عمداً در شیت نمی‌آید (فقط SQLite)؛ امضای تابع با send_to_bale
-    # یکسان می‌ماند تا worker هر دو را یکسان صدا بزند
     payload = {
         "secret": secret,
         "event": event,
@@ -60,51 +55,4 @@ def send_to_sheet(event: str, name: str, similarity: int, device_ts: str) -> boo
         return True
     except Exception as exc:  # noqa: BLE001
         log.error("Apps Script POST error: %s", exc)
-        return False
-
-
-# ---------------------------------------------------------------------
-# Bale bot (Telegram-compatible API)
-# ---------------------------------------------------------------------
-
-_EVENT_EMOJI = {
-    "attendance_in": "\U0001F7E2 ورود",
-    "attendance_out": "\U0001F534 خروج",
-    "door_face": "\U0001F6AA باز شدن درب با چهره",
-    "door_code": "\U0001F511 باز شدن درب با رمز",
-}
-
-
-def _bale_config() -> tuple[str, str] | None:
-    token = os.environ.get("BALE_TOKEN", "")
-    chat_id = os.environ.get("BALE_CHAT_ID", "")
-    if not token or not chat_id:
-        return None
-    return token, chat_id
-
-
-def send_to_bale(event: str, name: str, similarity: int, device_ts: str) -> bool:
-    """هم‌امضا با send_to_sheet تا worker هر دو را یکسان صدا بزند؛
-    similarity برای اعلان بله استفاده نمی‌شود."""
-    cfg = _bale_config()
-    if cfg is None:
-        return False
-    token, chat_id = cfg
-
-    title = _EVENT_EMOJI.get(event, event)
-    who = f": {name}" if name else ""
-    text = f"{title}{who}\n🕒 {jdate.to_jalali_str(device_ts)}"
-
-    try:
-        resp = requests.post(
-            _BALE_API.format(token=token),
-            json={"chat_id": chat_id, "text": text},
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            log.error("Bale send failed: HTTP %d %s", resp.status_code, resp.text[:200])
-            return False
-        return True
-    except Exception as exc:  # noqa: BLE001
-        log.error("Bale send error: %s", exc)
         return False

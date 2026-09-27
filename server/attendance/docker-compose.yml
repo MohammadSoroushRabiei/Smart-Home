@@ -8,5 +8,9 @@ services:
     ports:
       - "8000:8000"        # فقط داخل LAN استفاده می‌شود
     env_file: .env
+    # DNS داکر روی ویندوز گاهی گیر می‌کند؛ ارسال به Google Scripts هم به آن حساس است
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - ./data:/data       # دیتابیس SQLite (فایل gcp دیگر لازم نیست)

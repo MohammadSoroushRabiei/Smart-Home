@@ -1,4 +1,7 @@
-FROM python:3.12-slim
+# docker.io از ایران ۴۰۳ می‌دهد - میرور ایرانی پیش‌فرض است؛
+# اگر از کار افتاد: registry.docker.ir
+ARG DOCKER_MIRROR=docker.arvancloud.ir
+FROM ${DOCKER_MIRROR}/library/python:3.12-slim
 
 WORKDIR /app
 COPY requirements.txt .
