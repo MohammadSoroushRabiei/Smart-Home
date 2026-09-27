@@ -140,7 +140,7 @@ static const char *s_access_discovery =
     "\"name\":\"Access Event\","
     "\"unique_id\":\"" DEVICE_ID "_access\","
     "\"state_topic\":\"" TOPIC_ACCESS_STATE "\","
-    "\"event_types\":[\"access_granted_face\",\"access_denied_face\",\"access_granted_code\",\"access_denied_code\"],"
+    "\"event_types\":[\"door_unlocked_by_face\",\"face_not_recognized\",\"door_unlocked_by_code\",\"wrong_code_entered\"],"
     AVAILABILITY_BLOCK ","
     DEVICE_BLOCK
     "}";
@@ -282,10 +282,10 @@ static void retry_timer_cb(void *arg)
 static const char *access_event_type_to_str(access_event_type_t type)
 {
     switch (type) {
-        case ACCESS_EVENT_GRANTED_FACE: return "access_granted_face";
-        case ACCESS_EVENT_DENIED_FACE:  return "access_denied_face";
-        case ACCESS_EVENT_GRANTED_CODE: return "access_granted_code";
-        case ACCESS_EVENT_DENIED_CODE:  return "access_denied_code";
+        case ACCESS_EVENT_GRANTED_FACE: return "door_unlocked_by_face";
+        case ACCESS_EVENT_DENIED_FACE:  return "face_not_recognized";
+        case ACCESS_EVENT_GRANTED_CODE: return "door_unlocked_by_code";
+        case ACCESS_EVENT_DENIED_CODE:  return "wrong_code_entered";
         default:                       return "unknown";
     }
 }

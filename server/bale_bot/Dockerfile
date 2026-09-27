@@ -10,11 +10,6 @@ COPY requirements.txt .
 ARG PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple
 RUN pip install --no-cache-dir --index-url ${PIP_INDEX_URL} -r requirements.txt
 
-COPY app.py db.py integrations.py jdate.py ./
-
-# دیتابیس در volume می‌رود (SQLITE_PATH) - کاربر non-root
-RUN useradd -m server
-USER server
-
-EXPOSE 8000
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY bot.py jdate.py ./
+ENV PYTHONUNBUFFERED=1
+CMD ["python", "bot.py"]

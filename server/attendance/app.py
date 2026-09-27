@@ -1,12 +1,17 @@
 """حضور و غیاب — سرور لوکال (FastAPI)
 
+این سرور فقط حضور و غیاب است: دیتابیس + Google Sheets. اعلان‌های بله و
+رویدادهای درب/امنیتی به سرور بله (`server/bale_bot`) منتقل شده‌اند؛ رویداد
+غیرحضوری که اینجا برسد بدون ذخیره نادیده گرفته می‌شود (برد قدیمی ممکن است
+هنوز بفرستد).
+
 مسیرها:
   POST /api/event   - دریافت رویداد از ESP32 (گیت secret)
   GET  /health      - تست اتصال از برد/داشبورد (گیت secret در query)
   GET  /stats       - آمار (بدون secret؛ فقط برای دیدن از مرورگر LAN)
 
 جریان: رویداد بلافاصله در SQLite ذخیره می‌شود؛ worker دوره‌ای رکوردهای
-pending را به Google Sheets و بله می‌فرستد و موفق‌ها را علامت می‌زند.
+pending را به Google Sheets می‌فرستد و موفق‌ها را علامت می‌زند.
 اگر اینترنت قطع باشد رکوردها در SQLite امن می‌مانند و بعداً ارسال می‌شوند.
 """
 import logging
@@ -31,8 +36,7 @@ SECRET = os.environ.get("ATTENDANCE_SECRET", "")
 SQLITE_PATH = os.environ.get("SQLITE_PATH", "/data/attendance.db")
 WORKER_INTERVAL_S = float(os.environ.get("WORKER_INTERVAL_S", "15"))
 
-VALID_EVENTS = {"attendance_in", "attendance_out", "door_face", "door_code"}
-# شیت گوگل فقط برای حضور و غیاب است؛ رویدادهای درب فقط SQLite + بله
+# فقط حضور و غیاب - رویدادهای درب مال سرور بله‌اند
 ATTENDANCE_EVENTS = {"attendance_in", "attendance_out"}
 
 app = FastAPI(title="Smart-Home Attendance Server", docs_url=None, redoc_url=None)
@@ -71,13 +75,13 @@ def receive_event(ev: EventIn) -> dict[str, Any]:
         # تست اتصال از داشبورد برد - چیزی ذخیره نمی‌شود
         return {"ok": True, "test": True}
 
-    if ev.event not in VALID_EVENTS:
-        raise HTTPException(status_code=400, detail="unknown event")
+    if ev.event not in ATTENDANCE_EVENTS:
+        # رویدادهای درب مال سرور بله‌اند؛ با ۲۰۰ نادیده گرفته می‌شود تا صف
+        # فریمور قدیمی گیر نکند
+        log.info("non-attendance event ignored: %r (bale-bot server owns it)", ev.event)
+        return {"ok": True, "ignored": True}
 
     row_id = db.insert_event(ev.event, ev.name.strip(), ev.id, ev.similarity, ev.ts)
-    if ev.event not in ATTENDANCE_EVENTS:
-        # رویداد درب به شیت نمی‌رود - همان لحظه از صف گوگل خارج می‌شود
-        db.mark_synced("google", row_id)
     log.info("event stored: %s name=%r id=%d sim=%d%% ts=%r",
              ev.event, ev.name, ev.id, ev.similarity, ev.ts)
     # worker هر WORKER_INTERVAL_S یک‌بار صف را می‌کشد - اینجا لازم نیست منتظر بمانیم
@@ -92,8 +96,7 @@ def health(secret: str = Query(default="")) -> dict[str, Any]:
 
 @app.get("/stats")
 def stats() -> dict[str, Any]:
-    return db.stats() | {"google": bool(os.environ.get("GOOGLE_SCRIPT_URL")),
-                         "bale": bool(os.environ.get("BALE_TOKEN"))}
+    return db.stats() | {"google": bool(os.environ.get("GOOGLE_SCRIPT_URL"))}
 
 
 # ---------------------------------------------------------------------
@@ -121,10 +124,6 @@ def _worker_loop() -> None:
             _flush_dest("google", integrations.send_to_sheet)
         except Exception:  # noqa: BLE001
             log.exception("google flush cycle failed")
-        try:
-            _flush_dest("bale", integrations.send_to_bale)
-        except Exception:  # noqa: BLE001
-            log.exception("bale flush cycle failed")
 
 
 @app.on_event("startup")

@@ -1002,10 +1002,13 @@ static const char *dashboard_html =
     "<button class=\"btn\" id=\"btn-enroll\" style=\"margin-top:10px\">Add New Face</button>"
     "<div class=\"status-line\" id=\"enroll-line\"></div></div>"
 
-    "<div class=\"card set-section\"><h2>Attendance Server</h2>"
+    "<div class=\"card set-section\"><h2>Servers (Attendance & Bale)</h2>"
     "<label style=\"display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px\">"
     "<input type=\"checkbox\" id=\"att-enabled\" style=\"width:auto\"> Attendance enabled</label>"
+    "<label class=\"small\" style=\"margin-bottom:4px\">Attendance server (records & Google Sheets)</label>"
     "<input type=\"text\" id=\"att-url\" placeholder=\"http://192.168.1.50:8000\" style=\"direction:ltr;text-align:left\">"
+    "<label class=\"small\" style=\"margin:8px 0 4px\">Bale bot server (notifications & security log)</label>"
+    "<input type=\"text\" id=\"att-bale-url\" placeholder=\"http://192.168.1.50:8001\" style=\"direction:ltr;text-align:left\">"
     "<input type=\"password\" id=\"att-secret\" placeholder=\"Secret (blank = unchanged)\" style=\"margin-top:8px\">"
     "<div style=\"display:flex;gap:8px;margin-top:10px\">"
     "<button class=\"btn\" id=\"btn-att-save\" style=\"width:auto;flex:1\">Save</button>"
@@ -1148,6 +1151,7 @@ static const char *dashboard_html =
     "if(d.attendance){"
     "$('att-enabled').checked=!!d.attendance.enabled;"
     "$('att-url').value=d.attendance.url||'';"
+    "$('att-bale-url').value=d.attendance.bale_url||'';"
     "$('att-secret').value='';"
     "$('att-secret').placeholder='Secret'+(d.attendance.secret_set?' (unchanged if blank)':'');"
     "$('att-line').textContent=d.attendance.queue?('Queued records: '+d.attendance.queue):'';}"
@@ -1190,11 +1194,12 @@ static const char *dashboard_html =
     "}catch(e){$('enroll-line').textContent='Error: '+e.message;}"
     "$('btn-enroll').disabled=false;});"
     "$('btn-att-save').addEventListener('click',async function(){"
-    "const url=$('att-url').value.trim(),sec=$('att-secret').value;"
+    "const url=$('att-url').value.trim(),bale=$('att-bale-url').value.trim(),sec=$('att-secret').value;"
     "if($('att-enabled').checked&&!url.startsWith('http')){toast('Server URL must start with http:// or https://');return;}"
+    "if(bale&&!bale.startsWith('http')){toast('Bale server URL must start with http:// or https://');return;}"
     "$('btn-att-save').disabled=true;$('att-line').textContent='Saving...';"
     "try{"
-    "const res=await apiSettings({action:'attendance_set',enabled:$('att-enabled').checked?1:0,url:url,secret:sec});"
+    "const res=await apiSettings({action:'attendance_set',enabled:$('att-enabled').checked?1:0,url:url,bale_url:bale,secret:sec});"
     "if(res.status===200&&res.data.ok){toast('Attendance settings saved');"
     "$('att-secret').value='';$('att-line').textContent='Queued records: '+(res.data.queue||0);}"
     "else{$('att-line').textContent=res.data.error||'Failed';}"
@@ -1290,15 +1295,24 @@ static esp_err_t api_lock_unlock_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    // منبع درخواست برای لاگ امنیتی: داشبورد وب یا ربات بله
+    char source[8] = "http";
+    char src_raw[12] = {0};
+    if (extract_form_value(body, "source", src_raw, sizeof(src_raw)) &&
+        strcmp(src_raw, "bot") == 0) {
+        snprintf(source, sizeof(source), "bot");
+    }
+
     if (password_manager_verify(PASSWORD_KIND_LOCK, password)) {
         ESP_LOGI(TAG, "Door unlocked via dashboard password");
         app_state_set_lock(true);
         mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_CODE);
-        attendance_report_event(ATT_EVENT_DOOR_CODE, "", 0, 0.0f);
+        attendance_report_event_src(ATT_EVENT_DOOR_CODE, "", 0, 0.0f, source);
         return send_ok_json(req, "{\"ok\":true}");
     }
 
     mqtt_manager_publish_access_event(ACCESS_EVENT_DENIED_CODE);
+    attendance_report_event_src(ATT_EVENT_DOOR_DENIED_CODE, "", 0, 0.0f, source);
     ESP_LOGW(TAG, "Dashboard unlock rejected: wrong password");
     // محافظت سبک در برابر حدس آنلاین (ریسک brute-force شبکه‌ی محلی
     // همانند توکن Enroll آگاهانه پذیرفته شده؛ این فقط سرعت را کم می‌کند)
@@ -1367,17 +1381,23 @@ static esp_err_t api_settings_unlock_handler(httpd_req_t *req)
     char att_url_esc[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 2];
     json_escape(att_url, att_url_esc, sizeof(att_url_esc));
 
+    char att_bale[ATTENDANCE_SERVER_URL_MAX_LEN];
+    attendance_get_bale_url(att_bale, sizeof(att_bale));
+    char att_bale_esc[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 2];
+    json_escape(att_bale, att_bale_esc, sizeof(att_bale_esc));
+
     snprintf(s_json_buf, sizeof(s_json_buf),
              "{\"ok\":true,\"mqtt_host\":\"%s\",\"mqtt_state\":\"%s\","
              "\"wifi_ssid\":\"%s\",\"ip\":\"%s\",\"faces\":%.*s,"
              "\"attendance\":{\"configured\":%s,\"enabled\":%s,\"url\":\"%s\","
-             "\"secret_set\":%s,\"queue\":%d,\"test\":\"%s\"}}",
+             "\"bale_url\":\"%s\",\"secret_set\":%s,\"queue\":%d,\"test\":\"%s\"}}",
              host_esc, mqtt_state_str(mqtt_manager_get_state()),
              ssid_esc, wifi_conn ? wifi_get_ip_str() : "",
              (int)faces_len, faces,
              att_configured ? "true" : "false",
              attendance_is_enabled() ? "true" : "false",
              att_url_esc,
+             att_bale_esc,
              att_secret[0] != '\0' ? "true" : "false",
              attendance_queue_count(),
              att_test_state_str());
@@ -1507,9 +1527,11 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
         char enabled_str[8] = {0};
         // مقدار urlencoded می‌تواند تا ~۳ برابر رشته‌ی اصلی طول شود
         char url_raw[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 1] = {0};
+        char bale_raw[2 * ATTENDANCE_SERVER_URL_MAX_LEN + 1] = {0};
         char secret_raw[2 * ATTENDANCE_SECRET_MAX_LEN + 1] = {0};
         bool has_enabled = extract_form_value(body, "enabled", enabled_str, sizeof(enabled_str));
         bool has_url = extract_form_value(body, "url", url_raw, sizeof(url_raw));
+        bool has_bale = extract_form_value(body, "bale_url", bale_raw, sizeof(bale_raw));
         bool has_secret = extract_form_value(body, "secret", secret_raw, sizeof(secret_raw));
 
         if (!has_enabled) {
@@ -1533,6 +1555,17 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
             httpd_resp_set_status(req, "400 Bad Request");
             return send_ok_json(req,
                 "{\"ok\":false,\"error\":\"Invalid server URL (http://IP:port) or secret\"}");
+        }
+        if (has_bale) {
+            // رشته‌ی خالی = پاک کردن آدرس سرور بله
+            char bale_url[ATTENDANCE_SERVER_URL_MAX_LEN] = {0};
+            url_decode(bale_url, bale_raw, sizeof(bale_url));
+            ret = attendance_set_bale_url(bale_url);
+            if (ret != ESP_OK) {
+                httpd_resp_set_status(req, "400 Bad Request");
+                return send_ok_json(req,
+                    "{\"ok\":false,\"error\":\"Invalid Bale server URL (http://IP:port)\"}");
+            }
         }
         return send_attendance_status(req);
     }
@@ -1685,15 +1718,17 @@ static void handle_recognize(httpd_req_t *req)
         httpd_resp_sendstr(req, resp);
         app_state_set_lock(true);
         mqtt_manager_publish_access_event(ACCESS_EVENT_GRANTED_FACE);
-        // گزارش رویداد درب برای سرور لوکال (اعلان بله) - غیربلاک‌کننده؛
-        // اگر سرور کانفیگ/فعال نباشد چیزی ارسال نمی‌شود و به کاربر هم
-        // خطایی نمی‌رسد
-        attendance_report_event(ATT_EVENT_DOOR_FACE, name,
-                                (uint16_t)detected_id, similarity);
+        // گزارش رویداد درب برای سرور بله (اعلان + لاگ امنیتی) - غیربلاک‌کننده؛
+        // اگر سرور کانفیگ نشده باشد چیزی ارسال نمی‌شود و به کاربر خطایی نمی‌رسد
+        attendance_report_event_src(ATT_EVENT_DOOR_FACE, name,
+                                    (uint16_t)detected_id, similarity, "face");
     } else {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Access Denied: Unknown Face");
-        mqtt_manager_publish_access_event(ACCESS_EVENT_DENIED_FACE); 
+        mqtt_manager_publish_access_event(ACCESS_EVENT_DENIED_FACE);
+        // چهره‌ی ناشناس هم رویداد امنیتی است - فقط به سرور بله می‌رود
+        attendance_report_event_src(ATT_EVENT_DOOR_DENIED_FACE, "", 0,
+                                    similarity, "face");
 
     }
 }

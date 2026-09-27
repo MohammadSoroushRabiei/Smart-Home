@@ -1,0 +1,20 @@
+# سرویس مستقل — یا همین فایل را بالا بیاور یا فقط بلوک services را به
+# docker-compose.yml خودت (کنار HA و Mosquitto) اضافه کن
+services:
+  bale-bot:
+    build: .
+    container_name: bale-bot
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8001:8001"        # دریافت رویداد از برد (POST /api/event) - فقط LAN
+    # DNS داکر روی ویندوز گاهی گیر می‌کند (NameResolutionError برای tapi.bale.ai)؛
+    # resolver صریح این را پایدار می‌کند
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      - BALE_OFFSET_FILE=/data/bale_state.json
+      - BALE_DB_PATH=/data/bale_bot.db
+    volumes:
+      - ./data:/data

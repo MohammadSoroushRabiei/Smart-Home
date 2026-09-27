@@ -83,4 +83,15 @@ Desktop.ini
 # Attendance server - secrets & local data (never commit)
 server/attendance/.env
 server/attendance/data/
+
+# Bale control bot - secrets & local state (never commit)
+server/bale_bot/.env
+server/bale_bot/bale_state.json
+server/bale_bot/data/
+
+# Local SQLite databases (bale-bot / attendance) + WAL sidecar files
+server/**/*.db
+server/**/*.db-wal
+server/**/*.db-shm
+
 .vscode/settings.json

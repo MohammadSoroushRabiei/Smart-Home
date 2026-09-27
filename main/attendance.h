@@ -16,13 +16,15 @@ extern "C" {
 // باید هم‌اندازه‌ی بافر نام face_db باشد (char name[24])
 #define ATTENDANCE_NAME_MAX            24
 
-// انواع رویدادی که به سرور لوکال فرستاده می‌شود
+// انواع رویدادی که به سرورها فرستاده می‌شود
 typedef enum {
     ATT_EVENT_ATTENDANCE_IN  = 0,   // ثبت ورود
     ATT_EVENT_ATTENDANCE_OUT = 1,   // ثبت خروج
     ATT_EVENT_DOOR_FACE      = 2,   // باز شدن درب با چهره
     ATT_EVENT_DOOR_CODE      = 3,   // باز شدن درب با رمز
     ATT_EVENT_TEST           = 4,   // فقط تست اتصال - ذخیره نمی‌شود
+    ATT_EVENT_DOOR_DENIED_FACE = 5, // چهره‌ی ناشناس - فقط به سرور بله
+    ATT_EVENT_DOOR_DENIED_CODE = 6, // رمز اشتباه - فقط به سرور بله
 } attendance_event_t;
 
 /**
@@ -52,6 +54,18 @@ bool attendance_get_config(char *url, size_t url_size,
 esp_err_t attendance_set_config(const char *url, const char *secret, bool enabled);
 
 /**
+ * @brief آدرس پایه‌ی سرور بله (اعلان‌ها + لاگ امنیتی). رکوردهای حضور به هر دو
+ *        سرور و رویدادهای درب فقط به این سرور می‌روند.
+ * @return true اگر URL قبلاً تنظیم شده باشد
+ */
+bool attendance_get_bale_url(char *url, size_t url_size);
+
+/**
+ * @brief ذخیره‌ی آدرس سرور بله (http://IP:port). رشته‌ی خالی = پاک کردن.
+ */
+esp_err_t attendance_set_bale_url(const char *url);
+
+/**
  * @brief تعداد رکوردهای معوق در صف NVS (برای نمایش در داشبورد)
  */
 int attendance_queue_count(void);
@@ -73,11 +87,21 @@ esp_err_t attendance_record(const char *name, uint16_t person_id,
 /**
  * @brief گزارش رویدادهای درب (چهره/رمز) به سرور - بدون گیت ساعت و بدون
  *        ضدانتشار (سرور در بدترین حالت زمان دریافت خودش را می‌زند).
- *        غیربلاک‌کننده: فقط در صف می‌نویسد و برمی‌گردد؛ از هندلرهای HTTP
+ *        غیربلاک‌کننده: فقط در صف می‌نویسد و برمی‌گرداند؛ از هندلرهای HTTP
  *        قابل فراخوانی است.
  */
 esp_err_t attendance_report_event(attendance_event_t event, const char *name,
                                   uint16_t person_id, float similarity);
+
+/**
+ * @brief همان attendance_report_event با برچسب منبع برای لاگ امنیتی سرور بله
+ *        ("face" / "keypad" / "http" (داشبورد) / "bot" / "manual").
+ *        مسیردهی: ورود/خروج → سرور attendance (+ سرور بله برای اعلان)؛
+ *        رویدادهای درب و ناموفق → فقط سرور بله.
+ */
+esp_err_t attendance_report_event_src(attendance_event_t event, const char *name,
+                                      uint16_t person_id, float similarity,
+                                      const char *source);
 
 /**
  * @brief تست اتصال به سرور (GET {url}/health با secret). بلاک‌کننده تا
