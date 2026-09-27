@@ -1,0 +1,12 @@
+# سرویس مستقل — یا همین فایل را بالا بیاور یا فقط بلوک services را به
+# docker-compose.yml خودت (کنار HA و Mosquitto) اضافه کن
+services:
+  bale-bot:
+    build: .
+    container_name: bale-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - BALE_OFFSET_FILE=/data/bale_state.json
+    volumes:
+      - ./data:/data
