@@ -9,8 +9,7 @@ static const char *TAG = "dashboard_screen";
 
 static lv_obj_t *s_overlay;
 static lv_obj_t *s_qr;
-static lv_obj_t *s_ip_label;       // IP با فونت درشت
-static lv_obj_t *s_url_label;      // آدرس کامل - خاکستری
+static lv_obj_t *s_url_label;      // آدرس داشبورد زیر QR - تنها متن صفحه
 static lv_obj_t *s_offline_hint;   // پیام وقتی WiFi وصل نیست
 static bool s_open = false;
 static char s_url[40];             // آخرین URL رسیده از main - خالی = آفلاین
@@ -30,15 +29,19 @@ static void refresh(void)
 
     if (s_url[0] != '\0') {
         lv_qrcode_update(s_qr, s_url, strlen(s_url));
-        lv_label_set_text(s_ip_label, wifi_get_ip_str());
-        lv_label_set_text(s_url_label, s_url);
+        // نمایش بدون اسلش انتهایی: فقط https://<IP>
+        char disp[40];
+        snprintf(disp, sizeof(disp), "%s", s_url);
+        size_t n = strlen(disp);
+        if (n > 0 && disp[n - 1] == '/') {
+            disp[n - 1] = '\0';
+        }
+        lv_label_set_text(s_url_label, disp);
         lv_obj_clear_flag(s_qr, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(s_ip_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(s_url_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_offline_hint, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(s_qr, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_ip_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_url_label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(s_offline_hint, LV_OBJ_FLAG_HIDDEN);
     }
@@ -76,16 +79,15 @@ void dashboard_screen_init(void)
     lv_qrcode_set_light_color(s_qr, lv_color_white());
     lv_obj_align(s_qr, LV_ALIGN_CENTER, 0, -60);
 
-    s_ip_label = lv_label_create(s_overlay);
-    lv_obj_set_style_text_color(s_ip_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_ip_label, &lv_font_montserrat_28, 0);
-    lv_label_set_text(s_ip_label, "--");
-    lv_obj_align_to(s_ip_label, s_qr, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
-
+    // زیر QR فقط آدرس می‌آید. عرض ثابت + تراز TOP_MID (نه align_to) تا با
+    // تغییر متن، لیبل وسط صفحه بماند - align_to موقعیت را یک‌بار برای متن
+    // اولیه حساب می‌کند و لیبل بلندتر به سمت راست می‌چسبد
     s_url_label = lv_label_create(s_overlay);
-    lv_obj_set_style_text_color(s_url_label, lv_color_hex(0x999999), 0);
+    lv_obj_set_style_text_color(s_url_label, lv_color_white(), 0);
+    lv_obj_set_width(s_url_label, 300);
+    lv_obj_set_style_text_align(s_url_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(s_url_label, "");
-    lv_obj_align_to(s_url_label, s_ip_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 6);
+    lv_obj_align(s_url_label, LV_ALIGN_TOP_MID, 0, 285);
 
     s_offline_hint = lv_label_create(s_overlay);
     lv_obj_set_style_text_color(s_offline_hint, lv_palette_main(LV_PALETTE_ORANGE), 0);

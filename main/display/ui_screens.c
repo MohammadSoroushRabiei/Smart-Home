@@ -263,7 +263,7 @@ void ui_screens_init(void)
     lv_obj_t *scr = lv_screen_active();
 
     s_mqtt_btn = lv_button_create(scr);
-    lv_obj_set_size(s_mqtt_btn, 40, 40);
+    lv_obj_set_size(s_mqtt_btn, 40, 45);
     lv_obj_align(s_mqtt_btn, LV_ALIGN_TOP_LEFT, 10, 10);
     lv_obj_set_style_bg_color(s_mqtt_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_mqtt_btn, mqtt_btn_click_cb, LV_EVENT_CLICKED, NULL);
@@ -289,24 +289,25 @@ void ui_screens_init(void)
     lv_label_set_text(s_wifi_label, LV_SYMBOL_WIFI " WiFi");
     lv_obj_center(s_wifi_label);
 
-    // دکمه‌ی Web Dashboard — قرینه‌ی دکمه‌ی حضور در همان ردیف؛ QR و IP دیگر
-    // روی صفحه‌ی اصلی نیستند و داخل همان صفحه نشان داده می‌شوند
+    // دکمه‌ی Web Dashboard — هم‌اندازه‌ی دکمه‌های چراغ/فن، قرینه‌ی حضور در
+    // همان ردیف؛ QR و IP دیگر روی صفحه‌ی اصلی نیستند و داخل همان صفحه
+    // نشان داده می‌شوند
     s_dash_btn = lv_button_create(scr);
-    lv_obj_set_size(s_dash_btn, 130, 45);
-    lv_obj_align(s_dash_btn, LV_ALIGN_TOP_RIGHT, -8, 130);
-    lv_obj_set_style_bg_color(s_dash_btn, lv_palette_main(LV_PALETTE_LIGHT_BLUE), 0);
+    lv_obj_set_size(s_dash_btn, 140, 70);
+    lv_obj_align(s_dash_btn, LV_ALIGN_TOP_RIGHT, -10, 115);
+    lv_obj_set_style_bg_color(s_dash_btn, lv_palette_main(LV_PALETTE_TEAL), 0);
     lv_obj_add_event_cb(s_dash_btn, dashboard_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *dash_label = lv_label_create(s_dash_btn);
     lv_label_set_text(dash_label, "Web Dashboard");
     lv_obj_center(dash_label);
 
-    // دکمه‌ی حضور و غیاب — سمت چپ QR داشبورد؛ باز کردن صفحه‌ی QR حضور
-    // بدون رمز (ثبت حضور برای همه آزاد است؛ ثبت/ویرایش افراد داخل همان
-    // صفحه پشت رمز است)
+    // دکمه‌ی حضور و غیاب — هم‌اندازه‌ی دکمه‌های چراغ/فن، ستون چپ؛ باز کردن
+    // صفحه‌ی QR حضور بدون رمز (ثبت حضور برای همه آزاد است؛ ثبت/ویرایش افراد
+    // داخل همان صفحه پشت رمز است)
     s_att_btn = lv_button_create(scr);
-    lv_obj_set_size(s_att_btn, 100, 45);
-    lv_obj_align(s_att_btn, LV_ALIGN_TOP_LEFT, 8, 130);
+    lv_obj_set_size(s_att_btn, 140, 70);
+    lv_obj_align(s_att_btn, LV_ALIGN_TOP_LEFT, 10, 115);
     lv_obj_set_style_bg_color(s_att_btn, lv_palette_main(LV_PALETTE_TEAL), 0);
     lv_obj_add_event_cb(s_att_btn, attendance_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
@@ -358,7 +359,7 @@ void ui_screens_init(void)
     lv_obj_center(s_ml_btn_label);
 
     s_settings_btn = lv_button_create(scr);
-    lv_obj_set_size(s_settings_btn, 40, 40);
+    lv_obj_set_size(s_settings_btn, 40, 45);
     lv_obj_align(s_settings_btn, LV_ALIGN_TOP_RIGHT, -10, 10);
     lv_obj_set_style_bg_color(s_settings_btn, lv_palette_main(LV_PALETTE_GREY), 0);
     lv_obj_add_event_cb(s_settings_btn, settings_btn_event_cb, LV_EVENT_CLICKED, NULL);

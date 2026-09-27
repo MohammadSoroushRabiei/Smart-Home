@@ -6,10 +6,10 @@ extern "C" {
 
 /**
  * صفحه‌ی تمام‌صفحه‌ی «Web Dashboard» - از دکمه‌ی هم‌نام روی صفحه‌ی اصلی باز
- * می‌شود. QR آدرس داشبورد وب (https://<ip>/) و IP را نشان می‌دهد؛ وقتی WiFi
- * وصل نیست به‌جای آن‌ها پیام آفلاین. روی lv_layer_top ساخته می‌شود؛ همه‌ی
- * توابع باید بین lcd_driver_lvgl_lock()/lcd_driver_lvgl_unlock() صدا زده
- * شوند.
+ * می‌شود. QR آدرس داشبورد وب را نشان می‌دهد و زیر آن فقط آدرس (https://<ip>)
+ * می‌آید؛ وقتی WiFi وصل نیست به‌جای آن‌ها پیام آفلاین. روی lv_layer_top
+ * ساخته می‌شود؛ همه‌ی توابع باید بین
+ * lcd_driver_lvgl_lock()/lcd_driver_lvgl_unlock() صدا زده شوند.
  */
 
 void dashboard_screen_init(void);
