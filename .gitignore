@@ -95,3 +95,6 @@ server/**/*.db-wal
 server/**/*.db-shm
 
 .vscode/settings.json
+
+# Serial capture output (tools/serial_peek.py)
+tools/boot_log.txt
