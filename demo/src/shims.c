@@ -918,6 +918,14 @@ esp_err_t attendance_report_event(attendance_event_t ev, const char *name,
     (void)ev; (void)name; (void)id; (void)sim;
     return ESP_OK;
 }
+
+esp_err_t attendance_report_event_src(attendance_event_t event, const char *name,
+                                      uint16_t person_id, float similarity,
+                                      const char *source)
+{
+    (void)event; (void)name; (void)person_id; (void)similarity; (void)source;
+    return ESP_OK;   // سرور بله در دمو وجود ندارد - no-op
+}
 esp_err_t attendance_test_server(void) { return ESP_OK; }
 
 // =====================================================================
