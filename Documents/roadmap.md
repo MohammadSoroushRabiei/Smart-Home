@@ -7,11 +7,11 @@
 
 ## ۱. تاریخ‌ها و بودجه
 
-| رویداد          | تاریخ شمسی                  | میلادی           |
-| --------------- | --------------------------- | ---------------- |
-| امروز           | ۴ مهر (شنبه)                | ۲۶ سپتامبر ۲۰۲۶  |
-| ارسال گزارش     | ✅ ۳۰ شهریور ارسال شد       | ۲۱ سپتامبر ۲۰۲۶  |
-| دفاع            | ۶ مهر (دوشنبه)              | ۲۸ سپتامبر ۲۰۲۶  |
+| رویداد      | تاریخ شمسی           | میلادی          |
+| ----------- | -------------------- | --------------- |
+| امروز       | ۴ مهر (شنبه)         | ۲۶ سپتامبر ۲۰۲۶ |
+| ارسال گزارش | ✅ ۳۰ شهریور ارسال شد | ۲۱ سپتامبر ۲۰۲۶ |
+| دفاع        | ۶ مهر (دوشنبه)       | ۲۸ سپتامبر ۲۰۲۶ |
 
 **تا دفاع: ۲ روز.** امروز سخت‌افزار + نرم‌افزار (~۱۰ ساعت مهندسی)؛ فردا پاورپوینت، فیلم دمو، بروزرسانی گزارش و تمرین دفاع.
 
@@ -32,7 +32,7 @@
 
 ### سخت‌افزار (خرید و مدار)
 
-- [ ] **خرید**: ماژول پاور بردبورد + سنسورهای واقعی ML (PIR HC-SR501، رله ۲ کاناله + فن DC 5V، BH1750/GY-302)
+- [ ] **خرید**: سنسورهای واقعی ML (PIR HC-SR501، رله ۲ کاناله + فن DC 5V، BH1750/GY-302)
 - [ ] اتصال مدار قفل سلونوئیدی واقعی (جایگزینی LED تست با رله + قفل واقعی)
 - [ ] اتصال مدار لامپ واقعی (جایگزینی LED تست با رله + لامپ واقعی)
 - [ ] **ادغام سنسورهای واقعی ML** (جایگزینی دیوایس‌های مجازی — ساختار کد آماده است، فقط `virtual_devices.c` عوض می‌شود): PIR فقط GPIO (اولویت اول)، BH1750 روی باس I2C آدرس 0x23 (اولویت آخر)، فن واقعی روی رله
@@ -45,16 +45,8 @@
   - سمت سرور (~۴۵ دقیقه): `mosquitto_passwd`، `allow_anonymous false` + `password_file` + `acl_file`؛ به‌روزرسانی user/pass در HA و MQTT Explorer
   - دو تصمیم باز: مسیر فریمور (سریع: `user:pass@host` در فیلد host — صفر کد | تمیز: username/password در NVS + صفحه تنظیمات — ۱-۲ ساعت) و دسترسی بیرونی (Tailscale — پیشنهاد | Nabu Casa؛ MQTT هرگز port-forward مستقیم)
   - تبدیل `binary_sensor` به `lock`: مسیر بدون تغییر فریمور — Template Lock در HA که `/api/lock/unlock` را صدا می‌زند (~۱ ساعت) | مسیر فریمور — توپیک `smarthome/lock/set` + تغییر discovery در `mqtt_manager.c` (~۲-۳ ساعت)
-- [ ] ساخت داشبورد زیبا و مرتب در Home Assistant
-- [ ] Automation در HA
-- [ ] افزودن گزینه اسکن چهره و رمز ورود و تغییر رمزها در HA
-- [ ] **کنترل چراغ/فن/درب با ربات بله** (~۲-۴ ساعت — پایه آماده است: کلاینت بله سرور حضور): polling دستورات با getUpdates در همان سرویس + whitelist `chat_id`؛ `/light` و `/fan` → publish مستقیم روی توپیک‌های `smarthome/*/set`؛ `/open` → POST به `/api/lock/unlock` با تأیید دوم (بررسی رمز روی برد می‌ماند؛ مسیر مستقیم به برد، نه از HA)
-- [ ] **اتمام Attendance**: اسکریپت ۴ ستونی Apps Script + IP پایدار (الان هات‌اسپوت 10.244.x)
-
-### الزام دائمی (باید همیشه رعایت شود)
-
-- چراغ/قفل/سنسور هرگز نباید به دسترسی Home Assistant وابسته‌ی سخت شوند
-- فقدان liveness detection — محدودیت شناخته‌شده، صادقانه در دفاع اعلام شود
+  
+  
 
 ---
 
@@ -100,7 +92,6 @@
 
 ## ۸. Stretch Goals
 
-- قاب دور چهره حین اسکن (~۱-۲ ساعت): مختصات باکس `HumanFaceDetect` در پاسخ JSON recognize/enroll + رسم مستطیل روی پیش‌نمایش مودال داشبورد؛ نسخه‌ی ساده‌تر: قاب راهنمای ثابت CSS
 - انتقال HA/Mosquitto به لپ‌تاپ قدیمی (سرور دائمی) — ۳-۵ ساعت
 - حل ریشه‌ای orphan-record scan (بخش ۶) — ۲-۴ ساعت
 - محافظت brute-force روی توکن enroll (بخش ۶) — ۱-۲ ساعت
@@ -110,7 +101,6 @@
 - UI/UX با SquareLine Studio
 - پنل کنترل سریع
 - Liveness detection
-- iframe کارت capture در HA dashboard
 - BLE/iBeacon | NFC | دوربین OV2640 روی برد | OTA
 
 ---
@@ -123,22 +113,11 @@
 - `max_uri_handlers` پیش‌فرض ۸ — با هر هندلر جدید هماهنگ نگه دار (الان ۱۸ برای داشبورد وب)
 - **درس داشبورد وب — تمام‌شدن حافظه‌ی داخلی حین handshake:** poll هر ۲ ثانیه بدون keep-alive یعنی هر درخواست یک handshake تازه؛ بعد از چند دقیقه `MBEDTLS_ERR_SSL_ALLOC_FAILED (-0x7780)` و `esp-aes: Failed to allocate memory` و سرور دیگر اتصال نمی‌پذیرد. راه‌حل‌ها (سه لایه): ① keep-alive و بازیافت اتصال: `keep_alive_enable=true` (idle 30 / interval 5 / count 3) + `lru_purge_enable=true` + `CONFIG_LWIP_MAX_SOCKETS=16` ② **ریشه‌ی اصلی: دو بافر رندر LVGL (2×320×60×2 ≈ ۷۶KB با `INTERNAL|DMA`) حافظه‌ی داخلی را می‌بلعیدند** — به PSRAM منتقل شدند (`heap_caps_aligned_alloc(64, …, MALLOC_CAP_SPIRAM)`؛ روی S3 با EDMA پشتیبانی می‌شود) به‌علاوه‌ی `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y` و `SPIRAM_MALLOC_ALWAYSINTERNAL=8192` ③ لاگ دوره‌ای heap هر ۳۰ ثانیه در `main.c` برای رصد (اگر largest داخلی به زیر چند KB برسد یعنی بحرانی). ⚠️ `MBEDTLS_SSL_IN_CONTENT_LEN` باید ۱۶KB بماند — مرورگر هنگام آپلود JPEG رکورد ۱۶KB می‌فرستد و بافر ورودی کوچک‌تر decode را می‌شکند؛ فقط `OUT_CONTENT_LEN=4096` امن است
 
----
 
-## ۱۰. نکات فنی Home Assistant / Docker / MQTT 🏠
-
-- Docker Desktop روی ویندوز پورت‌ها را روی IP واقعی هم expose می‌کند
-- `ha-config/`, `mosquitto/data/`, `mosquitto/log/` در `.gitignore`
-- Mosquitto بدون `mosquitto.conf` هیچ پورتی listen نمی‌کند
-- MQTT integration در HA به broker با اسم سرویس Docker وصل می‌شود، نه IP
-- `esp-mqtt` کامپوننت built-in است؛ فقط نیاز به `PRIV_REQUIRES "mqtt"`
-- معماری قفل دو-لایه: `lock.c` گنگ (فقط رله + fail-safe مستقل)؛ `app_state.c` تنها نقطه‌ی ورودی رسمی
-- `binary_sensor` به‌جای `lock` کامل برای وضعیت قفل (تصمیم امنیتی تا امن شدن Mosquitto)
-- `event` entity به‌جای `binary_sensor` برای رویدادهای دسترسی
 
 ---
 
-## ۱۱. نکات فنی باس I2C مشترک 🔌
+## 10. نکات فنی باس I2C مشترک 🔌
 
 - **مشکل:** race condition بین `sensor_task` و `touch_poll_task` روی باس مشترک، بدون timeout داخلی در درایور GT911
 - **راه‌حل فعلی:** mutex اپلیکیشنی (`i2c_bus_lock`/`i2c_bus_unlock`) **فقط دور هر تک‌تراکنش I2C** (نه دور توالی‌های چندمرحله‌ای که `vTaskDelay` دارند)
