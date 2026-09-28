@@ -4,7 +4,7 @@
 #include "driver/gpio.h"
 
 // قفل سلونوئیدی Fail-Secure: بدون برق قفل است؛ با اعمال ولتاژ (رله) باز می‌شود.
-#define LOCK_RELAY_PIN          GPIO_NUM_21
+#define LOCK_RELAY_PIN          GPIO_NUM_14
 
 // سطح فعال رله - با جامپر روی خود ماژول قابل تنظیم است.
 // این پروژه رله را روی Low Level Trigger (Active LOW) گذاشته؛

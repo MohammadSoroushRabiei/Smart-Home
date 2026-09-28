@@ -113,8 +113,8 @@ void app_main(void)
     ESP_ERROR_CHECK(face_db_init());
     ESP_ERROR_CHECK(attendance_init());   // صف NVS + تسک ارسال به Google Sheets
 
-    
-    bool i2c_ok = i2c_bus_init();
+
+    i2c_bus_init();
 
     s_lcd_ok = lcd_driver_init();
     app_state_set_lcd_available(s_lcd_ok);
@@ -123,8 +123,8 @@ void app_main(void)
         ESP_LOGW("main", "Continuing without LCD");
     }
 
-    if (s_lcd_ok && i2c_ok) {
-        bool touch_ok = touch_driver_init(lcd_driver_get_display(), i2c_bus_get_handle());
+    if (s_lcd_ok && i2c_bus_touch_handle() != NULL) {
+        bool touch_ok = touch_driver_init(lcd_driver_get_display(), i2c_bus_touch_handle());
         if (!touch_ok) {
             ESP_LOGW("main", "Continuing without touch input");
         }
@@ -160,7 +160,8 @@ void app_main(void)
 
     ESP_ERROR_CHECK(face_recognition_init());
 
-    if (i2c_ok && bme280_init(i2c_bus_get_handle())) {
+    i2c_master_bus_handle_t sensor_bus = i2c_bus_sensor_handle();
+    if (sensor_bus != NULL && bme280_init(sensor_bus)) {
         sensor_task_start();
     } else {
         ESP_LOGW("main", "BME280 not found, continuing without sensor data");

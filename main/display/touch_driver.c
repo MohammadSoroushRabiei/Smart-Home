@@ -31,6 +31,8 @@ static const char *TAG = "touch_driver";
 #define TOUCH_WATCHDOG_TASK_PRIORITY    3      // بالاتر از touch_poll تا هنگام اسپین I2C هم اجرا شود
 
 static esp_lcd_touch_handle_t s_tp_handle = NULL;
+static i2c_master_bus_handle_t s_i2c_bus = NULL;   // باس تاچ (I2C_NUM_0) - برای قفل باس
+static uint8_t s_gt911_addr = 0x5D;   // آدرس بایندشده - ریست سخت‌افزاری هم باید همین را دوباره انتخاب کند
 
 // نتیجه‌ی خوانده‌شده توسط تسک پس‌زمینه؛ callback فقط این‌ها را می‌خواند (بدون I2C)
 static volatile bool     s_touch_pressed = false;
@@ -50,9 +52,9 @@ static void touch_poll_task(void *arg)
     while (1) {
         s_last_poll_us = esp_timer_get_time();
 
-        i2c_bus_lock();
+        i2c_bus_lock(s_i2c_bus);
         esp_err_t ret = esp_lcd_touch_read_data(s_tp_handle);
-        i2c_bus_unlock();
+        i2c_bus_unlock(s_i2c_bus);
         if (ret == ESP_OK) {
             consecutive_errors = 0;
             s_fail_streak = 0;
@@ -98,10 +100,8 @@ static void gt911_hw_reset_for_recovery(void)
     gpio_config(&int_out_cfg);
 
     gpio_set_level(TOUCH_PIN_RST, 0);   // levels.reset = 0
-    gpio_set_level(TOUCH_PIN_INT, 0);
+    gpio_set_level(TOUCH_PIN_INT, (s_gt911_addr == 0x14) ? 1 : 0);   // سطح INT لحظه‌ی بالا آمدن RST آدرس را انتخاب می‌کند
     vTaskDelay(pdMS_TO_TICKS(10));
-    gpio_set_level(TOUCH_PIN_INT, 0);   // انتخاب آدرس 0x5D (برای آدرس 0x14 باید 1 باشد)
-    vTaskDelay(pdMS_TO_TICKS(1));
     gpio_set_level(TOUCH_PIN_RST, 1);
     vTaskDelay(pdMS_TO_TICKS(10));
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -164,9 +164,39 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 bool touch_driver_init(lv_display_t *disp, i2c_master_bus_handle_t i2c_bus)
 {
     esp_err_t ret;
+    s_i2c_bus = i2c_bus;
 
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+
+    // GT911 آدرس I2C‌اش را از سطح INT در لحظه‌ی ریست انتخاب می‌کند (پایین=0x5D، بالا=0x14).
+    // اگر INT هنگام پاور-آپ شناور باشد ممکن است چیپ روی آدرس دیگر بالا بیاید؛
+    // اول probe می‌زنیم، اگر هیچ‌کدام جواب نداد با توالی ریستِ سخت‌افزاری آدرس را
+    // صریح انتخاب می‌کنیم و دوباره probe می‌زنیم.
+    static const uint8_t k_gt911_addrs[2] = { 0x5D, 0x14 };
+    for (int attempt = 0; attempt < 2 && s_gt911_addr == 0; attempt++) {
+        if (attempt > 0) {
+            ESP_LOGW(TAG, "GT911 silent on bus, issuing address-select hardware reset and retrying");
+            gt911_hw_reset_for_recovery();
+            vTaskDelay(pdMS_TO_TICKS(60));
+        }
+        for (int i = 0; i < 2; i++) {
+            if (i2c_master_probe(i2c_bus, k_gt911_addrs[i], 100) == ESP_OK) {
+                s_gt911_addr = k_gt911_addrs[i];
+                break;
+            }
+        }
+    }
+
+    if (s_gt911_addr == 0) {
+        ESP_LOGE(TAG, "GT911 answers on neither 0x5D nor 0x14 - check touch VDD/GND, SDA->GPIO1, SCL->GPIO2 and the 4.7k pull-ups");
+        return false;
+    }
+    if (s_gt911_addr != tp_io_config.dev_addr) {
+        ESP_LOGW(TAG, "GT911 woke up at alternate address 0x%02X - binding there", s_gt911_addr);
+        tp_io_config.dev_addr = s_gt911_addr;
+    }
+
     ret = esp_lcd_new_panel_io_i2c(i2c_bus, &tp_io_config, &tp_io_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Touch panel IO init failed: %s", esp_err_to_name(ret));
