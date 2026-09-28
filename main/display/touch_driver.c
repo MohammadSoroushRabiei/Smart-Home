@@ -31,6 +31,7 @@ static const char *TAG = "touch_driver";
 #define TOUCH_WATCHDOG_TASK_PRIORITY    3      // بالاتر از touch_poll تا هنگام اسپین I2C هم اجرا شود
 
 static esp_lcd_touch_handle_t s_tp_handle = NULL;
+static i2c_master_bus_handle_t s_i2c_bus = NULL;   // باس تاچ (I2C_NUM_0) - برای قفل باس
 
 // نتیجه‌ی خوانده‌شده توسط تسک پس‌زمینه؛ callback فقط این‌ها را می‌خواند (بدون I2C)
 static volatile bool     s_touch_pressed = false;
@@ -50,9 +51,9 @@ static void touch_poll_task(void *arg)
     while (1) {
         s_last_poll_us = esp_timer_get_time();
 
-        i2c_bus_lock();
+        i2c_bus_lock(s_i2c_bus);
         esp_err_t ret = esp_lcd_touch_read_data(s_tp_handle);
-        i2c_bus_unlock();
+        i2c_bus_unlock(s_i2c_bus);
         if (ret == ESP_OK) {
             consecutive_errors = 0;
             s_fail_streak = 0;
@@ -164,6 +165,7 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 bool touch_driver_init(lv_display_t *disp, i2c_master_bus_handle_t i2c_bus)
 {
     esp_err_t ret;
+    s_i2c_bus = i2c_bus;
 
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();

@@ -33,6 +33,7 @@ typedef struct {
 } bme280_calib_t;
 
 static i2c_master_dev_handle_t s_dev = NULL;
+static i2c_master_bus_handle_t s_bus = NULL;   // باس سنسورها (I2C_NUM_1) - برای قفل باس
 static bme280_calib_t s_calib;
 static bool s_ready = false;
 
@@ -43,17 +44,17 @@ static bool s_ready = false;
 static esp_err_t reg_write(uint8_t reg, uint8_t val)
 {
     uint8_t buf[2] = { reg, val };
-    i2c_bus_lock();
+    i2c_bus_lock(s_bus);
     esp_err_t ret = i2c_master_transmit(s_dev, buf, sizeof(buf), 100);
-    i2c_bus_unlock();
+    i2c_bus_unlock(s_bus);
     return ret;
 }
 
 static esp_err_t reg_read(uint8_t reg, uint8_t *data, size_t len)
 {
-    i2c_bus_lock();
+    i2c_bus_lock(s_bus);
     esp_err_t ret = i2c_master_transmit_receive(s_dev, &reg, 1, data, len, 100);
-    i2c_bus_unlock();
+    i2c_bus_unlock(s_bus);
     return ret;
 }
 
@@ -90,6 +91,7 @@ static void read_calibration(void)
 
 bool bme280_init(i2c_master_bus_handle_t bus)
 {
+    s_bus = bus;
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = BME280_I2C_ADDR,
