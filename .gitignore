@@ -98,3 +98,9 @@ server/**/*.db-shm
 
 # Serial capture output (tools/serial_peek.py)
 tools/boot_log.txt
+
+# Node dependencies (presentation generator)
+node_modules/
+
+# Bale bot local export offset (runtime state)
+server/bale_bot/data_backup_*.json
