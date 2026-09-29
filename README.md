@@ -61,21 +61,36 @@ Runtime data flow between firmware subsystems:
 
 ```mermaid
 flowchart LR
-    subgraph device["ESP32-S3 firmware — FreeRTOS dual-core"]
-        UI["LVGL UI<br/>320×480 + GT911 touch"] <--> ST["app_state<br/>shared state"]
-        SEN["sensor_task<br/>BME280 · LDR"] --> ST
-        ST <--> ML["ml_agent<br/>online SGD"]
-        ML --> DEV["light · fan"]
-        LCK["lock<br/>relay + keypad"] --- ST
-        WEB["HTTPS server<br/>self-signed TLS"] <--> ST
-        MQTT["MQTT client"] <--> ST
+    subgraph SG["ESP32-S3 firmware - FreeRTOS dual-core"]
+        UI["LVGL UI<br/>320x480 + GT911 touch"]
+        ST["app_state<br/>shared state"]
+        SEN["sensor_task<br/>BME280 / LDR"]
+        ML["ml_agent<br/>online SGD"]
+        DEV["light / fan"]
+        LCK["lock<br/>relay + keypad"]
+        WEB["HTTPS server<br/>self-signed TLS"]
+        MQTT["MQTT client"]
     end
-    P["📱 Phone<br/>web panel + face auth"] -->|TLS| WEB
-    MQTT <-->|pub/sub| BR["Mosquitto broker"]
-    BR <--> HA["🏡 Home Assistant"]
-    ST -->|"HTTPS + secret"| SRV["🗓 Attendance server<br/>FastAPI + SQLite"]
-    SRV -->|sync| GS["Google Sheets"]
-    SRV -->|notify| BB["💬 Bale bot"]
+    P["Phone<br/>web panel + face auth"]
+    BR["Mosquitto broker"]
+    HA["Home Assistant"]
+    SRV["Attendance server<br/>FastAPI + SQLite"]
+    GS["Google Sheets"]
+    BB["Bale bot"]
+
+    UI --- ST
+    SEN --> ST
+    ST --- ML
+    ML --> DEV
+    LCK --- ST
+    WEB --- ST
+    MQTT --- ST
+    P -->|TLS| WEB
+    MQTT ---|pub-sub| BR
+    BR --- HA
+    ST -->|HTTPS + secret| SRV
+    SRV -->|sync| GS
+    SRV -->|notify| BB
 ```
 
 ## 🧠 On-Device Machine Learning
