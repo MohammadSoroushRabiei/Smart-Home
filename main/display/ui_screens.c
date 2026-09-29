@@ -101,13 +101,15 @@ static void brightness_release_cb(lv_event_t *e)
     lcd_backlight_level_save();
 }
 
-// استایل اسلایدر نور: تراک باریک تیره + ایندیکیتور سفید + کراپ سفید با حاشیه‌ی
-// تیره (شیک و خنثی، نه آبیِ تم پیش‌فرض). ارتفاع شیء کم است ولی ناحیه‌ی لمس
-// با ext_click_area به ~۲۸px باز می‌شود تا با باریک شدن تراک، تپ سخت نشود
+// استایل اسلایدر نور: تراک خاکستریِ واضح با حاشیه‌ی روشن‌تر (تا روی زمینه‌ی
+// مشکی صفحه همرنگ و گم نشود) + ایندیکیتور سفید + کراپ سفید با حاشیه‌ی تیره.
+// ارتفاع شیء کم است ولی ناحیه‌ی لمس با ext_click_area به ~۲۸px باز می‌شود
 static void brightness_slider_style(lv_obj_t *slider)
 {
-    lv_obj_set_style_bg_color(slider, lv_color_hex(0x3A3A3A), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(slider, lv_color_hex(0x8A8A8A), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_color(slider, lv_color_hex(0xC0C0C0), LV_PART_MAIN);
+    lv_obj_set_style_border_width(slider, 1, LV_PART_MAIN);
     lv_obj_set_style_radius(slider, LV_RADIUS_CIRCLE, LV_PART_MAIN);
 
     lv_obj_set_style_bg_color(slider, lv_color_white(), LV_PART_INDICATOR);
