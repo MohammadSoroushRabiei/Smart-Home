@@ -59,39 +59,7 @@ service. Everything talks over the local Wi-Fi LAN — the cloud is a dashed lin
 
 Runtime data flow between firmware subsystems:
 
-```mermaid
-flowchart LR
-    subgraph SG["ESP32-S3 firmware - FreeRTOS dual-core"]
-        UI["LVGL UI<br/>320x480 + GT911 touch"]
-        ST["app_state<br/>shared state"]
-        SEN["sensor_task<br/>BME280 / LDR"]
-        ML["ml_agent<br/>online SGD"]
-        DEV["light / fan"]
-        LCK["lock<br/>relay + keypad"]
-        WEB["HTTPS server<br/>self-signed TLS"]
-        MQTT["MQTT client"]
-    end
-    P["Phone<br/>web panel + face auth"]
-    BR["Mosquitto broker"]
-    HA["Home Assistant"]
-    SRV["Attendance server<br/>FastAPI + SQLite"]
-    GS["Google Sheets"]
-    BB["Bale bot"]
-
-    UI --- ST
-    SEN --> ST
-    ST --- ML
-    ML --> DEV
-    LCK --- ST
-    WEB --- ST
-    MQTT --- ST
-    P -->|TLS| WEB
-    MQTT ---|pub-sub| BR
-    BR --- HA
-    ST -->|HTTPS + secret| SRV
-    SRV -->|sync| GS
-    SRV -->|notify| BB
-```
+<img src="docs/img/fig_runtime_flow.png" width="100%" alt="Runtime data flow — LVGL UI, sensor task, ML agent, HTTPS server and MQTT client around the shared app_state"/>
 
 ## 🧠 On-Device Machine Learning
 
