@@ -355,6 +355,12 @@ bool lcd_driver_init(void) { return true; }
 lv_display_t *lcd_driver_get_display(void) { return NULL; }
 void lcd_backlight_set(bool on) { (void)on; }
 
+// بک‌لایت مجازی: سطح نور فقط در حافظه نگه داشته می‌شود (PWM/NVS مال برد است)
+static uint8_t s_bl_level = 100;
+void lcd_backlight_set_level(uint8_t percent) { s_bl_level = percent; }
+uint8_t lcd_backlight_get_level(void) { return s_bl_level; }
+void lcd_backlight_level_save(void) { }
+
 // =====================================================================
 // WiFi مجازی - دنباله‌ی اتصال + اسکن ساختگی + اتصال از صفحه‌ی setup
 // =====================================================================

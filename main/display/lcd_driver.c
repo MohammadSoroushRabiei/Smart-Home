@@ -7,7 +7,8 @@
 #include "esp_timer.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "driver/gpio.h"
+#include "driver/ledc.h"
+#include "nvs.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
@@ -27,24 +28,107 @@ static lv_display_t *s_display = NULL;
 static esp_lcd_panel_io_handle_t s_io_handle = NULL;
 static esp_lcd_panel_handle_t s_panel_handle = NULL;
 
+// ===== بک‌لایت PWM (LEDC) =====
+// ۱۰ کیلوهرتز: فلیکر محسوس ندارد و با رزولوشن ۱۰ بیت روی کلاک APB هم جا می‌شود
+#define BL_LEDC_SPEED_MODE  LEDC_LOW_SPEED_MODE
+#define BL_LEDC_TIMER       LEDC_TIMER_0
+#define BL_LEDC_CHANNEL     LEDC_CHANNEL_0
+#define BL_LEDC_FREQ_HZ     10000
+#define BL_LEDC_RESOLUTION  LEDC_TIMER_10_BIT   // duty: 0..1023
+
+#define BL_NVS_NAMESPACE    "display"
+#define BL_NVS_KEY_LEVEL    "bl_level"
+
+static uint8_t s_bl_percent = 100;   // آخرین سطح نور خواسته‌شده (۰ تا ۱۰۰)
+
 void lcd_driver_lvgl_lock(void)   { xSemaphoreTakeRecursive(s_lvgl_lock, portMAX_DELAY); }
 void lcd_driver_lvgl_unlock(void) { xSemaphoreGiveRecursive(s_lvgl_lock);; }
 
 lv_display_t *lcd_driver_get_display(void) { return s_display; }
 
-void lcd_backlight_set(bool on)
+static uint32_t bl_percent_to_duty(uint8_t percent)
 {
-    gpio_set_level(LCD_PIN_BACKLIGHT, on ? 1 : 0);
+    return (uint32_t)percent * ((1U << BL_LEDC_RESOLUTION) - 1) / 100;
 }
 
-static void init_backlight_gpio(void)
+static void bl_apply_duty(uint32_t duty)
 {
-    gpio_config_t bk_cfg = {
-        .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = 1ULL << LCD_PIN_BACKLIGHT,
+    ledc_set_duty(BL_LEDC_SPEED_MODE, BL_LEDC_CHANNEL, duty);
+    ledc_update_duty(BL_LEDC_SPEED_MODE, BL_LEDC_CHANNEL);
+}
+
+void lcd_backlight_set(bool on)
+{
+    bl_apply_duty(on ? bl_percent_to_duty(s_bl_percent) : 0);
+}
+
+void lcd_backlight_set_level(uint8_t percent)
+{
+    if (percent > 100) {
+        percent = 100;
+    }
+    s_bl_percent = percent;
+    bl_apply_duty(bl_percent_to_duty(percent));
+}
+
+uint8_t lcd_backlight_get_level(void)
+{
+    return s_bl_percent;
+}
+
+void lcd_backlight_level_save(void)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(BL_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "backlight save: nvs_open failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    ret = nvs_set_u8(handle, BL_NVS_KEY_LEVEL, s_bl_percent);
+    if (ret == ESP_OK) {
+        ret = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "backlight save failed: %s", esp_err_to_name(ret));
+    }
+}
+
+// بارگذاری آخرین سطح نور از NVS؛ نبود کلید = پیش‌فرض ۱۰۰ درصد
+static void bl_load_level(void)
+{
+    nvs_handle_t handle;
+    if (nvs_open(BL_NVS_NAMESPACE, NVS_READONLY, &handle) == ESP_OK) {
+        uint8_t saved = 0;
+        if (nvs_get_u8(handle, BL_NVS_KEY_LEVEL, &saved) == ESP_OK && saved <= 100) {
+            s_bl_percent = saved;
+        }
+        nvs_close(handle);
+    }
+}
+
+static void init_backlight_pwm(void)
+{
+    const ledc_timer_config_t timer_cfg = {
+        .speed_mode = BL_LEDC_SPEED_MODE,
+        .timer_num = BL_LEDC_TIMER,
+        .duty_resolution = BL_LEDC_RESOLUTION,
+        .freq_hz = BL_LEDC_FREQ_HZ,
+        .clk_cfg = LEDC_AUTO_CLK,
     };
-    ESP_ERROR_CHECK(gpio_config(&bk_cfg));
-    lcd_backlight_set(false);
+    ESP_ERROR_CHECK(ledc_timer_config(&timer_cfg));
+
+    // خاموش شروع می‌شود تا فلش سفید قبل از آماده‌شدن پنل دیده نشود
+    const ledc_channel_config_t ch_cfg = {
+        .gpio_num = LCD_PIN_BACKLIGHT,
+        .speed_mode = BL_LEDC_SPEED_MODE,
+        .channel = BL_LEDC_CHANNEL,
+        .timer_sel = BL_LEDC_TIMER,
+        .duty = 0,
+        .hpoint = 0,
+        .intr_type = LEDC_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&ch_cfg));
 }
 
 static bool notify_flush_ready(esp_lcd_panel_io_handle_t panel_io,
@@ -200,13 +284,15 @@ static void init_lvgl(void)
 bool lcd_driver_init(void)
 {
     s_lvgl_lock = xSemaphoreCreateRecursiveMutex();
-    init_backlight_gpio();
+    init_backlight_pwm();
 
     if (init_i80_bus_and_panel() != ESP_OK) {
         ESP_LOGE(TAG, "LCD init failed - system will continue without display");
         return false;
     }
 
+    // روشن‌کردن با آخرین سطح نور ذخیره‌شده (پیش‌فرض ۱۰۰٪)
+    bl_load_level();
     lcd_backlight_set(true);
     init_lvgl();
     ESP_LOGI(TAG, "LCD driver initialized");

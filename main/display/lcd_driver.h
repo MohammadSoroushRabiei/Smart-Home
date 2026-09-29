@@ -36,8 +36,27 @@ lv_display_t *lcd_driver_get_display(void);
 
 /**
  * @brief روشن/خاموش کردن بک‌لایت.
+ *        روشن = PWM با آخرین سطح نور (lcd_backlight_set_level)؛ خاموش = duty صفر.
  */
 void lcd_backlight_set(bool on);
+
+/**
+ * @brief تنظیم سطح نور صفحه (۰ تا ۱۰۰ درصد). مقدار clamp می‌شود.
+ *        فقط PWM را عوض می‌کند؛ برای ماندگاری بعد از ریبوت،
+ *        lcd_backlight_level_save را صدا بزنید.
+ */
+void lcd_backlight_set_level(uint8_t percent);
+
+/**
+ * @brief آخرین سطح نور تنظیم‌شده (۰ تا ۱۰۰).
+ */
+uint8_t lcd_backlight_get_level(void);
+
+/**
+ * @brief ذخیره‌ی سطح نور فعلی در NVS (در اولین بوت و بعد از هر تغییر
+ *        در UI صدا زده می‌شود تا شدت نور بعد از ریبوت هم حفظ شود).
+ */
+void lcd_backlight_level_save(void);
 
 /**
  * @brief قفل کردن دسترسی به API های LVGL قبل از فراخوانی از یک Task دیگر

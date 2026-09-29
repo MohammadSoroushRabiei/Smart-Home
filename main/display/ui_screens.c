@@ -57,6 +57,10 @@ static lv_obj_t *s_dash_btn;
 static lv_obj_t *s_att_btn;
 static lv_obj_t *s_att_btn_label;
 
+// اسلایدر نور صفحه (بک‌لایت PWM) - زیر دکمه‌ی WiFi؛
+// اعمال لحظه‌ای با VALUE_CHANGED، ذخیره‌ی NVS فقط با رهاکردن دست
+static lv_obj_t *s_brightness_slider;
+
 // بعد از یک هولد روی دکمه‌ی WiFi، LVGL معمولاً یک CLICKED اضافه هم موقع
 // رهاکردن انگشت می‌فرستد - این فلگ از اجرای اشتباه منطق تپ جلوگیری می‌کند.
 static bool s_wifi_long_press_handled = false;
@@ -83,6 +87,18 @@ static void attendance_btn_event_cb(lv_event_t *e)
 static void dashboard_btn_event_cb(lv_event_t *e)
 {
     dashboard_screen_show();
+}
+
+static void brightness_value_cb(lv_event_t *e)
+{
+    lv_obj_t *slider = lv_event_get_target(e);
+    lcd_backlight_set_level((uint8_t)lv_slider_get_value(slider));
+}
+
+static void brightness_release_cb(lv_event_t *e)
+{
+    (void)e;
+    lcd_backlight_level_save();
 }
 
 static void ml_popup_close(void)
@@ -292,6 +308,17 @@ void ui_screens_init(void)
     lv_obj_set_style_text_align(s_wifi_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(s_wifi_label, LV_SYMBOL_WIFI " WiFi");
     lv_obj_center(s_wifi_label);
+
+    // اسلایدر نور صفحه — زیر دکمه‌ی WiFi (وسطِ فاصله‌ی بین ردیف بالا و
+    // دکمه‌های حضور/داشبورد). حداقل ۱۰٪ تا کاربر نتواند صفحه را کاملاً تاریک
+    // کند و اسلایدر را گم کند؛ همگام با آخرین سطح ذخیره‌شده در NVS
+    s_brightness_slider = lv_slider_create(scr);
+    lv_obj_set_size(s_brightness_slider, 200, 26);
+    lv_obj_align(s_brightness_slider, LV_ALIGN_TOP_MID, 0, 72);
+    lv_slider_set_range(s_brightness_slider, 10, 100);
+    lv_slider_set_value(s_brightness_slider, lcd_backlight_get_level(), LV_ANIM_OFF);
+    lv_obj_add_event_cb(s_brightness_slider, brightness_value_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(s_brightness_slider, brightness_release_cb, LV_EVENT_RELEASED, NULL);
 
     // دکمه‌ی Web Dashboard — هم‌اندازه‌ی دکمه‌های چراغ/فن، قرینه‌ی حضور در
     // همان ردیف؛ QR و IP دیگر روی صفحه‌ی اصلی نیستند و داخل همان صفحه
