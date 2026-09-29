@@ -17,4 +17,9 @@ services:
       - BALE_OFFSET_FILE=/data/bale_state.json
       - BALE_DB_PATH=/data/bale_bot.db
     volumes:
-      - ./data:/data
+      # دیتابیس روی volume داکری است نه mount ویندوزی - SQLite روی mount ویندوزی
+      # خطای disk I/O (قفل فایل) می‌دهد و اعلان‌های بله از دست می‌روند
+      - bale_data:/data
+
+volumes:
+  bale_data:
