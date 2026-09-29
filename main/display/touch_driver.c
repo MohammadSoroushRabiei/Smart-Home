@@ -117,6 +117,16 @@ static void touch_poll_task(void *arg)
 // می‌شود تا GT911 همیشه روی همان آدرسِ بایندشده بالا بیاید
 static void gt911_hw_reset(void)
 {
+    // RST حتماً باید واقعاً خروجی شود - این تابع در بوت قبل از هر init دیگری
+    // اجرا می‌شود و پایه هنوز ورودی است؛ gpio_set_level روی ورودی هیچ است
+    gpio_config_t rst_out_cfg = {
+        .mode = GPIO_MODE_OUTPUT,
+        .intr_type = GPIO_INTR_DISABLE,
+        .pull_up_en = 1,
+        .pin_bit_mask = BIT64(TOUCH_PIN_RST),
+    };
+    gpio_config(&rst_out_cfg);
+
     gpio_config_t int_out_cfg = {
         .mode = GPIO_MODE_OUTPUT,
         .intr_type = GPIO_INTR_DISABLE,
