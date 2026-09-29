@@ -101,6 +101,27 @@ static void brightness_release_cb(lv_event_t *e)
     lcd_backlight_level_save();
 }
 
+// استایل اسلایدر نور: تراک باریک تیره + ایندیکیتور سفید + کراپ سفید با حاشیه‌ی
+// تیره (شیک و خنثی، نه آبیِ تم پیش‌فرض). ارتفاع شیء کم است ولی ناحیه‌ی لمس
+// با ext_click_area به ~۲۸px باز می‌شود تا با باریک شدن تراک، تپ سخت نشود
+static void brightness_slider_style(lv_obj_t *slider)
+{
+    lv_obj_set_style_bg_color(slider, lv_color_hex(0x3A3A3A), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(slider, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+
+    lv_obj_set_style_bg_color(slider, lv_color_white(), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(slider, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
+
+    // کراپ = تراک + pad یعنی دایره‌ی ۱۸px روی تراک ۸px
+    lv_obj_set_style_bg_color(slider, lv_color_white(), LV_PART_KNOB);
+    lv_obj_set_style_border_color(slider, lv_color_hex(0x3A3A3A), LV_PART_KNOB);
+    lv_obj_set_style_border_width(slider, 2, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(slider, 5, LV_PART_KNOB);
+    lv_obj_set_style_shadow_width(slider, 0, LV_PART_KNOB);
+}
+
 static void ml_popup_close(void)
 {
     if (s_ml_popup != NULL) {
@@ -309,12 +330,14 @@ void ui_screens_init(void)
     lv_label_set_text(s_wifi_label, LV_SYMBOL_WIFI " WiFi");
     lv_obj_center(s_wifi_label);
 
-    // اسلایدر نور صفحه — زیر دکمه‌ی WiFi (وسطِ فاصله‌ی بین ردیف بالا و
-    // دکمه‌های حضور/داشبورد). حداقل ۱۰٪ تا کاربر نتواند صفحه را کاملاً تاریک
+    // اسلایدر نور صفحه — نوار باریک (۸px) زیر دکمه‌ی WiFi وسطِ فاصله‌ی تا
+    // دکمه‌های حضور/داشبورد. حداقل ۱۰٪ تا کاربر نتواند صفحه را کاملاً تاریک
     // کند و اسلایدر را گم کند؛ همگام با آخرین سطح ذخیره‌شده در NVS
     s_brightness_slider = lv_slider_create(scr);
-    lv_obj_set_size(s_brightness_slider, 200, 26);
-    lv_obj_align(s_brightness_slider, LV_ALIGN_TOP_MID, 0, 72);
+    lv_obj_set_size(s_brightness_slider, 200, 8);
+    lv_obj_align(s_brightness_slider, LV_ALIGN_TOP_MID, 0, 81);
+    lv_obj_set_ext_click_area(s_brightness_slider, 10);
+    brightness_slider_style(s_brightness_slider);
     lv_slider_set_range(s_brightness_slider, 10, 100);
     lv_slider_set_value(s_brightness_slider, lcd_backlight_get_level(), LV_ANIM_OFF);
     lv_obj_add_event_cb(s_brightness_slider, brightness_value_cb, LV_EVENT_VALUE_CHANGED, NULL);
