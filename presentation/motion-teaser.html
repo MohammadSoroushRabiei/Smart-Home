@@ -161,7 +161,7 @@ h2{font-size:62px;font-weight:600;letter-spacing:-.01em;line-height:1.08;margin-
 
 /* ============ scene 1 — title ============ */
 #s1{align-items:center;text-align:center}
-#s1 .badge{margin-bottom:34px}
+#s1 .badges{display:flex;gap:14px;margin-bottom:34px}
 #s1 h1{font-size:150px}
 #s1 .sub{max-width:780px;font-size:22px}
 #s1 .rule{width:340px;height:2px;background:var(--grad);border-radius:2px;margin:38px auto 0}
@@ -411,9 +411,19 @@ body.hold .pp .i-pause{display:none}
 }
 #hint.off{opacity:0!important}
 
+/* chapter trail — the storyline map, highlights the current chapter */
+#trail{
+  position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:30;
+  display:flex;gap:18px;white-space:nowrap;
+  opacity:0;animation:fadeIn 1s ease .6s both;transition:opacity .5s;
+}
+#trail span{font-size:11.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--dim);opacity:.5;transition:color .4s,opacity .4s}
+#trail span.done{color:var(--mut);opacity:.7}
+#trail span.on{color:var(--cyan);opacity:1;text-shadow:0 0 18px rgba(62,224,255,.45)}
+
 /* idle auto-hide of chrome */
-body.idle #brand,body.idle #hud,body.idle #hint{opacity:0;pointer-events:none}
-body.paused #brand,body.paused #hud,body.paused #hint{opacity:1;pointer-events:auto}
+body.idle #brand,body.idle #hud,body.idle #hint,body.idle #trail{opacity:0;pointer-events:none}
+body.paused #brand,body.paused #hud,body.paused #hint,body.paused #trail{opacity:1;pointer-events:auto}
 body.paused #stage *{animation-play-state:paused!important}
 #stage.noanim *{animation:none!important}
 
@@ -448,10 +458,14 @@ body.paused #stage *{animation-play-state:paused!important}
       SMART HOME <em>/ PROJECT TEASER</em>
     </header>
     <div id="hint">Space pause &nbsp;·&nbsp; ← → scenes &nbsp;·&nbsp; F fullscreen</div>
+    <div id="trail"></div>
 
     <!-- ═══════════ SCENE 1 · TITLE ═══════════ -->
     <section class="scene" id="s1">
-      <div class="pill badge in down" style="--d:.15s"><i></i>ESP32-S3 &nbsp;·&nbsp; FreeRTOS &nbsp;·&nbsp; LVGL 9</div>
+      <div class="badges in down" style="--d:.15s">
+        <span class="pill"><i></i>ESP32-S3 &nbsp;·&nbsp; FreeRTOS &nbsp;·&nbsp; LVGL 9</span>
+        <span class="pill"><i></i>No cloud required</span>
+      </div>
       <svg class="in" style="--d:.4s" width="150" height="120" viewBox="0 0 150 120" fill="none" stroke="url(#gTitle)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <defs><linearGradient id="gTitle" x1="0" y1="0" x2="150" y2="120" gradientUnits="userSpaceOnUse">
           <stop stop-color="#3ee0ff"/><stop offset=".55" stop-color="#7c8cff"/><stop offset="1" stop-color="#c58cff"/>
@@ -465,8 +479,8 @@ body.paused #stage *{animation-play-state:paused!important}
       <p class="sub in" style="--d:1.05s">An edge-first home automation platform — face recognition, an on-chip
       self-learning agent and a fully local service stack.</p>
       <div class="rule grow" style="--d:1.35s"></div>
-      <div class="byline in" style="--d:1.55s">Soroush <em>Rabiei</em></div>
-      <div class="mini in" style="--d:1.8s">Isfahan University of Technology · No cloud required</div>
+      <div class="byline in" style="--d:1.55s">Mohammad <em>Soroush&nbsp;Rabiei</em></div>
+      <div class="mini in" style="--d:1.8s">Isfahan University of Technology</div>
     </section>
 
     <!-- ═══════════ SCENE 2 · EDGE NODE ═══════════ -->
@@ -515,7 +529,7 @@ body.paused #stage *{animation-play-state:paused!important}
         </div>
       </div>
       <div>
-        <div class="kicker in" style="--d:.2s">02 · Access Control</div>
+        <div class="kicker in" style="--d:.2s">03 · Access Control</div>
         <h2 class="in" style="--d:.4s">Unlock with <span class="accent">a glance.</span></h2>
         <div class="blist">
           <div class="b in" style="--d:.7s">
@@ -536,7 +550,7 @@ body.paused #stage *{animation-play-state:paused!important}
 
     <!-- ═══════════ SCENE 4 · ON-DEVICE LCD DASHBOARD ═══════════ -->
     <section class="scene" id="s4">
-      <div class="kicker in" style="--d:.1s">03 · On-Device Dashboard</div>
+      <div class="kicker in" style="--d:.1s">02 · On-Device Dashboard</div>
       <h2 class="in" style="--d:.3s">A full touch UI, <span class="accent">on the wall.</span></h2>
       <div class="split">
         <div class="lcdwrap">
@@ -763,8 +777,10 @@ body.paused #stage *{animation-play-state:paused!important}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 
 /* ─────────── timeline ─────────── */
-const SCENES=$$('.scene');
-const DUR=[8000,8000,8500,9000,8500,8000,8500,8500,9000,9000];  // ms per scene
+/* play order ≠ DOM order — narrative: title, brain, touch, security, learning,
+   connectivity, automation, web, chat, closing */
+const SCENES=['s1','s2','s4','s3','s5','s6','s7','s8','s9','s10'].map(id=>document.getElementById(id));
+const DUR=[8000,8000,9000,8500,8500,8000,8500,8500,9000,9000];  // ms per scene
 const TOTAL=DUR.reduce((a,b)=>a+b,0);                      // ≈ 55 s
 const STARTS=[]; DUR.reduce((a,d,i)=>(STARTS[i]=a,a+d),0);
 let idx=-1, sceneT=0, totalT=0, playing=false, paused=false, ended=false;
@@ -794,6 +810,11 @@ function renderCounters(t){
 function updateHud(){
   idxEl.textContent=String(idx+1).padStart(2,'0')+' / '+String(SCENES.length).padStart(2,'0');
   $$('#dots button').forEach((b,i)=>b.classList.toggle('on',i===idx));
+  const ch=SCENE_CHAP[idx]??-1;
+  [...trail.children].forEach((s,i)=>{
+    s.classList.toggle('on',i===ch);
+    s.classList.toggle('done',i<ch);
+  });
 }
 function activate(i){
   SCENES.forEach(s=>s.classList.remove('active'));
@@ -801,7 +822,7 @@ function activate(i){
   const sc=SCENES[i];
   void sc.offsetWidth;                 // restart css animations
   sc.classList.add('active');
-  if(i===2) requestAnimationFrame(()=>scanbox.classList.add('glowok'));
+  if(i===3) requestAnimationFrame(()=>scanbox.classList.add('glowok'));
   idx=i; sceneT=0;
   collectCounters(); renderCounters(0); updateHud();
 }
@@ -945,6 +966,12 @@ addEventListener('mousemove',wake);
 /* scan box element (glow re-armed on each scene entry via activate()) */
 const scanbox=$('#scanbox');
 
+/* chapter trail — storyline map shown on every scene */
+const CHAPTERS=['Brain','Touch','Security','Learning','Connectivity','Automation','Web','Chat'];
+const SCENE_CHAP=[-1,0,1,2,3,4,5,6,7,-1];   // scene index → chapter index (-1: none)
+const trail=$('#trail');
+CHAPTERS.forEach(c=>{const s=document.createElement('span');s.textContent=c;trail.appendChild(s);});
+
 /* ─────────── boot ─────────── */
 buildNet();
 fit();
@@ -968,7 +995,7 @@ window.__seek=(i,ms)=>{
   stage.classList.remove('noanim');       // …so re-adding .active creates fresh ones
   const sc=SCENES[i];
   sc.classList.add('active');
-  if(i===2) scanbox.classList.add('glowok');
+  if(i===3) scanbox.classList.add('glowok');
   idx=i; sceneT=ms;
   void sc.offsetWidth;
   collectCounters();
