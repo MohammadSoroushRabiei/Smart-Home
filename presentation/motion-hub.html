@@ -8,15 +8,22 @@
 <!--
   Smart Home — Live System Hub (interactive, self-contained, no network needed)
   ─────────────────────────────────────────────────────────────────────────────
-  One page, the whole system: the ESP32-S3 board in the middle, and around it
-  the on-device LCD (a faithful, working replica of the firmware UI), the web
-  dashboard, Home Assistant (panel + companion app), the Bale messenger as a
-  phone, the face module, the environment sensors and a colour-coded system
-  log with per-source filters — all sharing ONE live state.
-  Works fully offline (publishes get queued in an "NVS outbox" and flush when
-  WiFi is back — like the real firmware).
-  ▶ Auto demo  = a scripted ~18 s walkthrough for presenting.
-  Test hook:   window.hub.state() / window.hub.set('light',true,'web')
+  One page, the whole system, one live state:
+  · Center: ESP32-S3 board wired to the REAL world — a solenoid door lock and a
+    light on a relay (GPIO), exactly like the hardware.
+  · Left: the on-device LCD — a faithful, working replica of the firmware UI
+    with its real sub-screens: keypad (unlock + settings gate), WiFi setup with
+    scan list, MQTT broker setup and the settings screen (attendance QR with
+    countdown, face enrollment, password change).
+  · Right: Home Assistant (web panel + companion app) with the four REAL
+    automations from automations.yaml, armed/disarmable and actually firing —
+    driven by the Context card (presence, lux, temperature).
+  · Bale (Telegram-style) bot with the full command set of server/bale_bot:
+    /start /status /open (password flow, 2-min TTL) /light_on /light_off
+    /fan_on /fan_off /cancel, inline menu, unknown-command reply, offline
+    warnings — and a real text input.
+  · Bottom: colour-coded system log with per-source filters.
+  ▶ Auto demo = scripted walkthrough.  Test hook: window.hub.state()/set()
 -->
 <style>
 /* ============ font (embedded: Space Grotesk variable 300–700, latin) ============ */
@@ -41,9 +48,10 @@
 html,body{height:100%}
 body{
   background:#020409;overflow:hidden;
-  font-family:'Space Grotesk','Segoe UI',system-ui,sans-serif;
+  font-family:'Space Grotesk','Segoe UI','Vazirmatn',system-ui,sans-serif;
   color:var(--ink);-webkit-font-smoothing:antialiased;user-select:none;
 }
+input{user-select:text;font-family:inherit}
 #viewport{position:fixed;inset:0}
 #stage{
   position:absolute;left:50%;top:50%;width:1600px;height:900px;
@@ -74,6 +82,8 @@ body{
 
 .pop2{opacity:0;animation:popIn .8s var(--ease) both;animation-delay:var(--d,0s)}
 @keyframes popIn{from{opacity:0;transform:translateY(22px) scale(.96)}to{opacity:1;transform:none}}
+.shake{animation:shakeX .4s ease}
+@keyframes shakeX{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
 
 /* ============ chrome ============ */
 #brand{position:absolute;left:44px;top:26px;z-index:30;display:flex;align-items:center;gap:11px;
@@ -81,7 +91,7 @@ body{
 #brand svg{width:18px;height:18px;color:var(--cyan)}
 #brand em{font-style:normal;color:var(--dim);letter-spacing:.22em;font-weight:400}
 #demo{
-  position:absolute;left:50%;top:24px;transform:translateX(-50%);z-index:30;
+  position:absolute;left:50%;top:22px;transform:translateX(-50%);z-index:30;
   display:flex;align-items:center;gap:9px;padding:9px 20px;border-radius:999px;cursor:pointer;
   border:1px solid rgba(62,224,255,.45);background:rgba(62,224,255,.07);color:var(--cyan);
   font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;
@@ -90,7 +100,7 @@ body{
 #demo:hover{background:rgba(62,224,255,.16);box-shadow:0 0 30px rgba(62,224,255,.25)}
 #demo:disabled{opacity:.55;cursor:default}
 #demo svg{width:13px;height:13px}
-#hint{position:absolute;right:44px;top:28px;z-index:30;font-size:11px;letter-spacing:.16em;
+#hint{position:absolute;right:44px;top:24px;z-index:30;font-size:11px;letter-spacing:.15em;
   color:var(--dim);text-transform:uppercase;text-align:right;line-height:1.7}
 
 /* ============ wires ============ */
@@ -98,9 +108,12 @@ body{
 #wires path{fill:none;stroke:rgba(124,170,230,.26);stroke-width:1.3;stroke-dasharray:6 8;
   animation:march 1.3s linear infinite;transition:stroke .3s,opacity .4s}
 #wires path.local{stroke:rgba(62,224,255,.26)}
+#wires path.gpio{stroke:rgba(255,152,0,.35);stroke-dasharray:4 6}
 #wires path.hot{stroke:rgba(62,224,255,.95);filter:drop-shadow(0 0 6px rgba(62,224,255,.8));transition:none}
+#wires path.gpio.hot{stroke:rgba(255,152,0,.95);filter:drop-shadow(0 0 6px rgba(255,152,0,.8))}
 #wires .pkt{fill:#8fe9ff;opacity:0;animation:pkt var(--pdur,3.2s) linear infinite;animation-delay:var(--pd,0s)}
 #wires .pkt.net{fill:#a5b0ff}
+#wires .pkt.gp{fill:#ffc46b}
 #wires .node{fill:#0c1424;stroke:rgba(124,170,230,.5);stroke-width:1.2}
 @keyframes march{to{stroke-dashoffset:-14}}
 @keyframes pkt{0%{offset-distance:0%;opacity:0}10%{opacity:.9}90%{opacity:.9}100%{offset-distance:100%;opacity:0}}
@@ -108,13 +121,16 @@ body{
   background:rgba(6,10,20,.85);border:1px solid var(--line);border-radius:6px;padding:3px 8px;transform:translate(-50%,-50%)}
 @keyframes labelIn{from{opacity:0;transform:translate(-50%,-30%)}to{opacity:1;transform:translate(-50%,-50%)}}
 .broker{
-  position:absolute;left:1016px;top:320px;width:64px;height:64px;border-radius:50%;z-index:4;
+  position:absolute;left:1016px;top:322px;width:64px;height:64px;border-radius:50%;z-index:4;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   background:radial-gradient(circle at 34% 30%,#1c2942,#0c1220);border:1.5px solid rgba(124,140,255,.5);
-  box-shadow:0 0 24px rgba(124,140,255,.25);
+  box-shadow:0 0 24px rgba(124,140,255,.25);transition:all .4s;
 }
 .broker b{font-size:11.5px;letter-spacing:.14em;color:var(--indigo)}
 .broker span{font-size:8.5px;letter-spacing:.1em;color:var(--dim)}
+#stage.nomqtt .broker{border-color:var(--line);box-shadow:none}
+#stage.nomqtt #wires path.net{opacity:.1;animation-play-state:paused}
+#stage.nomqtt #wires .pkt.net{animation-play-state:paused;opacity:0!important}
 #stage.offline .broker{border-color:var(--line);box-shadow:none}
 #stage.offline #wires path.net{opacity:.1;animation-play-state:paused}
 #stage.offline #wires .pkt.net{animation-play-state:paused;opacity:0!important}
@@ -126,19 +142,20 @@ body{
   box-shadow:0 24px 60px rgba(0,0,0,.45);
   transition:border-color .4s,box-shadow .4s,opacity .4s,filter .4s;
 }
-.sat-head{display:flex;align-items:center;gap:9px;padding:12px 16px 10px;
-  font-size:14px;font-weight:600;letter-spacing:.04em;border-bottom:1px solid var(--line)}
+.sat-head{display:flex;align-items:center;gap:9px;padding:11px 16px 9px;
+  font-size:13.5px;font-weight:600;letter-spacing:.04em;border-bottom:1px solid var(--line)}
 .sat-head svg{width:16px;height:16px;color:var(--cyan);flex:none}
+.sat-head .sub{font-size:9.5px;color:var(--dim);letter-spacing:.08em;font-weight:400;margin-left:2px}
 .live{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 9px var(--ok);
   margin-left:auto;animation:blink 2.2s ease-in-out infinite;flex:none}
 @keyframes blink{50%{opacity:.35}}
-#stage.offline .sat.net{opacity:.5;filter:grayscale(.6)}
-#stage.offline .sat.net .live{background:var(--lv-orange);box-shadow:0 0 9px var(--lv-orange)}
+#stage.offline .sat.net,#stage.nomqtt .sat.mqtt{opacity:.5;filter:grayscale(.6)}
+#stage.offline .sat.net .live,#stage.nomqtt .sat.mqtt .live{background:var(--lv-orange);box-shadow:0 0 9px var(--lv-orange)}
 .sat.ping{border-color:rgba(62,224,255,.7);box-shadow:0 0 44px rgba(62,224,255,.3)}
 
-/* ============ ESP32-S3 board (center) ============ */
-#board{position:absolute;left:620px;top:344px;width:360px;height:214px;z-index:6}
-.pcb{position:relative;width:100%;height:170px;border-radius:12px;
+/* ============ ESP32-S3 board + real world ============ */
+#board{position:absolute;left:620px;top:330px;width:360px;z-index:6}
+.pcb{position:relative;width:100%;height:148px;border-radius:12px;
   background:linear-gradient(160deg,#182338,#0f1727 60%);
   border:1px solid rgba(120,165,225,.3);
   box-shadow:inset 0 0 40px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.5);
@@ -148,38 +165,57 @@ body{
   background-image:
     linear-gradient(rgba(90,200,255,.5) 1px,transparent 1px),
     linear-gradient(90deg,rgba(90,200,255,.4) 1px,transparent 1px);
-  background-size:26px 26px;
+  background-size:24px 24px;
 }
-.pads-t,.pads-b{position:absolute;left:16px;right:16px;height:9px;border-radius:3px;
-  background:repeating-linear-gradient(90deg,#c9a24a 0 7px,#1a2436 7px 15px);opacity:.85}
-.pads-t{top:7px}.pads-b{bottom:7px}
+.pads-t,.pads-b{position:absolute;left:14px;right:14px;height:8px;border-radius:3px;
+  background:repeating-linear-gradient(90deg,#c9a24a 0 6px,#1a2436 6px 14px);opacity:.85}
+.pads-t{top:6px}.pads-b{bottom:6px}
 .shield{
-  position:absolute;left:50%;top:43px;transform:translateX(-50%);
-  width:124px;height:74px;border-radius:7px;
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);
+  width:118px;height:62px;border-radius:6px;
   background:linear-gradient(148deg,#aeb9c9,#69758a 70%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 18px rgba(0,0,0,.5);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
 }
-.shield i{font-style:normal;font-size:13px;font-weight:700;letter-spacing:.12em;color:#1b2431}
-.shield u{text-decoration:none;font-size:8px;letter-spacing:.3em;color:#39465c}
-.antenna{position:absolute;right:22px;top:25px;width:52px;height:8px;border-radius:2px;
+.shield i{font-style:normal;font-size:12px;font-weight:700;letter-spacing:.12em;color:#1b2431}
+.shield u{text-decoration:none;font-size:7.5px;letter-spacing:.3em;color:#39465c}
+.pcbname{position:absolute;left:0;right:0;bottom:16px;text-align:center;
+  font-size:9.5px;letter-spacing:.22em;color:rgba(190,215,245,.65);font-weight:600}
+.antenna{position:absolute;right:20px;top:22px;width:48px;height:7px;border-radius:2px;
   background:repeating-linear-gradient(90deg,#d7e2f2 0 4px,#131c2c 4px 8px);opacity:.7}
-.rgbled{position:absolute;left:24px;top:38px;width:9px;height:9px;border-radius:50%;
-  background:#3a4658;transition:all .4s}
-.rgbled.on{background:var(--lv-orange);box-shadow:0 0 16px 4px rgba(255,152,0,.65);animation:blink 1.6s infinite}
-.pwrled{position:absolute;left:24px;top:60px;width:7px;height:7px;border-radius:50%;
-  background:#ff5252;box-shadow:0 0 8px rgba(255,82,82,.8)}
-.usbc{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);width:44px;height:12px;
+.usbc{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);width:42px;height:11px;
   border-radius:4px 4px 0 0;background:linear-gradient(#aeb9c9,#5f6b7d)}
-.btn-chip{position:absolute;width:16px;height:16px;border-radius:3px;background:#232f45;border:1px solid #33415c}
-.b-boot{right:66px;top:64px}.b-rst{right:66px;top:90px}
-#board .bl{margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
-#board .bl b{font-size:12.5px;letter-spacing:.1em;color:var(--ink);font-weight:600}
-#board .bl span{font-size:10.5px;letter-spacing:.1em;color:var(--dim);
-  border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:rgba(10,16,30,.7)}
+.btn-chip{position:absolute;width:14px;height:14px;border-radius:3px;background:#232f45;border:1px solid #33415c}
+.b-boot{right:62px;top:58px}.b-rst{right:62px;top:80px}
+/* the real world: solenoid lock + relay light */
+#real{position:absolute;left:620px;top:524px;width:360px;height:92px;z-index:6}
+.rw{position:absolute;top:0;height:88px;border:1px solid var(--line);border-radius:14px;
+  background:rgba(14,20,36,.75);display:flex;align-items:center;justify-content:center;gap:12px}
+.rw .rl{position:absolute;left:12px;top:7px;font-size:9px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.rw-door{left:0;width:172px}
+.rw-light{right:0;width:172px}
+.door{position:relative;width:64px;height:60px;border-radius:6px 10px 10px 6px;
+  background:linear-gradient(160deg,#2a3550,#1a2438);border:2px solid rgba(148,170,220,.35);
+  transition:box-shadow .5s}
+.door::before{content:"";position:absolute;right:9px;top:22px;width:5px;height:16px;border-radius:3px;
+  background:#8fa0bd}
+.bolt{position:absolute;right:-11px;top:26px;width:14px;height:8px;border-radius:2px;
+  background:linear-gradient(#e8eef7,#9fb0c9);border:1px solid #5d6a83;transition:transform .5s var(--ease)}
+#stage.open .bolt{transform:translateX(11px);background:linear-gradient(#b6f5cd,#4caf50);border-color:#2e7d32}
+#stage.open .door{box-shadow:0 0 22px rgba(76,175,80,.35)}
+.door-st{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--mut)}
+#stage.open .door-st{color:#b6f5cd}
+.bulbwrap{position:relative;width:56px;height:60px;display:flex;align-items:center;justify-content:center}
+.bulbwrap svg{transition:filter .4s;color:#77839c}
+.bulbwrap .halo{position:absolute;width:56px;height:56px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,193,7,.55),transparent 70%);opacity:0;transition:opacity .5s}
+#stage.lit .bulbwrap svg{color:#ffd54f;filter:drop-shadow(0 0 10px rgba(255,193,7,.8))}
+#stage.lit .bulbwrap .halo{opacity:1}
+.light-st{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--mut)}
+#stage.lit .light-st{color:#ffe082}
 
 /* ============ LCD — faithful replica of the firmware UI ============ */
-#sat-lcd{left:44px;top:248px;padding:10px;border-radius:26px;width:276px;height:404px;overflow:hidden;
+#sat-lcd{left:44px;top:190px;padding:10px;border-radius:26px;width:276px;height:404px;overflow:hidden;
   background:linear-gradient(#151b28,#0b101b);border-color:rgba(148,170,220,.28)}
 .lcd-screen{position:relative;width:320px;height:480px;border-radius:14px;overflow:hidden;
   background:#000;transform:scale(.8);transform-origin:top left;
@@ -216,111 +252,166 @@ body{
 .lcard b{font-size:11.5px;color:#999;font-weight:400;letter-spacing:.04em}
 .lcard span{margin-top:2px;font-size:27px;font-weight:700;color:#fff}
 .lcard small{font-size:10px;color:#999;margin-top:-1px}
-.loverlay{position:absolute;inset:0;background:rgba(0,0,0,.92);z-index:9;display:none;
-  flex-direction:column;align-items:center;justify-content:center;gap:12px}
+/* LCD overlay screens (keypad / wifi / mqtt / settings / attendance) */
+.loverlay{position:absolute;inset:0;background:#000;z-index:9;display:none;flex-direction:column}
 .loverlay.open{display:flex}
-.loverlay .lback{position:absolute;left:5px;top:5px;width:36px;height:36px;border-radius:7px;
-  background:var(--lv-grey);color:#fff;border:0;cursor:pointer;font-size:16px;font-family:inherit}
-.loverlay h4{color:#fff;font-size:16px;font-weight:600;letter-spacing:.04em}
-.loverlay canvas{border:6px solid #fff;border-radius:3px;background:#fff}
-.loverlay .lurl{color:#cfd8e3;font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
-.loverlay .lcount{color:var(--lv-orange);font-family:ui-monospace,Consolas,monospace;font-size:13px;letter-spacing:.2em}
+.lo-head{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.lback{width:36px;height:36px;border-radius:7px;background:var(--lv-grey);color:#fff;border:0;
+  cursor:pointer;font-size:16px;font-family:inherit;flex:none}
+.lo-head h4{color:#fff;font-size:15px;font-weight:600;letter-spacing:.03em;flex:1;text-align:center;margin-right:36px}
+.kpad-dots{display:flex;gap:9px;justify-content:center;margin:6px 0 2px}
+.kpad-dots i{width:13px;height:13px;border-radius:50%;border:1.6px solid #8fa0bd}
+.kpad-dots i.f{background:#fff;border-color:#fff}
+.kpad-err{height:16px;text-align:center;font-size:11.5px;color:#ef5350;letter-spacing:.04em}
+.kpad-err.ok{color:#7bd882}
+.kpad{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-content:center;margin-top:4px}
+.kpad button{width:64px;height:44px;border-radius:8px;border:0;cursor:pointer;font-family:inherit;
+  background:#26324a;color:#fff;font-size:18px;font-weight:600}
+.kpad button:active{background:#33415c}
+.kpad button.ok{background:#2e7d32}
+.kpad button.fn{background:#1b2436;font-size:14px}
+.lwifi-list{flex:1;margin:4px 10px;display:flex;flex-direction:column;gap:7px}
+.lwifi{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;
+  background:#141b2b;border:1px solid var(--line);color:#dfe6f2;font-size:12.5px}
+.lwifi:hover{border-color:rgba(62,224,255,.4)}
+.lwifi .rss{margin-left:auto;display:flex;align-items:flex-end;gap:1.6px;height:13px}
+.lwifi .rss i{width:3px;background:#5d6a83;border-radius:1px}
+.lwifi .rss i.f{background:var(--lv-blue)}
+.lwifi .tag{font-size:9.5px;letter-spacing:.08em;color:var(--lv-green)}
+.lwifi .lockic{color:var(--mut);font-size:11px}
+.lscan{margin:2px 10px 10px;padding:9px 0;border-radius:9px;border:1px solid rgba(62,224,255,.4);
+  background:rgba(62,224,255,.08);color:var(--cyan);cursor:pointer;font-family:inherit;
+  font-size:12px;font-weight:600;letter-spacing:.12em}
+.lform{display:flex;flex-direction:column;gap:9px;padding:10px 14px}
+.lfield{background:#141b2b;border:1px solid var(--line);border-radius:8px;padding:9px 12px;
+  color:#dfe6f2;font-size:12.5px;letter-spacing:.03em}
+.lfield small{display:block;color:var(--dim);font-size:9px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+.lfield b{font-weight:500}
+.lbtn2{padding:9px 0;border-radius:9px;border:0;cursor:pointer;font-family:inherit;
+  background:var(--lv-teal);color:#fff;font-size:12.5px;font-weight:600;letter-spacing:.08em}
+.lbtn2.gray{background:#3a465c}
+.lstatus{min-height:30px;text-align:center;font-size:11.5px;color:var(--mut);padding:0 12px;line-height:1.5}
+.lstatus.ok{color:#7bd882}.lstatus.err{color:#ef5350}.lstatus.warn{color:#ffb74d}
+.lset-rows{flex:1;display:flex;flex-direction:column;gap:8px;padding:6px 12px 10px;overflow:hidden}
+.lset{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;background:#141b2b;
+  border:1px solid var(--line);font-size:12px;color:#dfe6f2;cursor:pointer}
+.lset:hover{border-color:rgba(62,224,255,.4)}
+.lset svg{width:16px;height:16px;color:var(--cyan);flex:none}
+.lset small{display:block;color:var(--dim);font-size:9.5px;margin-top:2px}
+.lset .go{margin-left:auto;color:var(--dim)}
 
 /* ============ face module ============ */
-#sat-cam{left:352px;top:108px;width:244px}
-.cambox{position:relative;height:132px;margin:12px 16px 4px;border-radius:12px;
+#sat-cam{left:352px;top:64px;width:244px}
+.cambox{position:relative;height:100px;margin:9px 16px 4px;border-radius:12px;
   background:radial-gradient(circle at 50% 42%,#101b2c,#070c16);overflow:hidden}
-.cambox .corner{position:absolute;width:24px;height:24px;border:0 solid var(--cyan);opacity:.9}
+.cambox .corner{position:absolute;width:22px;height:22px;border:0 solid var(--cyan);opacity:.9}
 .cambox .c1{left:8px;top:8px;border-left-width:2px;border-top-width:2px}
 .cambox .c2{right:8px;top:8px;border-right-width:2px;border-top-width:2px}
 .cambox .c3{left:8px;bottom:8px;border-left-width:2px;border-bottom-width:2px}
 .cambox .c4{right:8px;bottom:8px;border-right-width:2px;border-bottom-width:2px}
-.cambox svg.face{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);color:#9fd8ef}
-.camline{position:absolute;left:16px;right:16px;top:26px;height:2px;border-radius:2px;
+.cambox svg.face{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);color:#9fd8ef}
+.camline{position:absolute;left:16px;right:16px;top:22px;height:2px;border-radius:2px;
   background:linear-gradient(90deg,transparent,var(--cyan) 30%,#aef3ff 50%,var(--cyan) 70%,transparent);
   box-shadow:0 0 14px rgba(62,224,255,.8);opacity:0}
 #sat-cam.scanning .camline{opacity:1;animation:scanY 1s ease-in-out infinite}
-@keyframes scanY{0%,100%{transform:translateY(0)}50%{transform:translateY(66px)}}
-.camres{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11px;
-  letter-spacing:.13em;color:var(--dim);text-transform:uppercase}
+@keyframes scanY{0%,100%{transform:translateY(0)}50%{transform:translateY(48px)}}
+.camres{position:absolute;left:0;right:0;bottom:7px;text-align:center;font-size:10.5px;
+  letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
 .camres.ok{color:#b6f5cd}
-.scanbtn{margin:9px 16px 13px;width:calc(100% - 32px);padding:9px 0;border-radius:10px;cursor:pointer;
+.scanbtn{margin:8px 16px 12px;width:calc(100% - 32px);padding:8px 0;border-radius:10px;cursor:pointer;
   border:1px solid rgba(62,224,255,.4);background:rgba(62,224,255,.08);color:var(--cyan);
-  font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;transition:all .3s}
+  font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;transition:all .3s}
 .scanbtn:hover{background:rgba(62,224,255,.16)}
 .scanbtn:disabled{opacity:.5;cursor:default}
+.camsub{padding:0 16px 10px;font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center}
 
-/* ============ environment ============ */
-#sat-sens{left:352px;top:372px;width:244px}
-.scards{display:flex;gap:8px;padding:11px 14px 4px}
-.scard{flex:1;border-radius:11px;background:#141b2b;border-top:3px solid var(--lv-orange);
-  display:flex;flex-direction:column;align-items:center;padding:8px 0 9px}
-.scard.blue{border-top-color:var(--lv-blue)}
-.scard.green{border-top-color:var(--lv-green)}
-.scard b{font-size:10px;color:#8b93a7;font-weight:400}
-.scard span{font-size:18px;font-weight:700;margin-top:1px}
-.scard small{font-size:9px;color:var(--dim)}
-.senv{display:flex;justify-content:space-between;padding:9px 16px 12px;font-size:11.5px;color:var(--mut);letter-spacing:.05em}
-.senv b{color:var(--ok);font-weight:600}
+/* ============ context (drives the automations) ============ */
+#sat-ctx{left:352px;top:330px;width:244px}
+.ctx-rows{padding:10px 16px 12px;display:flex;flex-direction:column;gap:11px}
+.ctx-row{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--mut)}
+.ctx-row b{width:74px;flex:none;font-weight:600;color:var(--ink);font-size:12px}
+.ctx-row .val{margin-left:auto;font-size:12px;color:var(--cyan);font-weight:700;white-space:nowrap}
+.pill2{display:inline-flex;padding:4px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
+  font-size:11px;font-weight:700;letter-spacing:.12em;border:1px solid var(--line);color:var(--mut);
+  background:rgba(148,170,220,.08);transition:all .3s}
+.pill2.home{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.1)}
+.pill2.away{color:#ffc46b;border-color:rgba(255,152,0,.5);background:rgba(255,152,0,.08)}
+input.ctxs{-webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:99px;outline:none;cursor:pointer;
+  background:rgba(148,170,220,.18)}
+input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--cyan);box-shadow:0 0 8px rgba(62,224,255,.6);cursor:grab}
+.ctx-note{margin:0 16px 12px;padding:8px 11px;border-radius:9px;border:1px dashed rgba(62,224,255,.3);
+  font-size:10px;color:var(--dim);line-height:1.6;letter-spacing:.03em}
 
 /* ============ web dashboard ============ */
 #sat-web{left:620px;top:56px;width:484px}
-.bw-bar{display:flex;align-items:center;gap:6px;margin:10px 16px 0;padding:6px 12px;border-radius:8px;
+.bw-bar{display:flex;align-items:center;gap:6px;margin:9px 16px 0;padding:6px 12px;border-radius:8px;
   background:rgba(148,170,220,.08);font-size:11.5px;color:var(--mut);letter-spacing:.05em}
 .bw-bar i{width:8px;height:8px;border-radius:50%;background:rgba(148,170,220,.3)}
 .bw-bar .url{margin-left:8px;flex:1;text-align:center}
-.wtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px 4px}
+.wtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:11px 16px 4px}
 .wtile{border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;
-  display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:11px 12px;font-family:inherit;
+  display:flex;flex-direction:column;gap:7px;align-items:flex-start;padding:10px 12px;font-family:inherit;
   color:var(--ink);transition:all .25s;text-align:left}
 .wtile:hover{border-color:rgba(62,224,255,.4);background:rgba(62,224,255,.06)}
-.wtile b{font-size:13px;font-weight:600;white-space:nowrap}
-.wbadge{padding:3px 10px;border-radius:999px;font-size:10.5px;letter-spacing:.15em;font-weight:700;
+.wtile b{font-size:12.5px;font-weight:600;white-space:nowrap}
+.wbadge{padding:3px 10px;border-radius:999px;font-size:10px;letter-spacing:.14em;font-weight:700;
   color:var(--mut);border:1px solid var(--line)}
 .wbadge.on{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.12);box-shadow:0 0 16px rgba(74,222,128,.25)}
 .wbadge.cy{color:var(--cyan);border-color:rgba(62,224,255,.45);background:rgba(62,224,255,.08)}
 .wbadge.gr{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.12)}
-.wtile .val{font-size:13.5px;font-weight:700;color:var(--cyan);white-space:nowrap}
-.wchart{margin:8px 16px 14px;height:52px;border-radius:10px;border:1px solid var(--line);
+.wtile .val{font-size:12.5px;font-weight:700;color:var(--cyan);white-space:nowrap}
+.wrow{display:flex;align-items:center;gap:12px;padding:9px 16px 5px;font-size:11.5px;color:var(--mut)}
+.wrow .sw-name{width:110px;font-size:11px;color:var(--ink);font-weight:600}
+.wchart{margin:7px 16px 13px;height:44px;border-radius:10px;border:1px solid var(--line);
   background:rgba(62,224,255,.04);overflow:hidden}
 .wchart svg{width:100%;height:100%;display:block}
 
-/* ============ home assistant: panel + companion app ============ */
-#sat-ha{left:1136px;top:56px;width:420px}
-#sat-ha .sat-head svg{color:#41bdf5}
-.ha-body{display:flex;gap:12px;padding:12px 14px 14px}
-.ha-panel{flex:1;min-width:0}
-.ha-ov{font-size:10.5px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:2px 0 8px}
-.ha-cards{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.hcard{border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;
-  padding:10px 11px;display:flex;flex-direction:column;gap:5px;font-family:inherit;color:var(--ink);
-  text-align:left;transition:all .25s}
-.hcard:hover{border-color:rgba(65,189,245,.45)}
-.hcard .hc-top{display:flex;align-items:center;gap:7px}
-.hcard .hc-ic{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:12px;background:rgba(65,189,245,.12);flex:none}
-.hcard .hc-ic.orange{background:rgba(255,152,0,.14)}
-.hcard .hc-ic.cyan{background:rgba(0,188,212,.14)}
-.hcard .hc-ic.green{background:rgba(76,175,80,.14)}
-.hcard b{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hcard .hc-st{font-size:10.5px;letter-spacing:.08em;color:var(--mut);text-transform:uppercase}
-.hcard .hc-st.on{color:#b6f5cd}
-.ha-ml{display:flex;align-items:center;gap:8px;margin-top:9px;padding:8px 11px;border:1px solid var(--line);
-  border-radius:11px;font-size:11.5px;color:var(--mut)}
-.ha-ml b{color:var(--ink);font-weight:600}
-.ha-ml .hasw{margin-left:auto}
-.autom{margin-top:9px;padding:8px 11px;border-radius:10px;border:1px dashed rgba(65,189,245,.4);
-  font-size:10.5px;color:var(--mut);letter-spacing:.02em;line-height:1.55}
-.autom b{color:#41bdf5;font-weight:600}
+/* ============ switches (shared HA style) ============ */
 .hasw{width:36px;height:19px;border-radius:99px;border:0;cursor:pointer;position:relative;flex:none;
   background:rgba(148,170,220,.22);transition:background .25s}
 .hasw i{position:absolute;top:2.5px;left:3px;width:14px;height:14px;border-radius:50%;background:#dfe6f2;
   transition:all .25s var(--ease)}
 .hasw.on{background:#41bdf5;box-shadow:0 0 14px rgba(65,189,245,.45)}
 .hasw.on i{left:19px;background:#fff}
+
+/* ============ home assistant: panel + companion app ============ */
+#sat-ha{left:1136px;top:56px;width:420px}
+#sat-ha .sat-head svg{color:#41bdf5}
+.ha-body{display:flex;gap:12px;padding:10px 14px 13px}
+.ha-panel{flex:1;min-width:0}
+.ha-ov{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:1px 0 7px}
+.ha-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hcard{border:1px solid var(--line);border-radius:11px;background:var(--card);cursor:pointer;
+  padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-family:inherit;color:var(--ink);
+  text-align:left;transition:all .25s}
+.hcard:hover{border-color:rgba(65,189,245,.45)}
+.hcard .hc-top{display:flex;align-items:center;gap:6px}
+.hcard .hc-ic{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;background:rgba(65,189,245,.12);flex:none}
+.hcard .hc-ic.orange{background:rgba(255,152,0,.14)}
+.hcard .hc-ic.cyan{background:rgba(0,188,212,.14)}
+.hcard .hc-ic.green{background:rgba(76,175,80,.14)}
+.hcard b{font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hcard .hc-st{font-size:9.5px;letter-spacing:.08em;color:var(--mut);text-transform:uppercase}
+.hcard .hc-st.on{color:#b6f5cd}
+.ha-sec{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:10px 0 6px}
+.ha-autom{display:flex;flex-direction:column;gap:5px}
+.hauto{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:9px;
+  background:rgba(148,170,220,.05);border:1px solid var(--line)}
+.hauto .an{flex:1;min-width:0}
+.hauto .an b{display:block;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hauto .an small{display:block;font-size:8.5px;color:var(--dim);letter-spacing:.02em}
+.hauto .fire{font-size:8.5px;color:var(--dim);letter-spacing:.06em;white-space:nowrap}
+.hauto .fire.recent{color:var(--ok)}
+.hauto .hasw{transform:scale(.8);transform-origin:right center}
+.ha-note{margin-top:8px;padding:7px 10px;border-radius:9px;border:1px solid rgba(255,82,82,.4);
+  background:rgba(255,82,82,.07);color:#ffcdd2;font-size:10px;line-height:1.5;display:none}
+.ha-note.show{display:block}
+.ha-note b{font-weight:600}
 /* companion app phone */
 .ha-app{
-  width:136px;height:346px;border-radius:20px;flex:none;
+  width:136px;height:404px;border-radius:20px;flex:none;
   background:#0b101c;border:5px solid #1c2436;box-shadow:0 16px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;overflow:hidden;
 }
@@ -332,7 +423,7 @@ body{
 .ha-hero small{font-size:8.5px;letter-spacing:.16em;color:#8fc3ee;text-transform:uppercase}
 .ha-hero .v{font-size:19px;font-weight:700;color:#d9efff;line-height:1.2}
 .ha-hero .s{font-size:9px;color:#8fc3ee}
-.ha-arow{display:flex;align-items:center;gap:7px;margin:0 9px;padding:8px 2px;
+.ha-arow{display:flex;align-items:center;gap:7px;margin:0 9px;padding:7.5px 2px;
   border-bottom:1px solid rgba(148,170,220,.1);font-size:10.5px;color:var(--mut)}
 .ha-arow .aic{width:20px;height:20px;border-radius:50%;background:rgba(65,189,245,.12);
   display:flex;align-items:center;justify-content:center;font-size:10px;flex:none}
@@ -341,8 +432,8 @@ body{
 .ha-arow .st{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
 .ha-arow .st.on{color:#b6f5cd}
 
-/* ============ bale phone ============ */
-#sat-bale{left:1256px;top:488px;width:282px;padding:8px;border-radius:34px;
+/* ============ bale phone (full bot) ============ */
+#sat-bale{left:1206px;top:512px;width:282px;padding:8px;border-radius:34px;
   background:linear-gradient(#1a2233,#0d1322);border:1px solid rgba(148,170,220,.3);
   box-shadow:0 30px 70px rgba(0,0,0,.55), inset 0 0 0 3px #0a0f1a}
 .ph-screen{position:relative;border-radius:26px;overflow:hidden;background:#0d1424;
@@ -354,61 +445,67 @@ body{
 .ph-appbar .back{color:var(--mut);font-size:15px}
 .ph-appbar .ava{width:26px;height:26px;border-radius:50%;background:var(--grad);color:#071320;
   display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
-.ph-appbar .tt b{display:block;font-size:12.5px;font-weight:600}
-.ph-appbar .tt small{font-size:9px;color:var(--ok);letter-spacing:.06em}
+.ph-appbar .tt b{display:block;font-size:12px;font-weight:600}
+.ph-appbar .tt small{font-size:8.5px;color:var(--ok);letter-spacing:.04em}
 .ph-appbar .kebab{margin-left:auto;color:var(--dim);font-size:15px;letter-spacing:.1em}
-.ph-chat{flex:1;padding:10px 10px 4px;display:flex;flex-direction:column;gap:6px;overflow:hidden;
-  background-image:radial-gradient(rgba(148,170,220,.07) 1px,transparent 1px);background-size:14px 14px}
-.bmsg{max-width:88%;padding:6px 11px;border-radius:12px 12px 12px 4px;font-size:11.5px;width:fit-content;
-  background:#1d2a44;border:1px solid rgba(148,170,220,.12);animation:popIn .5s var(--ease) both}
+.ph-chat{flex:1;padding:9px 10px 4px;display:flex;flex-direction:column;gap:5px;overflow-y:auto;
+  background-image:radial-gradient(rgba(148,170,220,.07) 1px,transparent 1px);background-size:14px 14px;
+  scrollbar-width:none}
+.ph-chat::-webkit-scrollbar{display:none}
+.bmsg{max-width:92%;padding:5px 10px;border-radius:12px 12px 12px 4px;font-size:10.5px;width:fit-content;
+  background:#1d2a44;border:1px solid rgba(148,170,220,.12);animation:popIn .5s var(--ease) both;
+  line-height:1.55;white-space:pre-line}
 .bmsg.me{align-self:flex-end;border-radius:12px 12px 4px 12px;background:linear-gradient(140deg,#3d5fd0,#2f4ab0);
   border:0}
 .bmsg.warn{border-color:rgba(255,152,0,.45);color:#ffd8a1;background:rgba(255,152,0,.08)}
 .bmsg.ok{border-color:rgba(74,222,128,.45);color:#b6f5cd;background:rgba(74,222,128,.08)}
-.ph-kb{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 10px 6px;
+.ph-kb{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px 10px 5px;
   border-top:1px solid rgba(148,170,220,.1)}
-.bcmd{padding:7px 0;border-radius:9px;cursor:pointer;font-family:inherit;
+.bcmd{padding:6px 0;border-radius:8px;cursor:pointer;font-family:inherit;direction:rtl;
   border:1px solid rgba(124,140,255,.4);background:rgba(124,140,255,.08);color:#aab4ff;
-  font-size:10.5px;font-weight:600;transition:all .25s}
+  font-size:10px;font-weight:600;transition:all .25s}
 .bcmd:hover{background:rgba(124,140,255,.18)}
 .bcmd:disabled{opacity:.45;cursor:default}
-.ph-input{display:flex;align-items:center;gap:8px;margin:0 10px 10px;padding:7px 11px;border-radius:99px;
-  background:#182136;border:1px solid rgba(148,170,220,.12);font-size:11px;color:var(--dim)}
-.ph-input .fld{flex:1}
-.ph-input .send{color:var(--indigo)}
+.ph-input{display:flex;align-items:center;gap:7px;margin:0 10px 10px;padding:5px 6px 5px 11px;border-radius:99px;
+  background:#182136;border:1px solid rgba(148,170,220,.12)}
+.ph-input input{flex:1;background:transparent;border:0;outline:none;color:var(--ink);font-size:11px;min-width:0}
+.ph-input input::placeholder{color:var(--dim)}
+.ph-input .send{width:24px;height:24px;border-radius:50%;border:0;cursor:pointer;flex:none;
+  background:var(--indigo);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
 
 /* ============ system log ============ */
-#sat-log{left:352px;top:610px;width:768px;height:246px;display:flex;flex-direction:column}
+#sat-log{left:352px;top:640px;width:768px;height:216px;display:flex;flex-direction:column}
 #sat-log .sat-head{gap:12px}
-.logfilters{display:flex;gap:6px;margin-left:auto}
-.lf{padding:3px 11px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:9.5px;
-  letter-spacing:.14em;font-weight:600;color:var(--dim);border:1px solid var(--line);
+.logfilters{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap}
+.lf{padding:3px 10px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:9px;
+  letter-spacing:.13em;font-weight:600;color:var(--dim);border:1px solid var(--line);
   background:transparent;transition:all .25s;text-transform:uppercase}
 .lf:hover{color:var(--mut)}
 .lf.on{color:var(--cyan);border-color:rgba(62,224,255,.5);background:rgba(62,224,255,.08)}
-.logbody{flex:1;overflow-y:auto;padding:9px 16px 11px;font-family:ui-monospace,Consolas,monospace;
-  font-size:11px;line-height:1.85;scrollbar-width:thin;scrollbar-color:rgba(148,170,220,.3) transparent}
+.logbody{flex:1;overflow-y:auto;padding:8px 16px 10px;font-family:ui-monospace,Consolas,monospace;
+  font-size:10.5px;line-height:1.8;scrollbar-width:thin;scrollbar-color:rgba(148,170,220,.3) transparent}
 .logbody::-webkit-scrollbar{width:5px}
 .logbody::-webkit-scrollbar-thumb{background:rgba(148,170,220,.25);border-radius:3px}
 .tline{white-space:nowrap}
 .tline .ts{color:#42506b;margin-right:9px}
-.tline .tag{display:inline-block;min-width:52px;font-weight:600;letter-spacing:.05em}
+.tline .tag{display:inline-block;min-width:56px;font-weight:600;letter-spacing:.05em}
 .tline b{font-weight:400;color:#c6d2e6}
 .tline .v{color:var(--mut)}
 
 /* ============ legend & credits ============ */
-#legend{left:44px;top:700px;width:276px;padding:16px 18px;font-size:12px;color:var(--mut);line-height:2}
-#legend h5{font-size:10.5px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;margin-bottom:6px;font-weight:600}
+#legend{left:44px;top:622px;width:276px;padding:14px 18px;font-size:11.5px;color:var(--mut);line-height:1.95}
+#legend h5{font-size:10px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;margin-bottom:5px;font-weight:600}
 #legend .li{display:flex;align-items:center;gap:10px}
 #legend .sw{width:26px;height:0;border-top:1.6px dashed rgba(124,170,230,.55);flex:none}
 #legend .sw.local{border-top:1.6px solid rgba(62,224,255,.55)}
+#legend .sw.gpio{border-top:1.6px solid rgba(255,152,0,.55)}
 #legend .dots{display:flex;gap:4px;flex:none}
 #legend .dots i{width:5px;height:5px;border-radius:50%}
-#legend .cr{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
-  font-size:11px;letter-spacing:.06em;color:var(--dim)}
+#legend .cr{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+  font-size:10.5px;letter-spacing:.05em;color:var(--dim)}
 #legend .cr b{color:var(--mut);font-weight:600}
-
-/* fit-to-window */
+#hint2{position:absolute;left:44px;bottom:16px;z-index:30;font-size:10px;letter-spacing:.14em;
+  color:#3d4a63;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -426,36 +523,49 @@ body{
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5Z"/></svg>
       Auto demo
     </button>
-    <div id="hint">Click anything — everything<br>is one live state</div>
+    <div id="hint">Click anything — one live state.<br>Code 1234 · demo: lux → light</div>
 
     <svg id="wires"></svg>
-    <div class="broker pop2" style="--d:1.15s"><b>MQTT</b><span>Mosquitto</span></div>
+    <div class="broker pop2" style="--d:1.1s"><b>MQTT</b><span>Mosquitto</span></div>
 
-    <!-- ═══ ESP32-S3 board ═══ -->
+    <!-- ═══ ESP32-S3 board + real world ═══ -->
     <div id="board" class="pop2" style="--d:1.05s">
       <div class="pcb">
         <div class="pads-t"></div><div class="pads-b"></div>
         <div class="antenna"></div>
         <div class="shield"><i>ESP32-S3</i><u>N16R8</u></div>
-        <div class="rgbled" id="rgbled"></div><div class="pwrled"></div>
+        <div class="pcbname">ESP32-S3-DEVKITC-1</div>
         <div class="btn-chip b-boot"></div><div class="btn-chip b-rst"></div>
         <div class="usbc"></div>
       </div>
-      <div class="bl"><b>ESP32-S3-DevKitC-1</b><span>16 MB flash · 8 MB PSRAM</span><span>FreeRTOS · 240 MHz</span></div>
+    </div>
+    <div id="real" class="pop2" style="--d:1.15s">
+      <div class="rw rw-door">
+        <span class="rl">Solenoid lock · GPIO</span>
+        <div class="door"><span class="bolt"></span></div>
+        <span class="door-st" id="door-st">LOCKED</span>
+      </div>
+      <div class="rw rw-light">
+        <span class="rl">Ceiling light · relay</span>
+        <div class="bulbwrap"><span class="halo"></span>
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.55 1.1 1.3 1.1 2.2h5c0-.9.4-1.65 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>
+        </div>
+        <span class="light-st" id="light-st">OFF</span>
+      </div>
     </div>
 
     <!-- ═══ on-device LCD — faithful, working replica ═══ -->
     <div id="sat-lcd" class="sat pop2" style="--d:.2s">
       <div class="lcd-screen" id="lcdscr">
         <div class="lrow" style="left:10px;top:10px;right:10px;justify-content:space-between">
-          <button class="lbtn sq" id="l-mqtt" title="MQTT / Home Assistant">
+          <button class="lbtn sq" id="l-mqtt" title="MQTT / Home Assistant setup">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/></svg>
           </button>
-          <button class="lbtn wide" id="l-wifi">
+          <button class="lbtn wide" id="l-wifi" title="WiFi setup">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2.5 9.5a15 15 0 0 1 19 0M5.5 13a10.5 10.5 0 0 1 13 0M8.5 16.4a6 6 0 0 1 7 0"/><circle cx="12" cy="19.6" r="1.3" fill="currentColor" stroke="none"/></svg>
             <span id="l-wifi-t">WiFi: Atlas-2G</span>
           </button>
-          <button class="lbtn sq" id="l-set" title="Settings">
+          <button class="lbtn sq" id="l-set" title="Settings (code 1234)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>
           </button>
         </div>
@@ -473,7 +583,7 @@ body{
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 2.5v7"/><path d="M6.3 8a7.5 7.5 0 1 0 11.4 0" stroke-linejoin="round"/></svg>
             <span id="l-light-t">Light: OFF</span>
           </button>
-          <button class="lbtn tall" id="l-lock">
+          <button class="lbtn tall" id="l-lock" title="Enter unlock code">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="l-lock-ic"><path d="M18 6 6 18M6 6l12 12"/></svg>
             <span id="l-lock-t">Locked</span>
           </button>
@@ -493,15 +603,62 @@ body{
           <div class="lcard blue"><b>Humidity</b><span id="s-hum">42%</span><small>%RH</small></div>
           <div class="lcard green"><b>Pressure</b><span id="s-press">1013</span><small>hPa</small></div>
         </div>
-        <div class="loverlay" id="ov-dash">
-          <button class="lback">←</button><h4>Web Dashboard</h4>
-          <canvas width="96" height="96"></canvas>
-          <div class="lurl">https://10.0.0.8/</div>
+
+        <!-- keypad overlay (unlock / settings / wifi password / change password) -->
+        <div class="loverlay" id="ov-keypad">
+          <div class="lo-head"><button class="lback">←</button><h4 id="kp-title">Enter Code</h4></div>
+          <div class="kpad-dots" id="kp-dots"><i></i><i></i><i></i><i></i></div>
+          <div class="kpad-err" id="kp-err"></div>
+          <div class="kpad" id="kp-grid"></div>
+          <div style="text-align:center;font-size:9.5px;color:#5d6a83;letter-spacing:.14em;margin-top:5px">DEMO CODE · 1234</div>
         </div>
+
+        <!-- wifi setup overlay -->
+        <div class="loverlay" id="ov-wifi">
+          <div class="lo-head"><button class="lback">←</button><h4>WiFi Setup</h4></div>
+          <div class="lwifi-list" id="wifi-list"></div>
+          <button class="lscan" id="wifi-rescan">↻ RESCAN</button>
+        </div>
+
+        <!-- mqtt setup overlay -->
+        <div class="loverlay" id="ov-mqtt">
+          <div class="lo-head"><button class="lback">←</button><h4>MQTT / HA Broker</h4></div>
+          <div class="lform">
+            <div class="lfield"><small>Broker host : port</small><b>10.0.0.8 : 1883</b></div>
+            <div class="lfield"><small>Username</small><b>smart-home</b></div>
+            <div class="lfield"><small>Password</small><b>••••••••</b></div>
+            <button class="lbtn2" id="mqtt-connect">CONNECT</button>
+            <div class="lstatus" id="mqtt-status">Connected · QoS 1</div>
+          </div>
+        </div>
+
+        <!-- settings overlay (behind code) -->
+        <div class="loverlay" id="ov-set">
+          <div class="lo-head"><button class="lback">←</button><h4>Settings</h4></div>
+          <div class="lset-rows">
+            <div class="lset" id="set-att">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h5V4M20 15h-5v5M4 15h5v5M20 9h-5V4" stroke-linecap="round"/></svg>
+              <div>Attendance QR<small>rotating token · 10 min validity</small></div><span class="go">›</span>
+            </div>
+            <div class="lset" id="set-face" style="cursor:default">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.6" r="3.6"/><path d="M4.8 20c.7-3.7 3.6-5.6 7.2-5.6s6.5 1.9 7.2 5.6"/></svg>
+              <div style="flex:1">Face enrollment<small id="face-count">Soroush R. · 24 samples</small></div>
+              <button class="lbtn2" id="face-enroll" style="padding:6px 12px">ENROLL</button>
+            </div>
+            <div class="lset" id="set-pass">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/></svg>
+              <div>Change password<small>keypad · current → new</small></div><span class="go">›</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- attendance QR overlay -->
         <div class="loverlay" id="ov-att">
-          <button class="lback">←</button><h4>Attendance · scan to check in</h4>
-          <canvas width="96" height="96"></canvas>
-          <div class="lcount" id="att-count">10:00</div>
+          <div class="lo-head"><button class="lback">←</button><h4>Attendance · scan to check in</h4></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+            <canvas width="96" height="96" style="border:6px solid #fff;border-radius:3px;background:#fff"></canvas>
+            <div class="lstatus" style="font-family:ui-monospace,Consolas,monospace;font-size:13px;letter-spacing:.2em;color:var(--lv-orange)" id="att-count">10:00</div>
+          </div>
         </div>
       </div>
     </div>
@@ -514,29 +671,38 @@ body{
       </div>
       <div class="cambox">
         <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
-        <svg class="face" width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8.6" r="3.6"/><path d="M4.8 20c.7-3.7 3.6-5.6 7.2-5.6s6.5 1.9 7.2 5.6"/></svg>
+        <svg class="face" width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8.6" r="3.6"/><path d="M4.8 20c.7-3.7 3.6-5.6 7.2-5.6s6.5 1.9 7.2 5.6"/></svg>
         <div class="camline"></div>
         <div class="camres" id="camres">ESP-DL · ready</div>
       </div>
       <button class="scanbtn" id="scanbtn">Scan face</button>
+      <div class="camsub">detect → embed → cosine ≥ 0.70 · JPEG over HTTPS</div>
     </div>
 
-    <!-- ═══ environment ═══ -->
-    <div id="sat-sens" class="sat pop2" style="--d:.55s">
+    <!-- ═══ context: drives the automations ═══ -->
+    <div id="sat-ctx" class="sat pop2" style="--d:.55s">
       <div class="sat-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/><path d="M12 9v6"/></svg>
-        Environment
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        Context <span class="sub">drives automations</span><i class="live"></i>
       </div>
-      <div class="scards">
-        <div class="scard"><b>Temp</b><span id="w-temp">23.4</span><small>°C</small></div>
-        <div class="scard blue"><b>Humidity</b><span id="w-hum">42</span><small>%RH</small></div>
-        <div class="scard green"><b>Pressure</b><span id="w-press">1013</span><small>hPa</small></div>
+      <div class="ctx-rows">
+        <div class="ctx-row"><b>Presence</b>
+          <button class="pill2 home" id="ctx-pres">🏠 HOME</button>
+        </div>
+        <div class="ctx-row"><b>Ambient lux</b>
+          <input type="range" class="ctxs" id="ctx-lux" min="5" max="400" value="45">
+          <span class="val" id="ctx-lux-v">45 lx</span>
+        </div>
+        <div class="ctx-row"><b>Temperature</b>
+          <input type="range" class="ctxs" id="ctx-temp" min="20" max="32" step="0.1" value="23.4">
+          <span class="val" id="ctx-temp-v">23.4 °C</span>
+        </div>
       </div>
-      <div class="senv"><span>☀ LDR · <b id="w-lux">45</b> lx</span><span>presence <b id="w-pres">HOME</b></span></div>
+      <div class="ctx-note">Move lux &lt; 150 while HOME → Auto Light fires · temp &gt; 27 → Auto Fan · go AWAY → Away Mode · wrong code → Security Alert.</div>
     </div>
 
     <!-- ═══ web dashboard ═══ -->
-    <div id="sat-web" class="sat net pop2" style="--d:.7s">
+    <div id="sat-web" class="sat net mqtt pop2" style="--d:.7s">
       <div class="sat-head">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 2.6 4.2 5.6 4.2 9S14.8 18.4 12 21c-2.8-2.6-4.2-5.6-4.2-9S9.2 5.6 12 3Z"/></svg>
         Web Dashboard <i class="live"></i>
@@ -548,18 +714,25 @@ body{
         <button class="wtile" id="w-lock"><b>🔒 Lock</b><span class="wbadge" id="wb-lock">LOCKED</span></button>
         <div class="wtile"><b>🌡 Climate</b><span class="val" id="wb-clim">23.4°C · 42%</span></div>
       </div>
-      <div class="wchart"><svg id="wchart" viewBox="0 0 452 52" preserveAspectRatio="none">
+      <div class="wrow">
+        <span class="sw-name">🧠 ML autonomy</span>
+        <button class="hasw" id="w-ml"><i></i></button>
+        <span class="sw-name" style="width:auto">☀ Backlight</span>
+        <input type="range" class="ctxs" id="w-bright" min="10" max="100" value="78">
+        <span class="val" id="w-bright-v">78%</span>
+      </div>
+      <div class="wchart"><svg id="wchart" viewBox="0 0 452 44" preserveAspectRatio="none">
         <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="rgba(62,224,255,.35)"/><stop offset="1" stop-color="rgba(62,224,255,0)"/>
         </linearGradient></defs>
         <path id="chart-area" fill="url(#cg)"/>
-        <polyline id="chart-line" fill="none" stroke="#3ee0ff" stroke-width="1.6"/>
-        <circle id="chart-dot" r="2.6" fill="#aef3ff"/>
+        <polyline id="chart-line" fill="none" stroke="#3ee0ff" stroke-width="1.5"/>
+        <circle id="chart-dot" r="2.4" fill="#aef3ff"/>
       </svg></div>
     </div>
 
     <!-- ═══ home assistant: panel + companion app ═══ -->
-    <div id="sat-ha" class="sat net pop2" style="--d:.85s">
+    <div id="sat-ha" class="sat net mqtt pop2" style="--d:.85s">
       <div class="sat-head">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
         Home Assistant <i class="live"></i>
@@ -568,13 +741,14 @@ body{
         <div class="ha-panel">
           <div class="ha-ov">Overview</div>
           <div class="ha-cards">
-            <button class="hcard" id="hp-light"><span class="hc-top"><span class="hc-ic orange">💡</span><b>Bedroom light</b></span><span class="hc-st" id="hp-light-t">Off</span></button>
-            <button class="hcard" id="hp-fan"><span class="hc-top"><span class="hc-ic cyan">🌀</span><b>Ceiling fan</b></span><span class="hc-st" id="hp-fan-t">Off</span></button>
-            <div class="hcard"><span class="hc-top"><span class="hc-ic green">🔒</span><b>Front door</b></span><span class="hc-st" id="hp-lock-t">Locked</span></div>
-            <div class="hcard"><span class="hc-top"><span class="hc-ic">🌡</span><b>Climate</b></span><span class="hc-st" id="hp-clim-t">23.4 °C · 42 %</span></div>
+            <button class="hcard" id="hp-light"><span class="hc-top"><span class="hc-ic orange">💡</span><b>light.bedroom</b></span><span class="hc-st" id="hp-light-t">Off</span></button>
+            <button class="hcard" id="hp-fan"><span class="hc-top"><span class="hc-ic cyan">🌀</span><b>fan.living_room</b></span><span class="hc-st" id="hp-fan-t">Off</span></button>
+            <div class="hcard"><span class="hc-top"><span class="hc-ic green">🔒</span><b>lock.front_door</b></span><span class="hc-st" id="hp-lock-t">Locked</span></div>
+            <div class="hcard"><span class="hc-top"><span class="hc-ic">🌡</span><b>sensor.climate</b></span><span class="hc-st" id="hp-clim-t">23.4 °C · 42 %</span></div>
           </div>
-          <div class="ha-ml"><b>switch.ml_autonomy</b><button class="hasw" id="h-ml"><i></i></button></div>
-          <div class="autom">⏰ <b>automation</b> · presence after 18:00 &amp; lux &lt; 100 → <b>light ON</b></div>
+          <div class="ha-sec">Automations</div>
+          <div class="ha-autom" id="ha-autom"></div>
+          <div class="ha-note" id="ha-note"></div>
         </div>
         <div class="ha-app">
           <div class="ab"><span class="dot"></span>Home Assistant</div>
@@ -582,6 +756,8 @@ body{
           <div class="ha-arow"><span class="aic">💡</span><span>Light</span><button class="hasw" id="hap-light"><i></i></button></div>
           <div class="ha-arow"><span class="aic">🌀</span><span>Fan</span><button class="hasw" id="hap-fan"><i></i></button></div>
           <div class="ha-arow"><span class="aic">🔒</span><span>Door</span><span class="st" id="hap-lock">Locked</span></div>
+          <div class="ha-arow"><span class="aic">🧠</span><span>ML autonomy</span><button class="hasw" id="hap-ml"><i></i></button></div>
+          <div class="ha-arow"><span class="aic">⏰</span><span>Automations</span><span class="st" id="hap-auto">4 armed</span></div>
         </div>
       </div>
     </div>
@@ -592,31 +768,38 @@ body{
         <div class="ph-notch"></div>
         <div class="ph-appbar">
           <span class="back">‹</span><span class="ava">B</span>
-          <div class="tt"><b>SmartHome Bot</b><small>bot · online</small></div>
+          <div class="tt"><b>SmartHome Bot</b><small>Bale (Telegram) · bot · online</small></div>
           <span class="kebab">⋮</span>
         </div>
         <div class="ph-chat" id="bchat"></div>
-        <div class="ph-kb">
-          <button class="bcmd" data-cmd="/light_on">💡 /light_on</button>
-          <button class="bcmd" data-cmd="/light_off">🌙 /light_off</button>
-          <button class="bcmd" data-cmd="/fan_on">🌀 /fan_on</button>
-          <button class="bcmd" data-cmd="/status">📊 /status</button>
+        <div class="ph-kb" id="ph-kb">
+          <button class="bcmd" data-c="light_on">💡 چراغ روشن</button>
+          <button class="bcmd" data-c="light_off">💡 چراغ خاموش</button>
+          <button class="bcmd" data-c="fan_on">🌀 فن روشن</button>
+          <button class="bcmd" data-c="fan_off">🌀 فن خاموش</button>
+          <button class="bcmd" data-c="open">🔓 باز کردن درب</button>
+          <button class="bcmd" data-c="status">📊 وضعیت</button>
         </div>
-        <div class="ph-input"><span>📎</span><span class="fld">Message</span><span class="send">➤</span></div>
+        <div class="ph-input">
+          <input id="bale-in" placeholder="/status یا پیام…" autocomplete="off">
+          <button class="send" id="bale-send" title="Send">➤</button>
+        </div>
       </div>
     </div>
 
     <!-- ═══ legend & credits ═══ -->
-    <div id="legend" class="sat pop2" style="--d:1.35s">
+    <div id="legend" class="sat pop2" style="--d:1.25s">
       <h5>Legend</h5>
       <div class="li"><span class="sw local"></span> local bus · I²C / parallel</div>
+      <div class="li"><span class="sw gpio"></span> GPIO / relay → real lock &amp; light</div>
       <div class="li"><span class="sw"></span> MQTT over WiFi</div>
       <div class="li"><span class="dots"><i style="background:#3ee0ff"></i><i style="background:#7c8cff"></i><i style="background:#41bdf5"></i><i style="background:#c58cff"></i><i style="background:#4ade80"></i><i style="background:#ff9800"></i></span> log colour = source</div>
       <div class="cr"><b>Mohammad Soroush Rabiei</b> · Isfahan University of Technology</div>
     </div>
+    <div id="hint2">Everything clickable · demo code 1234</div>
 
     <!-- ═══ system log ═══ -->
-    <div id="sat-log" class="sat pop2" style="--d:1.2s">
+    <div id="sat-log" class="sat pop2" style="--d:1.35s">
       <div class="sat-head">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
         System Log
@@ -625,6 +808,7 @@ body{
           <button class="lf" data-f="lcd">LCD</button>
           <button class="lf" data-f="web">Web</button>
           <button class="lf" data-f="ha">HA</button>
+          <button class="lf" data-f="auto">Auto</button>
           <button class="lf" data-f="bale">Bale</button>
           <button class="lf" data-f="face">Face</button>
           <button class="lf" data-f="sensor">Env</button>
@@ -651,22 +835,25 @@ function fit(){
 addEventListener('resize',fit);fit();
 
 /* ═════════ shared live state ═════════ */
-const S={light:false,fan:false,ml:false,unlocked:false,wifi:true,
-         bright:78,temp:23.4,hum:42,press:1013,lux:45};
+const S={light:false,fan:false,ml:false,unlocked:false,wifi:true,mqtt:true,
+         bright:78,temp:23.4,hum:42,press:1013,lux:45,presence:true};
 const outbox=[];
-const SRC_WIRE={lcd:'w-lcd',web:'w-web',ha:'w-ha',bale:'w-bale',face:'w-cam',sensor:'w-sens'};
+const SRC_WIRE={lcd:'w-lcd',web:'w-web',ha:'w-ha',bale:'w-bale',face:'w-cam',sensor:'w-ctx',auto:'w-ha',ctx:'w-ctx'};
 
 function set(k,v,src='lcd'){
   if(S[k]===v) return;
+  const oldPresence=S.presence;
   S[k]=v;
   render();
   const topic={light:'home/light/state',fan:'home/fan/state',unlocked:'home/lock/event',
-               ml:'home/ml/mode',wifi:null,bright:'display/brightness'}[k];
-  if(topic) publish(topic, fmt(k,v), src);
-  if(k==='light') $('#rgbled').classList.toggle('on',v);
-  if(k==='wifi') stage.classList.toggle('offline',!v);
+               ml:'home/ml/mode',wifi:null,mqtt:null,bright:'display/brightness',
+               presence:'home/presence',lux:'home/lux',temp:'home/climate'}[k];
+  if(topic && k!=='lux' && k!=='temp') publish(topic, fmt(k,v), src);
+  if(k==='wifi'){ stage.classList.toggle('offline',!v); log('network/wifi',v?'connected · '+S.ssid:'disconnected','sys'); }
+  if(k==='mqtt'){ stage.classList.toggle('nomqtt',!v); log('network/mqtt',v?'connected':'disconnected — Bale bot keeps working','sys'); }
+  if(k==='presence'){ log('home/presence',v?'HOME':'AWAY','sensor'); if(oldPresence&&!v) autoFire('away'); }
   if(k==='unlocked'){
-    if(v&&src!=='timer'){ baleSay(`🔓 Door unlocked — ${src==='face'?'face match':src}`,'ok'); log('event/door','unlocked',src); }
+    if(v&&src!=='timer'){ baleSay(`🔓 درب باز شد — ${src==='face'?'تشخیص چهره':src==='bale'?'رمز از بله':src}`,'ok'); log('event/door','unlocked',src); }
     if(v) setTimeout(()=>{if(S.unlocked)set('unlocked',false,'timer');},5000);
   }
 }
@@ -675,47 +862,47 @@ function fmt(k,v){
   if(k==='unlocked') return v?'UNLOCKED':'LOCKED';
   if(k==='ml') return v?'AUTO':'SHADOW';
   if(k==='bright') return v+'%';
+  if(k==='presence') return v?'HOME':'AWAY';
   return String(v);
 }
 function publish(topic,val,src){
   if(!S.wifi && topic!=='display/brightness'){
     outbox.push(topic+' '+val);
-    log('outbox',`⇥ ${topic} ${val} · queued`,'sys');
-    baleSay('⚠ Device offline — event queued in the outbox.','warn',src==='bale');
+    log('outbox',`⇥ ${topic} ${val} · queued (NVS)`,'sys');
+    baleSay('⚠️ بورد در دسترس نیست؛ رویداد در صندوق outbox صف شد.','warn',src==='bale');
     return;
   }
   log(topic,val,src);
-  flash(src==='sensor'?['w-sens','w-up']:[SRC_WIRE[src],'w-up'].filter(Boolean));
+  flash(src==='sensor'?['w-ctx','w-up']:[SRC_WIRE[src],'w-up'].filter(Boolean));
 }
 
-/* ═════════ wires — routed around the cards, junction dots at both ends ═════════ */
+/* ═════════ wires ═════════ */
 const WIRES=[
-  {id:'w-lcd', d:'M 322,562 C 440,566 540,558 618,522', cls:'local',
-   label:'8-bit parallel · I²C · PWM', lx:470, ly:590, dur:2.6, del:0},
-  {id:'w-cam', d:'M 474,340 C 520,362 580,356 638,348', cls:'local',
-   label:'JPEG · HTTPS', lx:642, ly:326, dur:2.2, del:.5},
-  {id:'w-sens',d:'M 598,452 C 606,458 612,464 620,472', cls:'local', dur:2.2, del:1},
-  {id:'w-log', d:'M 800,558 L 800,608', cls:'local', dur:1.4, del:.2},
-  {id:'w-up',  d:'M 980,410 C 996,396 1006,376 1014,354', cls:'net', dur:1.6, del:0},
-  {id:'w-web', d:'M 1048,320 C 1058,312 1068,303 1080,298', cls:'net', dur:1.4, del:.3},
-  {id:'w-ha',  d:'M 1080,352 C 1100,362 1118,378 1134,396', cls:'net', dur:1.7, del:.9},
-  {id:'w-bale',d:'M 1048,384 C 1060,470 1180,560 1252,622', cls:'net', dur:2.3, del:1.4},
+  {id:'w-lcd', d:'M 322,318 C 460,318 560,320 618,338', cls:'local',
+   label:'8-bit parallel · I²C · PWM', lx:470, ly:316, dur:2.6, del:0},
+  {id:'w-cam', d:'M 598,184 C 612,242 618,292 624,336', cls:'local', dur:2.2, del:.5},
+  {id:'w-ctx', d:'M 598,462 C 606,452 612,444 620,436', cls:'local', dur:2.2, del:1},
+  {id:'w-gpio1',d:'M 700,482 L 700,522', cls:'local gpio', dur:1.6, del:.2},
+  {id:'w-gpio2',d:'M 900,482 L 900,522', cls:'local gpio', dur:1.6, del:.8},
+  {id:'w-log', d:'M 980,446 C 1012,486 1042,556 1054,638', cls:'local', dur:1.8, del:.4},
+  {id:'w-up',  d:'M 980,400 C 996,392 1004,380 1014,368', cls:'net', dur:1.6, del:0},
+  {id:'w-web', d:'M 1048,320 L 1048,302', cls:'net', dur:1.2, del:.3},
+  {id:'w-ha',  d:'M 1080,354 C 1100,362 1118,378 1134,394', cls:'net', dur:1.7, del:.9},
+  {id:'w-bale',d:'M 1048,386 C 1060,478 1130,588 1202,656', cls:'net', dur:2.3, del:1.4},
 ];
 function buildWires(){
   const NS='http://www.w3.org/2000/svg', svg=$('#wires');
   const mk=(t,at)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);return e;};
   for(const w of WIRES){
     const p=mk('path',{d:w.d,id:w.id}); if(w.cls)p.setAttribute('class',w.cls); svg.appendChild(p);
-    // junction dots at both ends
-    const pts=w.d.match(/M\s*([\d.]+)[, ]([\d.]+)|L\s*([\d.]+)[, ]([\d.]+)/g)||[];
-    const start=w.d.slice(2).split(/C|L/)[0].trim().split(/[\s,]+/);
     const segs=w.d.trim().split(/\s+/);
-    const end=segs.slice(-2);
+    const start=segs[1].split(',');
+    const end=segs.slice(-2).map(x=>x.replace('L','').trim());
     [[start[0],start[1]],[end[0],end[1]]].forEach(([x,y])=>{
-      if(x!==undefined) svg.appendChild(mk('circle',{cx:x,cy:y,r:2.4,class:'node'}));
+      if(x!==undefined) svg.appendChild(mk('circle',{cx:x,cy:y,r:2.2,class:'node'}));
     });
-    if(!w.cls.includes('stub')) for(let i=0;i<2;i++){
-      const c=mk('circle',{r:2.5,class:'pkt '+(w.cls.includes('net')?'net':'')});
+    for(let i=0;i<2;i++){
+      const c=mk('circle',{r:2.4,class:'pkt '+(w.cls.includes('net')?'net':w.cls.includes('gpio')?'gp':'')});
       c.style.offsetPath=`path("${w.d}")`;
       c.style.setProperty('--pdur',w.dur+'s');
       c.style.setProperty('--pd',(w.del+i*(w.dur/2))+'s');
@@ -736,11 +923,11 @@ function flash(ids){
   }
 }
 
-/* ═════════ system log — colour-coded by source, filterable ═════════ */
-const SRC_COLOR={lcd:'#3ee0ff',web:'#7c8cff',ha:'#41bdf5',bale:'#c58cff',face:'#4ade80',
+/* ═════════ system log ═════════ */
+const SRC_COLOR={lcd:'#3ee0ff',web:'#7c8cff',ha:'#41bdf5',auto:'#69f0ae',bale:'#c58cff',face:'#4ade80',
                  keypad:'#4ade80',sensor:'#ff9800',timer:'#93a0b8',boot:'#93a0b8',
                  sys:'#93a0b8',demo:'#7c8cff'};
-const SRC_NAME ={lcd:'LCD',web:'WEB',ha:'HA',bale:'BALE',face:'FACE',keypad:'KEYPAD',
+const SRC_NAME ={lcd:'LCD',web:'WEB',ha:'HA',auto:'AUTO',bale:'BALE',face:'FACE',keypad:'KEYPAD',
                  sensor:'ENV',timer:'SYS',boot:'SYS',sys:'SYS',demo:'DEMO'};
 let logFilter='all';
 function ts(){
@@ -767,7 +954,7 @@ $('#logfilters').addEventListener('click',e=>{
   });
 });
 
-/* ═════════ render — one state, every view ═════════ */
+/* ═════════ render ═════════ */
 const sym={
   power:'<path d="M12 2.5v7"/><path d="M6.3 8a7.5 7.5 0 1 0 11.4 0" stroke-linejoin="round"/>',
   charge:'<path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2Z" stroke-linejoin="round"/>',
@@ -798,7 +985,7 @@ function render(){
 
   const w=$('#l-wifi');
   w.classList.toggle('on-blue',S.wifi);
-  $('#l-wifi-t').textContent=S.wifi?'WiFi: Atlas-2G':'WiFi';
+  $('#l-wifi-t').textContent=S.wifi?'WiFi: '+S.ssid:'WiFi';
 
   $('#wb-light').textContent=S.light?'ON':'OFF';
   $('#wb-light').className='wbadge'+(S.light?' on':'');
@@ -807,8 +994,8 @@ function render(){
   $('#wb-lock').textContent=S.unlocked?'UNLOCKED':'LOCKED';
   $('#wb-lock').className='wbadge'+(S.unlocked?' gr':'');
   $('#wb-clim').textContent=S.temp.toFixed(1)+'°C · '+Math.round(S.hum)+'%';
+  $('#w-ml').classList.toggle('on',S.ml);
 
-  // HA panel
   $('#hp-light-t').textContent=S.light?'On':'Off';
   $('#hp-light-t').classList.toggle('on',S.light);
   $('#hp-fan-t').textContent=S.fan?'On':'Off';
@@ -816,70 +1003,273 @@ function render(){
   $('#hp-lock-t').textContent=S.unlocked?'Unlocked':'Locked';
   $('#hp-lock-t').classList.toggle('on',S.unlocked);
   $('#hp-clim-t').textContent=S.temp.toFixed(1)+' °C · '+Math.round(S.hum)+' %';
-  $('#h-ml').classList.toggle('on',S.ml);
-  // HA companion app
   $('#hap-light').classList.toggle('on',S.light);
   $('#hap-fan').classList.toggle('on',S.fan);
+  $('#hap-ml').classList.toggle('on',S.ml);
   $('#hap-lock').textContent=S.unlocked?'Unlocked':'Locked';
   $('#hap-lock').classList.toggle('on',S.unlocked);
   $('#hap-temp').textContent=S.temp.toFixed(1)+'°C';
   $('#hap-hum').textContent=Math.round(S.hum)+'% · '+Math.round(S.press)+' hPa';
+  $('#hap-auto').textContent=AUTOS.filter(a=>a.on).length+' armed';
+
+  // real world
+  $('#door-st').textContent=S.unlocked?'UNLOCKED':'LOCKED';
+  $('#light-st').textContent=S.light?'ON':'OFF';
 
   // sensors everywhere
   $('#s-temp').textContent=S.temp.toFixed(1)+'°';
   $('#s-hum').textContent=Math.round(S.hum)+'%';
   $('#s-press').textContent=Math.round(S.press);
-  $('#w-temp').textContent=S.temp.toFixed(1);
-  $('#w-hum').textContent=Math.round(S.hum);
-  $('#w-press').textContent=Math.round(S.press);
-  $('#w-lux').textContent=Math.round(S.lux);
+  $('#wb-clim').textContent=S.temp.toFixed(1)+'°C · '+Math.round(S.hum)+'%';
+  $('#ctx-lux-v').textContent=Math.round(S.lux)+' lx';
+  $('#ctx-temp-v').textContent=S.temp.toFixed(1)+' °C';
+  $('#ctx-pres').className='pill2 '+(S.presence?'home':'away');
+  $('#ctx-pres').textContent=S.presence?'🏠 HOME':'👋 AWAY';
   drawChart();
 }
 
-/* live temperature chart in the web dashboard */
+/* live temperature chart */
 const hist=Array.from({length:26},(_,i)=>23.4+Math.sin(i/2.6)*.45+Math.sin(i/1.3)*.15);
 function drawChart(){
   hist.push(S.temp); hist.shift();
   const min=Math.min(...hist)-.2, max=Math.max(...hist)+.2;
-  const pts=hist.map((v,i)=>[(i/(hist.length-1))*452, 48-((v-min)/(max-min))*42]);
+  const pts=hist.map((v,i)=>[(i/(hist.length-1))*452, 40-((v-min)/(max-min))*34]);
   $('#chart-line').setAttribute('points',pts.map(p=>p.join(',')).join(' '));
   $('#chart-area').setAttribute('d',
-    `M ${pts[0][0]},52 L ${pts.map(p=>p.join(',')).join(' L ')} L 452,52 Z`);
+    `M ${pts[0][0]},44 L ${pts.map(p=>p.join(',')).join(' L ')} L 452,44 Z`);
   const e=pts[pts.length-1];
   $('#chart-dot').setAttribute('cx',e[0]); $('#chart-dot').setAttribute('cy',e[1]);
 }
 
-/* ═════════ LCD interactions (same logic as the firmware callbacks) ═════════ */
+/* ═════════ HA — the four REAL automations (automations.yaml) ═════════ */
+const AUTOS=[
+  {id:'fan_temp', name:'Auto Fan by Temperature', desc:'fan ON > 27°C · OFF < 25°C', on:true, last:null},
+  {id:'light_lux', name:'Auto Light by Presence & Brightness', desc:'ON: home & lux<150 · OFF: lux>300 / away', on:true, last:null},
+  {id:'sec_alert', name:'Security Alert - Failed Door Access', desc:'unknown face or wrong code', on:true, last:null},
+  {id:'away', name:'Away Mode - Lights & Fan Off', desc:'presence AWAY → light+fan off', on:true, last:null},
+];
+function autoFire(id){
+  const a=AUTOS.find(x=>x.id===id); if(!a||!a.on) return;
+  a.last=ts();
+  renderAutos();
+  const d=new Date();
+  if(id==='fan_temp'){
+    const on=S.temp>=27;
+    if(S.fan!==on){ set('fan',on,'auto'); }
+    log('automation.fan_temp',`fired → fan ${on?'ON':'OFF'} (temp ${S.temp.toFixed(1)}°C)`,'auto'); flash(['w-ha','w-up']);
+  }else if(id==='light_lux'){
+    const on=S.presence&&S.lux<150;
+    if(S.light!==on){ set('light',on,'auto'); }
+    log('automation.light_lux',`fired → light ${on?'ON':'OFF'} (home:${S.presence?'yes':'no'}, ${Math.round(S.lux)} lx)`,'auto'); flash(['w-ha','w-up']);
+  }else if(id==='sec_alert'){
+    haNote('🚨 دسترسی ناموفق','تلاش ناموفق برای باز کردن درب. ('+ts()+')');
+    log('automation.sec_alert','fired → persistent_notification (failed door access)','auto'); flash(['w-ha']);
+  }else if(id==='away'){
+    if(S.light) set('light',false,'auto');
+    if(S.fan) set('fan',false,'auto');
+    haNote('👋 خروج ثبت شد','حضور AWAY شد؛ چراغ و فن خاموش شدند. ('+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+')');
+    log('automation.away_mode','fired → light off · fan off · notification','auto'); flash(['w-ha','w-up']);
+  }
+}
+function haNote(title,msg){
+  const n=$('#ha-note');
+  n.innerHTML=`<b>${title}</b> — ${msg}`;
+  n.classList.add('show');
+  clearTimeout(n._t); n._t=setTimeout(()=>n.classList.remove('show'),9000);
+}
+function renderAutos(){
+  const c=$('#ha-autom'); c.innerHTML='';
+  for(const a of AUTOS){
+    const d=document.createElement('div'); d.className='hauto';
+    d.innerHTML=`<div class="an"><b>${a.name}</b><small>${a.desc}</small></div>
+      <span class="fire${a.last?' recent':''}">${a.last?'⚡ '+a.last:'armed'}</span>
+      <button class="hasw${a.on?' on':''}" title="enable/disable"><i></i></button>`;
+    d.querySelector('.hasw').addEventListener('click',()=>{
+      a.on=!a.on; renderAutos();
+      log('automation/'+a.id,a.on?'armed':'disarmed','ha');
+    });
+    c.appendChild(d);
+  }
+  $('#hap-auto').textContent=AUTOS.filter(a=>a.on).length+' armed';
+}
+setInterval(()=>{ // trigger evaluation — like HA's trigger engine
+  if(S.temp>27 && AUTOS.find(a=>a.id==='fan_temp').on && !S.fan) autoFire('fan_temp');
+  if(S.temp<25 && AUTOS.find(a=>a.id==='fan_temp').on && S.fan) autoFire('fan_temp');
+  if(S.presence && S.lux<150 && AUTOS.find(a=>a.id==='light_lux').on && !S.light) autoFire('light_lux');
+  if((S.lux>300||!S.presence) && AUTOS.find(a=>a.id==='light_lux').on && S.light) autoFire('light_lux');
+},1000);
+
+/* ═════════ LCD interactions ═════════ */
 $('#l-light').addEventListener('click',()=>set('light',!S.light,'lcd'));
 $('#l-fan').addEventListener('click',()=>set('fan',!S.fan,'lcd'));
 $('#l-ml').addEventListener('click',()=>set('ml',!S.ml,'lcd'));
-$('#l-wifi').addEventListener('click',()=>{
-  const v=!S.wifi; set('wifi',v,'lcd');
-  if(v&&outbox.length){
-    setTimeout(()=>{
-      log('NVS outbox',`flushing ${outbox.length} event${outbox.length>1?'s':''}…`,'sys');
-      const q=[...outbox]; outbox.length=0;
-      q.forEach((m,i)=>setTimeout(()=>{
-        const [t,...rest]=m.split(' ');
-        log(t,rest.join(' ')+' · flushed','sys');flash(['w-up']);
-      },500+i*450));
-      baleSay('✅ Back online — outbox flushed.','ok',false);
-    },600);
-  }
-});
 $('#l-bright').addEventListener('input',e=>{
   S.bright=+e.target.value;
   $('#lcdscr').style.setProperty('--bright',.45+S.bright/100*.55);
+  $('#w-bright').value=S.bright; $('#w-bright-v').textContent=S.bright+'%';
 });
 $('#l-bright').addEventListener('change',e=>publish('display/brightness',e.target.value+'%','lcd'));
-$('#l-lock').addEventListener('click',()=>{
-  if(S.unlocked){set('unlocked',false,'lcd');return;}
-  $('#camres').textContent='keypad · ••••';flash(['w-cam']);
-  setTimeout(()=>{set('unlocked',true,'keypad');
-    $('#camres').textContent='code accepted';setTimeout(()=>$('#camres').textContent='ESP-DL · ready',1600);},900);
+$('#w-bright').addEventListener('input',e=>{
+  S.bright=+e.target.value;
+  $('#lcdscr').style.setProperty('--bright',.45+S.bright/100*.55);
+  $('#l-bright').value=S.bright; $('#w-bright-v').textContent=S.bright+'%';
+});
+$('#w-bright').addEventListener('change',e=>publish('display/brightness',e.target.value+'%','web'));
+
+/* ── keypad overlay (shared: unlock / settings / wifi password / change password) ── */
+let kpMode=null, kpBuf='', kpTarget=null;
+function openKeypad(mode,title){
+  kpMode=mode; kpBuf=''; kpTarget=null;
+  $('#kp-title').textContent=title;
+  $('#kp-err').textContent=''; $('#kp-err').className='kpad-err';
+  drawDots();
+  $$('.loverlay').forEach(o=>o.classList.remove('open'));
+  $('#ov-keypad').classList.add('open');
+}
+function drawDots(){
+  const dots=$('#kp-dots').children;
+  for(let i=0;i<4;i++) dots[i].className=i<kpBuf.length?'f':'';
+}
+(function buildKeypad(){
+  const g=$('#kp-grid');
+  const keys=['1','2','3','4','5','6','7','8','9','⌫','0','✓'];
+  for(const k of keys){
+    const b=document.createElement('button');
+    b.textContent=k;
+    if(k==='✓') b.className='ok';
+    if(k==='⌫') b.className='fn';
+    b.addEventListener('click',()=>{
+      if(k==='⌫'){ kpBuf=kpBuf.slice(0,-1); }
+      else if(k==='✓'){ submitKeypad(); return; }
+      else if(kpBuf.length<4){ kpBuf+=k; }
+      drawDots();
+      if(kpBuf.length===4) setTimeout(submitKeypad,180);
+    });
+    g.appendChild(b);
+  }
+})();
+function kpErr(msg){
+  const e=$('#kp-err'); e.textContent=msg; e.className='kpad-err';
+  $('#ov-keypad').classList.add('shake');
+  setTimeout(()=>$('#ov-keypad').classList.remove('shake'),450);
+}
+function submitKeypad(){
+  if(kpBuf.length<4){ kpErr('Enter 4 digits'); return; }
+  if(kpMode==='unlock'){
+    if(kpBuf==='1234'){ closeOverlays(); set('unlocked',true,'keypad'); }
+    else{ kpErr('Wrong code'); log('event/door','wrong code entered','keypad'); autoFire('sec_alert'); kpBuf=''; drawDots(); }
+  }else if(kpMode==='settings'){
+    if(kpBuf==='1234'){ kpBuf=''; $$('.loverlay').forEach(o=>o.classList.remove('open')); $('#ov-set').classList.add('open'); }
+    else{ kpErr('Wrong code'); log('event/settings','wrong code','keypad'); kpBuf=''; drawDots(); }
+  }else if(kpMode==='wifi'){
+    closeOverlays();
+    connectWifi(kw);
+    renderWifi();
+  }else if(kpMode==='pass-cur'){
+    if(kpBuf==='1234'){ openKeypad('pass-new','Enter New Password'); }
+    else{ kpErr('Wrong current password'); kpBuf=''; drawDots(); }
+  }else if(kpMode==='pass-new'){
+    closeOverlays();
+    const e=$('#kp-err'); /* toast via log + settings hint */
+    log('settings/password','changed','lcd');
+    $$('.loverlay').forEach(o=>o.classList.remove('open'));
+    $('#ov-set').classList.add('open');
+    const st=$('#set-pass small'); st.textContent='password changed ✓';
+    setTimeout(()=>st.textContent='keypad · current → new',2500);
+  }
+}
+function closeOverlays(){ $$('.loverlay').forEach(o=>o.classList.remove('open')); }
+$('#l-lock').addEventListener('click',()=>{ if(S.unlocked){set('unlocked',false,'lcd');} else openKeypad('unlock','Enter Code'); });
+$('#l-set').addEventListener('click',()=>openKeypad('settings','Enter Settings Code'));
+
+/* ── wifi setup overlay ── */
+let kw={ssid:'Atlas-2G'};
+const NETWORKS=[
+  {ssid:'Atlas-2G', rssi:3, known:true, locked:true},
+  {ssid:'HomeNet-5G', rssi:2, known:false, locked:true},
+  {ssid:'MP-Guest', rssi:2, known:false, locked:false},
+  {ssid:'NSA-Van-24', rssi:1, known:false, locked:true},
+];
+function renderWifi(){
+  const c=$('#wifi-list'); c.innerHTML='';
+  for(const n of NETWORKS){
+    const d=document.createElement('div'); d.className='lwifi';
+    const bars=[1,2,3].map(i=>`<i class="${i<=n.rssi?'f':''}" style="height:${3+i*3.5}px"></i>`).join('');
+    d.innerHTML=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8fa0bd" stroke-width="2.2" stroke-linecap="round"><path d="M2.5 9.5a15 15 0 0 1 19 0M5.5 13a10.5 10.5 0 0 1 13 0M8.5 16.4a6 6 0 0 1 7 0"/><circle cx="12" cy="19.6" r="1.3" fill="#8fa0bd" stroke="none"/></svg>
+      <span>${n.ssid}</span>
+      ${n.ssid===S.ssid&&S.wifi?'<span class="tag">CONNECTED</span>':n.locked?'<span class="lockic">🔒</span>':''}
+      <span class="rss">${bars}</span>`;
+    d.addEventListener('click',()=>{
+      if(n.ssid===S.ssid&&S.wifi){ // tap connected → disconnect (real firmware behaviour)
+        set('wifi',false,'lcd'); renderWifi(); return;
+      }
+      if(!n.locked){ connectWifi(n,()=>'ok'); renderWifi(); return; }
+      kw=n; openKeypad('wifi','Password · '+n.ssid);
+    });
+    c.appendChild(d);
+  }
+}
+function connectWifi(n,check){
+  S.ssid=n.ssid;
+  log('network/wifi',`connecting to ${n.ssid}…`,'lcd');
+  setTimeout(()=>{
+    S.wifi=true; stage.classList.remove('offline');
+    render(); renderWifi();
+    log('network/wifi',`connected · ${n.ssid}`,'lcd'); flash(['w-lcd','w-up']);
+    if(outbox.length){
+      setTimeout(()=>{
+        log('NVS outbox',`flushing ${outbox.length} event${outbox.length>1?'s':''}…`,'sys');
+        const q=[...outbox]; outbox.length=0;
+        q.forEach((m,i)=>setTimeout(()=>{
+          const [t,...rest]=m.split(' ');
+          log(t,rest.join(' ')+' · flushed','sys');flash(['w-up']);
+        },500+i*450));
+      },500);
+    }
+  },1100);
+}
+$('#l-wifi').addEventListener('click',()=>{ renderWifi(); $$('.loverlay').forEach(o=>o.classList.remove('open')); $('#ov-wifi').classList.add('open'); });
+$('#wifi-rescan').addEventListener('click',()=>{
+  NETWORKS.forEach(n=>n.rssi=Math.max(1,Math.min(3,n.rssi+Math.round((Math.random()-.5)*2))));
+  const c=$('#wifi-list'); c.style.opacity=.4;
+  setTimeout(()=>{ renderWifi(); c.style.opacity=1; },500);
+  log('network/wifi','scan complete · 4 networks','lcd');
 });
 
-/* LCD overlays — the real QR screens */
+/* ── mqtt overlay ── */
+$('#l-mqtt').addEventListener('click',()=>{
+  $$('.loverlay').forEach(o=>o.classList.remove('open'));
+  const st=$('#mqtt-status');
+  st.textContent=S.mqtt?'Connected · QoS 1':'Not connected'; st.className='lstatus'+(S.mqtt?' ok':'');
+  $('#mqtt-connect').textContent=S.mqtt?'DISCONNECT':'CONNECT';
+  $('#ov-mqtt').classList.add('open');
+});
+$('#mqtt-connect').addEventListener('click',()=>{
+  const st=$('#mqtt-status'), btn=$('#mqtt-connect');
+  if(S.mqtt){ set('mqtt',false,'lcd'); st.textContent='Disabled'; st.className='lstatus warn'; btn.textContent='CONNECT'; return; }
+  if(!S.wifi){ st.textContent='Connection failed — WiFi is off'; st.className='lstatus err'; return; }
+  st.textContent='Connecting…'; st.className='lstatus';
+  setTimeout(()=>{ set('mqtt',true,'lcd'); st.textContent='Connected · QoS 1'; st.className='lstatus ok'; btn.textContent='DISCONNECT'; },900);
+});
+
+/* ── settings overlay ── */
+$('#set-att').addEventListener('click',()=>{ openAtt(); });
+$('#set-pass').addEventListener('click',()=>openKeypad('pass-cur','Enter Current Password'));
+$('#face-enroll').addEventListener('click',()=>{
+  const b=$('#face-enroll'), small=$('#face-count');
+  if(b.disabled) return; b.disabled=true;
+  let samples=24;
+  const iv=setInterval(()=>{ samples+=1; small.textContent=`Soroush R. · ${samples} samples · capturing…`; },350);
+  setTimeout(()=>{ clearInterval(iv); small.textContent=`Soroush R. · ${samples} samples`; b.disabled=false;
+    log('settings/faces','enrolled 3 new samples (multi-sample)','lcd'); },1300);
+});
+
+/* attendance QR overlay */
+function openAtt(){
+  closeOverlays();
+  drawQR($('#ov-att canvas'));
+  $('#ov-att').classList.add('open');
+}
 function drawQR(cv){
   const ctx=cv.getContext('2d'),n=21,s=cv.width/n;
   ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='#000';
@@ -888,16 +1278,11 @@ function drawQR(cv){
   for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(rnd()<.45)ctx.fillRect(x*s,y*s,s,s);
   finder(0,0);finder(n-7,0);finder(0,n-7);
 }
-function openOverlay(id){
-  $$('.loverlay').forEach(o=>o.classList.remove('open'));
-  const o=$(id);o.classList.add('open');
-  drawQR(o.querySelector('canvas'));
-}
 $('#l-dash').addEventListener('click',()=>{
-  openOverlay('#ov-dash');$('#sat-web').classList.add('ping');flash(['w-lcd','w-up','w-web']);
+  closeOverlays(); $('#sat-web').classList.add('ping'); flash(['w-lcd','w-up','w-web']);
   setTimeout(()=>$('#sat-web').classList.remove('ping'),1800);
 });
-$('#l-att').addEventListener('click',()=>{openOverlay('#ov-att');});
+$('#l-att').addEventListener('click',openAtt);
 $$('.lback').forEach(b=>b.addEventListener('click',e=>e.target.closest('.loverlay').classList.remove('open')));
 let attT=600;
 setInterval(()=>{
@@ -923,56 +1308,142 @@ $('#scanbtn').addEventListener('click',()=>{
 $('#w-light').addEventListener('click',()=>set('light',!S.light,'web'));
 $('#w-fan').addEventListener('click',()=>set('fan',!S.fan,'web'));
 $('#w-lock').addEventListener('click',()=>set('unlocked',!S.unlocked,'web'));
+$('#w-ml').addEventListener('click',()=>set('ml',!S.ml,'web'));
 $('#hp-light').addEventListener('click',()=>set('light',!S.light,'ha'));
 $('#hp-fan').addEventListener('click',()=>set('fan',!S.fan,'ha'));
 $('#hap-light').addEventListener('click',()=>set('light',!S.light,'ha'));
 $('#hap-fan').addEventListener('click',()=>set('fan',!S.fan,'ha'));
-$('#h-ml').addEventListener('click',()=>set('ml',!S.ml,'ha'));
+$('#hap-ml').addEventListener('click',()=>set('ml',!S.ml,'ha'));
 
-/* ═════════ bale bot ═════════ */
+/* ═════════ context card ═════════ */
+$('#ctx-pres').addEventListener('click',()=>set('presence',!S.presence,'ctx'));
+$('#ctx-lux').addEventListener('input',e=>{ S.lux=+e.target.value; render(); });
+$('#ctx-lux').addEventListener('change',e=>publish('home/lux',Math.round(S.lux)+' lx','sensor'));
+$('#ctx-temp').addEventListener('input',e=>{ S.temp=+e.target.value; render(); });
+$('#ctx-temp').addEventListener('change',e=>publish('home/climate',S.temp.toFixed(1)+'°C','sensor'));
+
+/* ═════════ bale bot — full command set of server/bale_bot/bot.py ═════════ */
+const CODE='1234';
+let doorFlow=null;               // {expires} — the /open password flow (2-min TTL)
 function baleSay(text,cls='',asMe=false){
   const c=$('#bchat');const d=document.createElement('div');
-  d.className='bmsg '+(asMe?'me':cls);d.textContent=text;c.appendChild(d);
-  while(c.children.length>4)c.removeChild(c.firstChild);
+  d.className='bmsg '+(asMe?'me':cls);d.dir='auto';d.textContent=text;c.appendChild(d);
+  while(c.children.length>14)c.removeChild(c.firstChild);
+  c.scrollTop=c.scrollHeight;
+}
+function botReply(text,cls){ setTimeout(()=>{ baleSay(text,cls); if(cls==='menu') log('bot/unknown','reply + inline menu','bale'); },450); }
+function boardProblem(){ return S.wifi?null:'بورد در دسترس نیست؛ بعداً تلاش کنید.'; }
+function botDevice(kind,on){
+  const problem=boardProblem();
+  if(problem){ baleSay('⚠️ '+problem,'warn'); return; }
+  if(kind==='light') set('light',on,'bale'); else set('fan',on,'bale');
+  baleSay(kind==='light'?`چراغ ${on?'روشن ✅':'خاموش ⚪'} شد.`:`فن ${on?'روشن ✅':'خاموش ⚪'} شد.`);
+  log(`bot/${kind}_${on?'on':'off'}`,'ok','bale'); flash(['w-bale','w-up']);
+}
+function botStatus(){
+  const problem=boardProblem();
+  if(problem){ baleSay('⚠️ '+problem,'warn'); return; }
+  baleSay(
+`📊 وضعیت خانه هوشمند
+💡 چراغ: ${S.light?'روشن ✅':'خاموش ⚪'}
+🌀 فن: ${S.fan?'روشن ✅':'خاموش ⚪'}
+🚪 درب: ${S.unlocked?'باز 🔓':'قفل 🔒'}
+🌡 دما: ${S.temp.toFixed(1)}°C   💧 رطوبت: ${Math.round(S.hum)}%   🎈 فشار: ${Math.round(S.press)} hPa
+☀️ نور: ${Math.round(S.lux)} lux
+🏠 حضور: ${S.presence?'در خانه':'بیرون'}
+🤖 عامل ML: ${S.ml?'خودکار (AUTO)':'مشاور (SHADOW)'}
+📡 MQTT: ${S.mqtt?'connected':'disabled'} — کنترل از بله مستقل از MQTT کار می‌کند`);
+  log('bot/status','full status sent','bale'); flash(['w-bale','w-up']);
+}
+const HELP_TEXT=
+`🤖 ربات کنترل خانه هوشمند
+
+با دکمه‌های منو (یا دستورها) چراغ، فن و درب را کنترل کنید:
+/status — وضعیت کامل
+/open — باز کردن درب (با رمز)
+/light_on و /light_off — چراغ
+/fan_on و /fan_off — فن
+/cancel — لغو عملیات درب`;
+function botHandle(text){
+  if(doorFlow){                       // a pending /open password
+    if(text.trim()==='/cancel'){ doorFlow=null; baleSay('لغو شد.'); log('bot/cancel','door flow cancelled','bale'); return; }
+    if(Date.now()>doorFlow.expires){ doorFlow=null; baleSay('⌛ فرصت رمز تمام شد — دوباره /open بزنید.','warn'); }
+    else{
+      doorFlow=null;
+      if(text.trim()===CODE){
+        set('unlocked',true,'bale');
+        baleSay('✅ درب باز شد.','ok');
+        baleSay('💡 برای امنیت بیشتر می‌توانید پیام رمز را از چت پاک کنید.');
+        log('bot/open','unlocked with password','bale'); flash(['w-bale','w-up']);
+      }else{
+        baleSay('❌ رمز اشتباه است.','warn');
+        log('event/door','wrong code via bot','bale'); autoFire('sec_alert');
+      }
+    }
+    return;
+  }
+  const t=text.trim(), cmd=t.split(/\s+/)[0].replace(/^\//,'').split('@')[0].toLowerCase();
+  if(cmd==='start'||cmd==='help'){ baleSay(HELP_TEXT); log('bot/start','help + menu','bale'); }
+  else if(cmd==='status'){ botStatus(); }
+  else if(cmd==='open'){
+    if(boardProblem()){ baleSay('⚠️ '+boardProblem(),'warn'); return; }
+    doorFlow={expires:Date.now()+120000};
+    baleSay('🔐 رمز درب را بفرستید (۲ دقیقه فرصت دارید).\nخودِ رمز تأیید است — لغو: /cancel');
+    log('bot/open','password flow started (TTL 2 min)','bale');
+  }
+  else if(cmd==='cancel'){ doorFlow=null; baleSay('لغو شد.'); log('bot/cancel','cancelled','bale'); }
+  else if(cmd==='light_on'){ botDevice('light',true); }
+  else if(cmd==='light_off'){ botDevice('light',false); }
+  else if(cmd==='fan_on'){ botDevice('fan',true); }
+  else if(cmd==='fan_off'){ botDevice('fan',false); }
+  else if(cmd==='light'||cmd==='fan'){
+    const a=t.split(/\s+/)[1];
+    if(a==='on'||a==='1') botDevice(cmd,true);
+    else if(a==='off'||a==='0') botDevice(cmd,false);
+    else baleSay(`مثال: /${cmd} on یا /${cmd} off`);
+  }
+  else{ baleSay('دستور ناشناخته است.'); baleSay(HELP_TEXT); log('bot/unknown',`"${t.slice(0,24)}"`,'bale'); }
 }
 $$('.bcmd').forEach(b=>b.addEventListener('click',()=>{
-  const cmd=b.dataset.cmd;
-  baleSay(cmd,'',true);flash(['w-bale','w-up']);
-  setTimeout(()=>{
-    if(cmd==='/light_on') {set('light',true,'bale');baleSay('💡 Light is ON');}
-    else if(cmd==='/light_off'){set('light',false,'bale');baleSay('🌙 Light is OFF');}
-    else if(cmd==='/fan_on'){set('fan',true,'bale');baleSay('🌀 Fan is ON');}
-    else if(cmd==='/status'){
-      if(!S.wifi){baleSay('⚠ Device offline — try later.','warn');}
-      else baleSay(`🌡 ${S.temp.toFixed(1)}°C · 💧 ${Math.round(S.hum)}% · ${S.unlocked?'🔓 unlocked':'🔒 locked'} · 💡 ${S.light?'ON':'OFF'}`);
-    }
-  },650);
+  const c=b.dataset.c;
+  baleSay('/'+c,'',true);
+  botHandle('/'+c);
 }));
+$('#bale-send').addEventListener('click',()=>{
+  const inp=$('#bale-in'); const v=inp.value.trim(); if(!v) return;
+  baleSay(v,'',true); inp.value='';
+  botHandle(v);
+});
+$('#bale-in').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#bale-send').click(); });
 
-/* ═════════ environment random-walk ═════════ */
+/* ═════════ environment drift (subtle, sliders win) ═════════ */
 setInterval(()=>{
-  S.temp=Math.min(26,Math.max(21,S.temp+(Math.random()-.5)*.3));
-  S.hum =Math.min(55,Math.max(35,S.hum +(Math.random()-.5)*1.4));
+  S.hum =Math.min(55,Math.max(35,S.hum +(Math.random()-.5)*1.2));
   S.press=Math.min(1018,Math.max(1008,S.press+(Math.random()-.5)*.8));
-  S.lux =Math.min(300,Math.max(8,S.lux +(Math.random()-.5)*10));
+  if(!ctxTempTouched) S.temp=Math.min(32,Math.max(20,S.temp+(Math.random()-.5)*.15));
+  $('#ctx-temp').value=S.temp;
   render();
 },2500);
 setInterval(()=>publish('home/climate',`${S.temp.toFixed(1)}°C ${Math.round(S.hum)}%`,'sensor'),9000);
+let ctxTempTouched=false;
+$('#ctx-temp').addEventListener('input',()=>ctxTempTouched=true);
 
-/* ═════════ auto demo — scripted walkthrough for presenting ═════════ */
+/* ═════════ auto demo — scripted walkthrough ═════════ */
 const demo=[
-  [600,  ()=>{set('light',true,'ha');}],
-  [2800, ()=>{baleSay('/status','',true);setTimeout(()=>baleSay(`🌡 ${S.temp.toFixed(1)}°C · 💧 ${Math.round(S.hum)}% · 🔒 locked`),500);}],
-  [5000, ()=>{set('fan',true,'web');}],
-  [7200, ()=>{$('#scanbtn').click();}],
-  [12500,()=>{const b=$('#l-bright');b.value=32;b.dispatchEvent(new Event('input'));b.dispatchEvent(new Event('change'));}],
-  [14200,()=>{set('light',false,'lcd');}],
-  [16000,()=>{if(S.unlocked)set('unlocked',false,'timer');}],
+  [600,  ()=>{ $('#ctx-lux').value=90; $('#ctx-lux').dispatchEvent(new Event('input')); }],
+  [1800, ()=>{ /* auto light fires via engine */ }],
+  [4200, ()=>{ baleSay('/open','',true); botHandle('/open'); }],
+  [6200, ()=>{ baleSay('1234','',true); botHandle('1234'); }],
+  [9200, ()=>{ const k=openKeypad('unlock','Enter Code'); }],
+  [10800,()=>{ kpBuf='9999'; drawDots(); submitKeypad(); }],
+  [13200,()=>{ $('#ctx-temp').value=28; $('#ctx-temp').dispatchEvent(new Event('input')); }],
+  [15200,()=>{ set('presence',false,'ctx'); }],
+  [17800,()=>{ set('presence',true,'ctx'); $('#ctx-lux').value=220; $('#ctx-lux').dispatchEvent(new Event('input')); }],
 ];
 $('#demo').addEventListener('click',()=>{
   const btn=$('#demo');btn.disabled=true;btn.style.opacity=.55;
   demo.forEach(([t,fn])=>setTimeout(fn,t));
-  setTimeout(()=>{btn.disabled=false;btn.style.opacity=1;},17500);
+  setTimeout(()=>{btn.disabled=false;btn.style.opacity=1;},19500);
 });
 
 /* ═════════ particles ═════════ */
@@ -995,13 +1466,15 @@ let last=performance.now();
 (function tick(now){const dt=Math.min(now-last,100);last=now;particles(dt);requestAnimationFrame(tick);})(last);
 
 /* ═════════ boot ═════════ */
+S.ssid='Atlas-2G';
 buildWires();
+renderAutos();
 render();
-log('home/hello','SmartHome hub online','boot');
+log('home/hello','SmartHome hub online · 4 automations armed','boot');
 baleSay('👋 SmartHome bot ready — try a command below.');
 
 /* test hook */
-window.hub={state:()=>S,set};
+window.hub={state:()=>S,set,botHandle,autoFire};
 </script>
 </body>
 </html>
