@@ -209,7 +209,7 @@ For inquiries: mohammadsoroushrabiei@gmail.com
 
 <img src="docs/proposal/logo_iut.png" width="64" alt="Isfahan University of Technology logo"/><br>
 
-**Soroush Rabiei** — Undergraduate Final Project, [Isfahan University of Technology](https://www.iut.ac.ir/)
+**Mohammad Soroush Rabiei** — Undergraduate Final Project, [Isfahan University of Technology](https://www.iut.ac.ir/)
 
 [![GitHub](https://img.shields.io/badge/GitHub-@MohammadSoroushRabiei-181717?logo=github&logoColor=white)](https://github.com/MohammadSoroushRabiei)
 
