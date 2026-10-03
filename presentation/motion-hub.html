@@ -148,91 +148,91 @@ input{user-select:text;font-family:inherit}
 .sat.ping{border-color:rgba(62,224,255,.7);box-shadow:0 0 44px rgba(62,224,255,.3)}
 
 /* ============ ESP32-S3 board + real world ============ */
-#board{position:absolute;left:620px;top:354px;width:300px;z-index:6}
-.pcb{position:relative;width:100%;height:108px;border-radius:11px;
+#board{position:absolute;left:620px;top:354px;width:280px;z-index:6}
+.pcb{position:relative;width:100%;height:92px;border-radius:10px;
   background:linear-gradient(160deg,#182338,#0f1727 60%);
   border:1px solid rgba(120,165,225,.3);
   box-shadow:inset 0 0 40px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.5);
 }
 .pcb::before{
-  content:"";position:absolute;inset:0;border-radius:12px;opacity:.16;pointer-events:none;
+  content:"";position:absolute;inset:0;border-radius:10px;opacity:.16;pointer-events:none;
   background-image:
     linear-gradient(rgba(90,200,255,.5) 1px,transparent 1px),
     linear-gradient(90deg,rgba(90,200,255,.4) 1px,transparent 1px);
-  background-size:24px 24px;
+  background-size:22px 22px;
 }
-.pads-t,.pads-b{position:absolute;left:14px;right:14px;height:8px;border-radius:3px;
-  background:repeating-linear-gradient(90deg,#c9a24a 0 6px,#1a2436 6px 14px);opacity:.85}
-.pads-t{top:6px}.pads-b{bottom:6px}
+.pads-t,.pads-b{position:absolute;left:12px;right:12px;height:6px;border-radius:3px;
+  background:repeating-linear-gradient(90deg,#c9a24a 0 5px,#1a2436 5px 12px);opacity:.85}
+.pads-t{top:5px}.pads-b{bottom:5px}
 .shield{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);
-  width:100px;height:52px;border-radius:6px;
+  width:92px;height:44px;border-radius:5px;
   background:linear-gradient(148deg,#aeb9c9,#69758a 70%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 18px rgba(0,0,0,.5);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
 }
-.shield i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.12em;color:#1b2431}
-.shield u{text-decoration:none;font-size:7px;letter-spacing:.3em;color:#39465c}
-.pcbname{position:absolute;left:0;right:0;bottom:11px;text-align:center;
-  font-size:8.5px;letter-spacing:.2em;color:rgba(190,215,245,.65);font-weight:600}
-.antenna{position:absolute;right:16px;top:18px;width:42px;height:6px;border-radius:2px;
+.shield i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.12em;color:#1b2431}
+.shield u{text-decoration:none;font-size:6.5px;letter-spacing:.28em;color:#39465c}
+.pcbname{position:absolute;left:0;right:0;bottom:9px;text-align:center;
+  font-size:8px;letter-spacing:.18em;color:rgba(190,215,245,.65);font-weight:600}
+.antenna{position:absolute;right:14px;top:14px;width:38px;height:5px;border-radius:2px;
   background:repeating-linear-gradient(90deg,#d7e2f2 0 4px,#131c2c 4px 8px);opacity:.7}
-.usbc{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);width:36px;height:10px;
+.usbc{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);width:32px;height:9px;
   border-radius:4px 4px 0 0;background:linear-gradient(#aeb9c9,#5f6b7d)}
 /* the real world: solenoid lock + relay light + ceiling fan — square icon tiles */
-#real{position:absolute;left:620px;top:486px;width:484px;height:74px;z-index:6}
-.rw{position:absolute;top:0;height:74px;border:1px solid var(--line);border-radius:13px;
-  background:rgba(14,20,36,.75);display:flex;align-items:center;justify-content:center;gap:12px;
-  padding-top:9px;transition:border-color .5s,box-shadow .5s}
-.rw .rl{position:absolute;left:10px;top:6px;font-size:8px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;white-space:nowrap;z-index:2}
+#real{position:absolute;left:620px;top:474px;width:484px;height:64px;z-index:6}
+.rw{position:absolute;top:0;height:64px;border:1px solid var(--line);border-radius:12px;
+  background:rgba(14,20,36,.75);display:flex;align-items:center;justify-content:center;gap:11px;
+  padding-top:8px;transition:border-color .5s,box-shadow .5s}
+.rw .rl{position:absolute;left:9px;top:5px;font-size:7.5px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;white-space:nowrap;z-index:2}
 .rw-door{left:0;width:152px}
 .rw-light{left:166px;width:152px}
 .rw-fan{right:0;width:152px}
 .rw.clk{cursor:pointer}
 .rw.clk:hover{border-color:rgba(62,224,255,.45);background:rgba(62,224,255,.05)}
-.ibox{width:42px;height:42px;flex:none;border-radius:9px;position:relative;
+.ibox{width:34px;height:34px;flex:none;border-radius:8px;position:relative;
   background:rgba(6,10,20,.6);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center}
-.doorframe{position:relative;width:30px;height:30px;perspective:140px}
-.door{position:absolute;inset:0;border-radius:4px 6px 6px 4px;transform-origin:left center;
+.doorframe{position:relative;width:26px;height:26px;perspective:120px}
+.door{position:absolute;inset:0;border-radius:3px 5px 5px 3px;transform-origin:left center;
   background:linear-gradient(160deg,#3a4663,#232e48);border:2px solid rgba(148,170,220,.4);
-  display:flex;align-items:center;justify-content:flex-end;padding-right:4px;
+  display:flex;align-items:center;justify-content:flex-end;padding-right:3px;
   transition:transform .8s var(--ease),background .5s;transform-style:preserve-3d}
-.door::before{content:"";width:3px;height:10px;border-radius:2px;background:#8fa0bd}
-.bolt{position:absolute;left:27px;top:12px;width:10px;height:6px;border-radius:2px;
+.door::before{content:"";width:2.5px;height:8px;border-radius:2px;background:#8fa0bd}
+.bolt{position:absolute;left:23px;top:10px;width:8px;height:5px;border-radius:2px;
   background:linear-gradient(#ff8a80,#c62828);border:1px solid #8e1f1f;transition:all .5s var(--ease)}
 #stage.open .door{transform:rotateY(55deg);background:linear-gradient(160deg,#2c4a3c,#1c3329)}
 #stage.open .bolt{opacity:0;transform:translateX(9px)}
 #stage.open .doorframe{filter:drop-shadow(0 0 10px rgba(76,175,80,.45))}
 #stage.open .rw-door{border-color:rgba(76,175,80,.5)}
-.bulbwrap{position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center}
-.bulbwrap svg.b{width:26px;height:26px;transition:filter .4s,color .4s;color:#5d6a83}
+.bulbwrap{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
+.bulbwrap svg.b{width:22px;height:22px;transition:filter .4s,color .4s;color:#5d6a83}
 .bulbwrap svg.b .fillpart{fill:transparent;transition:fill .4s}
-.bulbwrap .halo{position:absolute;width:40px;height:40px;border-radius:50%;
+.bulbwrap .halo{position:absolute;width:34px;height:34px;border-radius:50%;
   background:radial-gradient(circle,rgba(255,193,7,.6),transparent 70%);opacity:0;transition:opacity .5s}
 .bulbwrap .rays{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none}
-.bulbwrap .rays i{position:absolute;left:50%;top:50%;width:2px;height:5px;border-radius:2px;
+.bulbwrap .rays i{position:absolute;left:50%;top:50%;width:2px;height:4px;border-radius:2px;
   background:#ffd54f;transform-origin:50% 0}
-.bulbwrap .rays i:nth-child(1){transform:translate(-50%,-20px) rotate(0deg)}
-.bulbwrap .rays i:nth-child(2){transform:translate(-50%,-19px) rotate(45deg)}
-.bulbwrap .rays i:nth-child(3){transform:translate(-50%,-19px) rotate(-45deg)}
-.bulbwrap .rays i:nth-child(4){transform:translate(-50%,-18px) rotate(90deg)}
-.bulbwrap .rays i:nth-child(5){transform:translate(-50%,-18px) rotate(-90deg)}
-.bulbwrap .rays i:nth-child(6){transform:translate(-50%,-16px) rotate(135deg)}
-.bulbwrap .rays i:nth-child(7){transform:translate(-50%,-16px) rotate(-135deg)}
+.bulbwrap .rays i:nth-child(1){transform:translate(-50%,-17px) rotate(0deg)}
+.bulbwrap .rays i:nth-child(2){transform:translate(-50%,-16px) rotate(45deg)}
+.bulbwrap .rays i:nth-child(3){transform:translate(-50%,-16px) rotate(-45deg)}
+.bulbwrap .rays i:nth-child(4){transform:translate(-50%,-15px) rotate(90deg)}
+.bulbwrap .rays i:nth-child(5){transform:translate(-50%,-15px) rotate(-90deg)}
+.bulbwrap .rays i:nth-child(6){transform:translate(-50%,-13px) rotate(135deg)}
+.bulbwrap .rays i:nth-child(7){transform:translate(-50%,-13px) rotate(-135deg)}
 #stage.lit .bulbwrap svg.b{color:#ffd54f;filter:drop-shadow(0 0 10px rgba(255,193,7,.8))}
 #stage.lit .bulbwrap svg.b .fillpart{fill:rgba(255,213,79,.45)}
 #stage.lit .bulbwrap .halo{opacity:1}
 #stage.lit .bulbwrap .rays{opacity:1}
 #stage.lit .rw-light{border-color:rgba(255,193,7,.45)}
 /* ceiling fan — blades spin only when ON */
-.fanwrap{position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center}
-.fanwrap svg{width:30px;height:30px;color:#5d6a83;transition:color .4s}
+.fanwrap{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
+.fanwrap svg{width:24px;height:24px;color:#5d6a83;transition:color .4s}
 .fanwrap .blades{transform-origin:50% 50%}
 #stage.fanon .fanwrap svg{color:#4dd0e1;filter:drop-shadow(0 0 8px rgba(0,188,212,.7))}
 #stage.fanon .fanwrap .blades{animation:spin 1s linear infinite;transform-box:fill-box;transform-origin:center}
 @keyframes spin{to{transform:rotate(360deg)}}
-.door-st,.light-st,.fan-st{font-size:11.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)}
+.door-st,.light-st,.fan-st{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)}
 .door-st{color:#e57373}
 #stage.open .door-st{color:#b6f5cd}
 .light-st{color:var(--mut)}
@@ -401,69 +401,62 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 .hasw.on{background:#41bdf5;box-shadow:0 0 14px rgba(65,189,245,.45)}
 .hasw.on i{left:19px;background:#fff}
 
-/* ============ HA automations card ============ */
-#sat-autom{left:1136px;top:650px;width:420px;height:206px;display:flex;flex-direction:column}
-#sat-autom .sat-head{gap:10px}
-#sat-autom .ha-autom{flex:1;padding:8px 14px 10px;overflow:hidden}
-#sat-autom .ha-note{margin:0 14px 10px}
-
-/* ============ home assistant: panel + companion app ============ */
-#sat-ha{left:1136px;top:56px;width:420px}
+/* ============ home assistant: web panel + companion app ============ */
+#sat-ha{left:1128px;top:56px;width:428px}
 #sat-ha .sat-head svg{color:#41bdf5}
-.ha-body{display:flex;gap:12px;padding:10px 14px 13px;height:512px}
-.ha-panel{flex:1;min-width:0;display:flex;flex-direction:column}
-.ha-sec{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:2px 0 5px}
-.ha-ents{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;flex:1;justify-content:space-evenly}
-.hent{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;
-  background:rgba(148,170,220,.05);border:1px solid var(--line)}
-.hent .hic{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+#sat-ha .ha-note{margin:9px 14px 2px}
+.ha-body{padding:8px 14px 12px}
+.ha-sec{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:4px 0 6px}
+.ha-ents{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hent{border:1px solid var(--line);border-radius:11px;background:rgba(148,170,220,.05);
+  padding:8px 10px;display:flex;flex-direction:column;gap:7px}
+.hent .ht{display:flex;align-items:center;gap:7px;min-width:0}
+.hent .hic{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:10.5px;background:rgba(65,189,245,.12);flex:none}
 .hent .hic.orange{background:rgba(255,152,0,.14)}
 .hent .hic.cyan{background:rgba(0,188,212,.14)}
 .hent .hic.green{background:rgba(76,175,80,.14)}
 .hent .hic.violet{background:rgba(197,140,255,.14)}
-.hent .eid{flex:1;min-width:0;font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hent .eid{font-size:10px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hent .eid b{color:var(--ink);font-weight:600}
-.hent .st{font-size:9.5px;letter-spacing:.06em;color:var(--mut);flex:none;white-space:nowrap}
+.hent .hb{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.hent .st{font-size:9.5px;letter-spacing:.05em;color:var(--mut);white-space:nowrap}
 .hent .st.on{color:#b6f5cd}
-.hent .hasw{flex:none}
-.ha-autom{display:flex;flex-direction:column;gap:4px}
-.hauto{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:10px;
-  background:rgba(148,170,220,.05);border:1px solid var(--line)}
+.ha-sec.aut{margin-top:12px}
+.ha-autom{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.hauto{border:1px solid var(--line);border-radius:9px;background:rgba(148,170,220,.05);
+  padding:6px 9px;display:flex;align-items:center;gap:7px}
 .hauto .an{flex:1;min-width:0}
 .hauto .an b{display:block;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hauto .an small{display:block;font-size:8.5px;color:var(--dim);letter-spacing:.02em}
-.hauto .fire{font-size:8.5px;color:var(--dim);letter-spacing:.06em;white-space:nowrap;flex:none}
+.hauto .fire{font-size:8px;color:var(--dim);letter-spacing:.04em;white-space:nowrap;flex:none}
 .hauto .fire.recent{color:var(--ok)}
-.hauto .hasw{transform:scale(.8);transform-origin:right center}
-.ha-note{padding:7px 10px;border-radius:9px;border:1px solid rgba(255,82,82,.4);
+.hauto .hasw{transform:scale(.8);transform-origin:right center;flex:none}
+.ha-note{margin-top:9px;padding:7px 10px;border-radius:9px;border:1px solid rgba(255,82,82,.4);
   background:rgba(255,82,82,.07);color:#ffcdd2;font-size:10px;line-height:1.5;display:none;direction:rtl}
 .ha-note.show{display:block}
 .ha-note b{font-weight:600}
-/* companion app phone */
+/* ═══ HA companion app (vertical phone) ═══ */
+#sat-hamob{left:1128px;top:472px;width:428px;height:384px;display:flex;flex-direction:column}
+.hamob-wrap{flex:1;display:flex;justify-content:center;padding:4px 0 12px}
 .ha-app{
-  width:200px;height:100%;border-radius:22px;flex:none;position:relative;
+  width:280px;height:100%;border-radius:26px;position:relative;
   background:#0b101c;border:5px solid #1c2436;box-shadow:0 16px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;overflow:hidden;
 }
-.ha-app .notch{position:absolute;left:50%;top:5px;transform:translateX(-50%);width:52px;height:5px;
+.ha-app .notch{position:absolute;left:50%;top:6px;transform:translateX(-50%);width:56px;height:5px;
   border-radius:99px;background:#2a3550;z-index:5}
-.ha-app .ab{display:flex;align-items:center;gap:7px;padding:14px 11px 9px;background:#12203a;
-  font-size:10.5px;font-weight:600;letter-spacing:.04em}
-.ha-app .ab .dot{width:17px;height:17px;border-radius:50%;background:var(--grad);flex:none}
-.ha-hero{margin:10px 10px 0;border-radius:11px;padding:10px 12px;
-  background:linear-gradient(140deg,#1d3a5f,#12314f);border:1px solid rgba(65,189,245,.3)}
-.ha-hero small{font-size:8.5px;letter-spacing:.16em;color:#8fc3ee;text-transform:uppercase}
-.ha-hero .v{font-size:20px;font-weight:700;color:#d9efff;line-height:1.25}
-.ha-hero .s{font-size:9px;color:#8fc3ee}
-.ha-arow{display:flex;align-items:center;gap:8px;margin:0 10px;padding:10px 2px;
-  border-bottom:1px solid rgba(148,170,220,.1);font-size:11.5px;color:var(--mut)}
+.ha-app .ab{display:flex;align-items:center;gap:8px;padding:13px 13px 8px;background:#12203a;
+  font-size:11px;font-weight:600;letter-spacing:.04em}
+.ha-app .ab .dot{width:18px;height:18px;border-radius:50%;background:var(--grad);flex:none}
+.ha-app .ab small{margin-left:auto;font-size:8.5px;color:var(--ok);letter-spacing:.05em}
+.ha-arow{display:flex;align-items:center;gap:9px;margin:0 12px;padding:4.5px 2px;
+  border-bottom:1px solid rgba(148,170,220,.1);font-size:11px;color:var(--mut)}
 .ha-arow:last-child{border-bottom:0}
-.ha-arow .aic{width:23px;height:23px;border-radius:50%;background:rgba(65,189,245,.12);
-  display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+.ha-arow .aic{width:22px;height:22px;border-radius:50%;background:rgba(65,189,245,.12);
+  display:flex;align-items:center;justify-content:center;font-size:10.5px;flex:none}
 .ha-arow span{flex:1}
-.ha-arow .hasw{transform:scale(.95);transform-origin:right center}
-.ha-arow .st{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.ha-arow .hasw{flex:none}
+.ha-arow .st{font-size:10px;letter-spacing:.05em;color:var(--mut);white-space:nowrap}
 .ha-arow .st.on{color:#b6f5cd}
 
 /* ============ bale phone (full bot) ============ */
@@ -508,9 +501,9 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
   background:var(--indigo);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
 
 /* ============ system log ============ */
-#sat-log{left:620px;top:590px;width:484px;height:266px;display:flex;flex-direction:column}
+#sat-log{left:620px;top:568px;width:484px;height:288px;display:flex;flex-direction:column}
 /* ═══ ML agent — live on-chip SGD network ═══ */
-#sat-ml{left:352px;top:552px;width:244px;height:304px;display:flex;flex-direction:column}
+#sat-ml{left:352px;top:616px;width:244px;height:240px;display:flex;flex-direction:column}
 #nnviz{width:100%;height:auto;display:block;padding:4px 10px 0}
 .nnrow{display:flex;gap:7px;padding:2px 13px 0}
 .nnp{flex:1;border:1px solid var(--line);border-radius:9px;background:rgba(148,170,220,.05);padding:6px 9px}
@@ -768,7 +761,7 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10" r="1.4" fill="currentColor" stroke="none"/><path d="M9 15.2c.9.9 2 1.3 3 1.3s2.1-.4 3-1.3"/></svg>
         ML Agent <span class="sub">on-chip SGD</span><i class="live"></i>
       </div>
-      <svg id="nnviz" viewBox="0 0 212 122"></svg>
+      <svg id="nnviz" viewBox="0 0 212 120"></svg>
       <div class="nnrow">
         <div class="nnp"><small>Light head</small><b id="nn-light">—</b></div>
         <div class="nnp"><small>Fan head</small><b id="nn-fan">—</b></div>
@@ -812,50 +805,53 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
       </svg></div>
     </div>
 
-    <!-- ═══ home assistant: panel + companion app ═══ -->
+    <!-- ═══ home assistant: web panel (horizontal) ═══ -->
     <div id="sat-ha" class="sat net mqtt pop2" style="--d:.85s">
       <div class="sat-head">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
-        Home Assistant <i class="live"></i>
+        Home Assistant <span class="sub">web panel</span><i class="live"></i>
       </div>
       <div class="ha-body">
-        <div class="ha-panel">
-          <div class="ha-sec">Entities</div>
-          <div class="ha-ents">
-            <div class="hent"><span class="hic orange">💡</span><span class="eid"><b>light</b>.smart_home</span><span class="st" id="hp-light-t">Off</span><button class="hasw" id="hp-light"><i></i></button></div>
-            <div class="hent"><span class="hic cyan">🌀</span><span class="eid"><b>fan</b>.living_room</span><span class="st" id="hp-fan-t">Off</span><button class="hasw" id="hp-fan"><i></i></button></div>
-            <div class="hent"><span class="hic green">🔒</span><span class="eid"><b>lock</b>.front_door</span><span class="st" id="hp-lock-t">Locked</span></div>
-            <div class="hent"><span class="hic violet">🧠</span><span class="eid"><b>switch</b>.ml_autonomy</span><span class="st" id="hp-ml-t">Shadow</span><button class="hasw" id="hp-ml"><i></i></button></div>
-            <div class="hent"><span class="hic orange">🌡</span><span class="eid"><b>sensor</b>.temperature</span><span class="st" id="hp-temp-t">23.4 °C</span></div>
-            <div class="hent"><span class="hic cyan">💧</span><span class="eid"><b>sensor</b>.humidity</span><span class="st" id="hp-hum-t">42 %</span></div>
-            <div class="hent"><span class="hic green">🎈</span><span class="eid"><b>sensor</b>.pressure</span><span class="st" id="hp-press-t">1013 hPa</span></div>
-            <div class="hent"><span class="hic">☀</span><span class="eid"><b>sensor</b>.ambient_light</span><span class="st" id="hp-lux-t">45 lx</span></div>
-            <div class="hent"><span class="hic green">🏠</span><span class="eid"><b>binary_sensor</b>.presence</span><span class="st" id="hp-pres-t">Home</span></div>
-          </div>
+        <div class="ha-sec">Entities</div>
+        <div class="ha-ents">
+          <div class="hent"><div class="ht"><span class="hic orange">💡</span><span class="eid"><b>light</b>.smart_home</span></div><div class="hb"><span class="st" id="hp-light-t">Off</span><button class="hasw" id="hp-light"><i></i></button></div></div>
+          <div class="hent"><div class="ht"><span class="hic cyan">🌀</span><span class="eid"><b>fan</b>.living_room</span></div><div class="hb"><span class="st" id="hp-fan-t">Off</span><button class="hasw" id="hp-fan"><i></i></button></div></div>
+          <div class="hent"><div class="ht"><span class="hic green">🔒</span><span class="eid"><b>lock</b>.front_door</span></div><div class="hb"><span class="st" id="hp-lock-t">Locked</span></div></div>
+          <div class="hent"><div class="ht"><span class="hic violet">🧠</span><span class="eid"><b>switch</b>.ml_autonomy</span></div><div class="hb"><span class="st" id="hp-ml-t">Shadow</span><button class="hasw" id="hp-ml"><i></i></button></div></div>
+          <div class="hent"><div class="ht"><span class="hic orange">🌡</span><span class="eid"><b>sensor</b>.temperature</span></div><div class="hb"><span class="st" id="hp-temp-t">23.4 °C</span></div></div>
+          <div class="hent"><div class="ht"><span class="hic cyan">💧</span><span class="eid"><b>sensor</b>.humidity</span></div><div class="hb"><span class="st" id="hp-hum-t">42 %</span></div></div>
+          <div class="hent"><div class="ht"><span class="hic green">🎈</span><span class="eid"><b>sensor</b>.pressure</span></div><div class="hb"><span class="st" id="hp-press-t">1013 hPa</span></div></div>
+          <div class="hent"><div class="ht"><span class="hic">☀</span><span class="eid"><b>sensor</b>.ambient_light</span></div><div class="hb"><span class="st" id="hp-lux-t">45 lx</span></div></div>
+          <div class="hent"><div class="ht"><span class="hic green">🏠</span><span class="eid"><b>binary_sensor</b>.presence</span></div><div class="hb"><span class="st" id="hp-pres-t">Home</span></div></div>
         </div>
+        <div class="ha-sec aut">Automations · automations.yaml</div>
+        <div class="ha-autom" id="ha-autom"></div>
+        <div class="ha-note" id="ha-note"></div>
+      </div>
+    </div>
+
+    <!-- ═══ HA companion app (vertical phone) ═══ -->
+    <div id="sat-hamob" class="sat net mqtt pop2" style="--d:1s">
+      <div class="sat-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2" stroke-linecap="round"/></svg>
+        HA Companion App <i class="live"></i>
+      </div>
+      <div class="hamob-wrap">
         <div class="ha-app">
           <div class="notch"></div>
-          <div class="ab"><span class="dot"></span>Home Assistant</div>
-          <div class="ha-hero"><small>Indoor climate</small><div class="v" id="hap-temp">23.4°C</div><div class="s" id="hap-hum">42% · 1013 hPa</div></div>
+          <div class="ab"><span class="dot"></span>Home Assistant<small>● connected</small></div>
           <div class="ha-arow"><span class="aic">💡</span><span>Light</span><button class="hasw" id="hap-light"><i></i></button></div>
           <div class="ha-arow"><span class="aic">🌀</span><span>Fan</span><button class="hasw" id="hap-fan"><i></i></button></div>
           <div class="ha-arow"><span class="aic">🔒</span><span>Door</span><span class="st" id="hap-lock">Locked</span></div>
           <div class="ha-arow"><span class="aic">🧠</span><span>ML autonomy</span><button class="hasw" id="hap-ml"><i></i></button></div>
-          <div class="ha-arow"><span class="aic">🏠</span><span>Presence</span><span class="st" id="hap-pres">Home</span></div>
+          <div class="ha-arow"><span class="aic">🌡</span><span>Temperature</span><span class="st" id="hap-temp">23.4 °C</span></div>
+          <div class="ha-arow"><span class="aic">💧</span><span>Humidity</span><span class="st" id="hap-hum">42 %</span></div>
+          <div class="ha-arow"><span class="aic">🎈</span><span>Pressure</span><span class="st" id="hap-press">1013 hPa</span></div>
           <div class="ha-arow"><span class="aic">☀</span><span>Ambient lux</span><span class="st" id="hap-lux">45 lx</span></div>
+          <div class="ha-arow"><span class="aic">🏠</span><span>Presence</span><span class="st" id="hap-pres">Home</span></div>
           <div class="ha-arow"><span class="aic">⏰</span><span>Automations</span><span class="st" id="hap-auto">4 armed</span></div>
         </div>
       </div>
-    </div>
-
-    <!-- ═══ HA automations (real automations.yaml, armed / fired) ═══ -->
-    <div id="sat-autom" class="sat net mqtt pop2" style="--d:1.1s">
-      <div class="sat-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2Z"/></svg>
-        Automations <span class="sub">automations.yaml · live triggers</span><i class="live"></i>
-      </div>
-      <div class="ha-autom" id="ha-autom"></div>
-      <div class="ha-note" id="ha-note"></div>
     </div>
 
     <!-- ═══ bale messenger as a phone ═══ -->
@@ -967,18 +963,18 @@ function publish(topic,val,src){
 
 /* ═════════ wires ═════════ */
 const WIRES=[
-  {id:'w-lcd', d:'M 322,308 C 460,308 560,314 618,378', cls:'local',
-   label:'8-bit parallel · I²C · PWM', lx:470, ly:308, dur:2.6, del:0},
+  {id:'w-lcd', d:'M 322,307 C 460,307 560,312 618,378', cls:'local',
+   label:'8-bit parallel · I²C · PWM', lx:470, ly:307, dur:2.6, del:0},
   {id:'w-cam', d:'M 598,160 C 612,230 618,290 626,352', cls:'local', dur:2.2, del:.5},
-  {id:'w-ctx', d:'M 598,438 C 606,462 612,486 618,508', cls:'local', dur:2.2, del:1},
-  {id:'w-ml',  d:'M 598,700 C 606,676 612,650 618,622', cls:'local', dur:2.2, del:1.3},
-  {id:'w-gpio1',d:'M 700,464 L 700,484', cls:'local gpio', dur:1.6, del:.2},
-  {id:'w-gpio2',d:'M 862,464 L 862,484', cls:'local gpio', dur:1.6, del:.8},
-  {id:'w-gpio3',d:'M 900,464 C 960,472 1000,478 1026,486', cls:'local gpio', dur:1.6, del:1.2},
-  {id:'w-log', d:'M 800,562 L 800,588', cls:'local', dur:1.4, del:.2},
-  {id:'w-web', d:'M 918,358 C 950,350 980,340 1004,328', cls:'net', dur:1.4, del:.3},
-  {id:'w-ha',  d:'M 920,402 C 990,412 1060,418 1126,420', cls:'net', dur:1.7, del:.9},
-  {id:'w-bale',d:'M 660,466 C 600,540 430,620 324,678', cls:'net', dur:2.3, del:1.4},
+  {id:'w-ctx', d:'M 598,452 C 606,448 612,442 618,436', cls:'local', dur:2.2, del:1},
+  {id:'w-ml',  d:'M 598,704 C 606,640 614,530 622,456', cls:'local', dur:2.2, del:1.3},
+  {id:'w-gpio1',d:'M 700,448 L 698,472', cls:'local gpio', dur:1.6, del:.2},
+  {id:'w-gpio2',d:'M 862,448 L 862,472', cls:'local gpio', dur:1.6, del:.8},
+  {id:'w-gpio3',d:'M 896,448 C 960,456 1000,462 1026,472', cls:'local gpio', dur:1.6, del:1.2},
+  {id:'w-log', d:'M 800,540 L 800,566', cls:'local', dur:1.4, del:.2},
+  {id:'w-web', d:'M 898,358 C 940,350 980,338 1004,328', cls:'net', dur:1.4, del:.3},
+  {id:'w-ha',  d:'M 900,412 C 990,402 1060,370 1126,310', cls:'net', dur:1.7, del:.9},
+  {id:'w-bale',d:'M 640,446 C 560,520 430,560 324,660', cls:'net', dur:2.3, del:1.4},
 ];
 function buildWires(){
   const NS='http://www.w3.org/2000/svg', svg=$('#wires');
@@ -1113,8 +1109,9 @@ function render(){
   $('#hap-lock').classList.toggle('on',S.unlocked);
   $('#hap-pres').textContent=S.presence?'Home':'Away';
   $('#hap-lux').textContent=Math.round(S.lux)+' lx';
-  $('#hap-temp').textContent=S.temp.toFixed(1)+'°C';
-  $('#hap-hum').textContent=Math.round(S.hum)+'% · '+Math.round(S.press)+' hPa';
+  $('#hap-temp').textContent=S.temp.toFixed(1)+' °C';
+  $('#hap-hum').textContent=Math.round(S.hum)+' %';
+  $('#hap-press').textContent=Math.round(S.press)+' hPa';
   $('#hap-auto').textContent=AUTOS.filter(a=>a.on).length+' armed';
 
   // real world
@@ -1186,8 +1183,8 @@ function haNote(title,msg){
 function renderAutos(){
   const c=$('#ha-autom'); c.innerHTML='';
   for(const a of AUTOS){
-    const d=document.createElement('div'); d.className='hauto';
-    d.innerHTML=`<div class="an"><b>${a.name}</b><small>${a.desc}</small></div>
+    const d=document.createElement('div'); d.className='hauto'; d.title=a.desc;
+    d.innerHTML=`<div class="an"><b>${a.name}</b></div>
       <span class="fire${a.last?' recent':''}">${a.last?'⚡ '+a.last:'armed'}</span>
       <button class="hasw${a.on?' on':''}" title="enable/disable"><i></i></button>`;
     d.querySelector('.hasw').addEventListener('click',()=>{
@@ -1211,47 +1208,44 @@ setInterval(()=>{
 },700);
 
 /* ═════════ ML agent — tiny logistic model with REAL on-page SGD (η=0.08) ═════════ */
-const NN={wL:[.2,-.6,.4,.1],wF:[-.1,.8,-.3,.05],n:0,lossHist:[]};
+const NN={wL:Array(12).fill(0),wF:Array(12).fill(0),n:0,lossHist:[]};
 const sig=z=>1/(1+Math.exp(-z));
-const feats=()=>[1,S.temp/32,S.lux/400,S.presence?1:0];
-function buildNN(){
+const feats=()=>{const t=S.temp/32,l=S.lux/400,p=S.presence?1:0;
+  return [1,t,t*t,l,l*l,p,1-p,p*t,p*l,(S.hum-42)/20,(S.press-1013)/8,S.ml?1:0];};
+function buildNN(){       // horizontal layout: 12 inputs on top → 2 sigmoid heads below
   const NS='http://www.w3.org/2000/svg', svg=$('#nnviz');
   const mk=(t,at)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);return e;};
-  const inputs=[['T',22],['L',52],['P',82],['B',112]];   // temp · lux · presence · bias
-  const outs=[['Light',42],['Fan',92]];
-  const X1=36,X2=176;
-  inputs.forEach(([lab,y],i)=>{
-    const g=mk('g',{});
-    g.appendChild(mk('circle',{cx:X1,cy:y,r:5,fill:'#0a1322',stroke:'#3ee0ff','stroke-width':1.6}));
-    const t=mk('text',{x:X1-9,y:y+3,'text-anchor':'end',fill:'#93a0b8','font-size':9.5}); t.textContent=lab;
-    g.appendChild(t);
+  const cap=mk('text',{x:106,y:9,'text-anchor':'middle',fill:'#5d6a83','font-size':7.5,'letter-spacing':2});
+  cap.textContent='12 CONTEXT FEATURES'; svg.appendChild(cap);
+  const outs=[[58,'Light'],[154,'Fan']], YIN=26, YOUT=98;
+  for(let i=0;i<12;i++){
+    const x=10+i*17.4;
+    svg.appendChild(mk('circle',{cx:x,cy:YIN,r:3,fill:'#0a1322',stroke:'#3ee0ff','stroke-width':1.2}));
     [0,1].forEach(j=>{
-      const oy=outs[j][1];
+      const ox=outs[j][0];
       svg.appendChild(mk('path',{id:'nnw'+j+i,fill:'none',
-        d:`M ${X1+6} ${y} C ${X1+62} ${y}, ${X2-64} ${oy}, ${X2-8} ${oy}`}));
+        d:`M ${x} ${YIN+4} C ${x} 58, ${ox} 52, ${ox} ${YOUT-9}`}));
     });
-    svg.appendChild(g);
-  });
-  outs.forEach(([lab,y],j)=>{
-    svg.appendChild(mk('circle',{cx:X2,cy:y,r:6.5,fill:'#0a1322',stroke:'#7c8cff','stroke-width':2}));
-    const t=mk('text',{x:X2+10,y:y-1,fill:'#eef3fb','font-size':10,'font-weight':600}); t.textContent=lab;
-    svg.appendChild(t);
-    const v=mk('text',{x:X2+10,y:y+12,fill:'#3ee0ff','font-size':9.5,'font-weight':700}); v.id='nnp'+j;
-    svg.appendChild(v);
+  }
+  outs.forEach(([ox,lab])=>{
+    svg.appendChild(mk('circle',{cx:ox,cy:YOUT,r:6.5,fill:'#0a1322',stroke:'#7c8cff','stroke-width':2}));
+    const t=mk('text',{x:ox,y:YOUT+20,'text-anchor':'middle',fill:'#eef3fb','font-size':10,'font-weight':600});
+    t.textContent=lab; svg.appendChild(t);
   });
 }
 function renderNN(){
   const f=feats();
-  [['L',0,'nn-light'],['F',1,'nn-fan']].forEach(([h,j,id])=>{
-    const w=NN['w'+h];
+  [['wL',0],['wF',1]].forEach(([key,j])=>{
+    const w=NN[key];
     const p=sig(w.reduce((a,wi,i)=>a+wi*f[i],0));
     const on=p>=.5;
-    const el=$('#'+id); if(el) el.textContent=(on?'ON ':'OFF ')+Math.round((on?p:1-p)*100)+'%';
-    for(let i=0;i<4;i++){
+    const el=$(j?'#nn-fan':'#nn-light');
+    if(el) el.textContent=(on?'ON ':'OFF ')+Math.round((on?p:1-p)*100)+'%';
+    for(let i=0;i<12;i++){
       const path=$('#nnw'+j+i); if(!path) continue;
-      const wi=Math.max(-2,Math.min(2,w[i]));
-      path.setAttribute('stroke',(wi>=0?'rgba(62,224,255,':'rgba(255,157,107,')+(0.16+Math.abs(wi)*0.3).toFixed(2)+')');
-      path.setAttribute('stroke-width',(0.8+Math.abs(wi)*1.5).toFixed(2));
+      const wi=Math.max(-2.5,Math.min(2.5,w[i]));
+      path.setAttribute('stroke',(wi>=0?'rgba(62,224,255,':'rgba(255,157,107,')+(0.14+Math.abs(wi)*0.28).toFixed(2)+')');
+      path.setAttribute('stroke-width',(0.7+Math.abs(wi)*1.4).toFixed(2));
     }
   });
   const lh=NN.lossHist;
@@ -1279,9 +1273,12 @@ function nnLearn(){       // every manual action becomes a training sample — l
 }
 (function pretrainNN(){   // offline pre-train step so the agent starts sensible
   let seed=42; const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
-  for(let k=0;k<600;k++){
+  for(let k=0;k<800;k++){
     const lux=5+rnd()*395, temp=20+rnd()*12, pres=rnd()<.72;
-    const f=[1,temp/32,lux/400,pres?1:0];
+    const keepT=S.temp,keepL=S.lux,keepP=S.presence;
+    S.temp=temp; S.lux=lux; S.presence=pres;
+    const f=feats();
+    S.temp=keepT; S.lux=keepL; S.presence=keepP;
     const yL=(lux<150&&pres)?1:0, yF=(temp>27)?1:0;
     [['wL',yL],['wF',yF]].forEach(([key,y])=>{
       const w=NN[key];
@@ -1289,6 +1286,7 @@ function nnLearn(){       // every manual action becomes a training sample — l
       for(let i=0;i<w.length;i++) w[i]+=0.08*(y-p)*f[i];
     });
   }
+  NN.lossHist=[];
 })();
 
 /* ═════════ LCD interactions ═════════ */
