@@ -179,18 +179,15 @@ input{user-select:text;font-family:inherit}
   background:repeating-linear-gradient(90deg,#d7e2f2 0 4px,#131c2c 4px 8px);opacity:.7}
 .usbc{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);width:32px;height:9px;
   border-radius:4px 4px 0 0;background:linear-gradient(#aeb9c9,#5f6b7d)}
-/* the real world: solenoid lock + relay light + ceiling fan — square icon tiles */
-#real{position:absolute;left:620px;top:474px;width:484px;height:64px;z-index:6}
-.rw{position:absolute;top:0;height:64px;border:1px solid var(--line);border-radius:12px;
-  background:rgba(14,20,36,.75);display:flex;align-items:center;justify-content:center;gap:11px;
-  padding-top:8px;transition:border-color .5s,box-shadow .5s}
-.rw .rl{position:absolute;left:9px;top:5px;font-size:7.5px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;white-space:nowrap;z-index:2}
-.rw-door{left:0;width:152px}
-.rw-light{left:166px;width:152px}
-.rw-fan{right:0;width:152px}
-.rw.clk{cursor:pointer}
-.rw.clk:hover{border-color:rgba(62,224,255,.45);background:rgba(62,224,255,.05)}
-.ibox{width:34px;height:34px;flex:none;border-radius:8px;position:relative;
+/* the real world: solenoid lock + relay light + ceiling fan — stacked rows */
+#real{left:620px;top:376px;width:240px;height:290px}
+.rwr{display:flex;align-items:center;gap:12px;padding:9px 12px;
+  border-bottom:1px solid rgba(148,170,220,.08);transition:background .3s}
+.rwr:last-child{border-bottom:0}
+.rwr.clk{cursor:pointer}
+.rwr.clk:hover{background:rgba(62,224,255,.05)}
+.rwr .rt b{display:block;font-size:11.5px;font-weight:600;color:var(--ink)}
+.ibox{width:36px;height:36px;flex:none;border-radius:9px;position:relative;
   background:rgba(6,10,20,.6);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center}
 .doorframe{position:relative;width:26px;height:26px;perspective:120px}
@@ -202,37 +199,33 @@ input{user-select:text;font-family:inherit}
 .bolt{position:absolute;left:23px;top:10px;width:8px;height:5px;border-radius:2px;
   background:linear-gradient(#ff8a80,#c62828);border:1px solid #8e1f1f;transition:all .5s var(--ease)}
 #stage.open .door{transform:rotateY(55deg);background:linear-gradient(160deg,#2c4a3c,#1c3329)}
-#stage.open .bolt{opacity:0;transform:translateX(9px)}
+#stage.open .bolt{opacity:0;transform:translateX(8px)}
 #stage.open .doorframe{filter:drop-shadow(0 0 10px rgba(76,175,80,.45))}
-#stage.open .rw-door{border-color:rgba(76,175,80,.5)}
-.bulbwrap{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
-.bulbwrap svg.b{width:22px;height:22px;transition:filter .4s,color .4s;color:#5d6a83}
+.bulbwrap{position:relative;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.bulbwrap svg.b{width:20px;height:20px;transition:filter .4s,color .4s;color:#5d6a83}
 .bulbwrap svg.b .fillpart{fill:transparent;transition:fill .4s}
-.bulbwrap .halo{position:absolute;width:34px;height:34px;border-radius:50%;
+.bulbwrap .halo{position:absolute;width:30px;height:30px;border-radius:50%;
   background:radial-gradient(circle,rgba(255,193,7,.6),transparent 70%);opacity:0;transition:opacity .5s}
 .bulbwrap .rays{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none}
 .bulbwrap .rays i{position:absolute;left:50%;top:50%;width:2px;height:4px;border-radius:2px;
   background:#ffd54f;transform-origin:50% 0}
-.bulbwrap .rays i:nth-child(1){transform:translate(-50%,-17px) rotate(0deg)}
-.bulbwrap .rays i:nth-child(2){transform:translate(-50%,-16px) rotate(45deg)}
-.bulbwrap .rays i:nth-child(3){transform:translate(-50%,-16px) rotate(-45deg)}
-.bulbwrap .rays i:nth-child(4){transform:translate(-50%,-15px) rotate(90deg)}
-.bulbwrap .rays i:nth-child(5){transform:translate(-50%,-15px) rotate(-90deg)}
-.bulbwrap .rays i:nth-child(6){transform:translate(-50%,-13px) rotate(135deg)}
-.bulbwrap .rays i:nth-child(7){transform:translate(-50%,-13px) rotate(-135deg)}
+.bulbwrap .rays i:nth-child(1){transform:translate(-50%,-16px) rotate(0deg)}
+.bulbwrap .rays i:nth-child(2){transform:translate(-50%,-15px) rotate(45deg)}
+.bulbwrap .rays i:nth-child(3){transform:translate(-50%,-15px) rotate(-45deg)}
+.bulbwrap .rays i:nth-child(4){transform:translate(-50%,-14px) rotate(90deg)}
+.bulbwrap .rays i:nth-child(5){transform:translate(-50%,-14px) rotate(-90deg)}
 #stage.lit .bulbwrap svg.b{color:#ffd54f;filter:drop-shadow(0 0 10px rgba(255,193,7,.8))}
 #stage.lit .bulbwrap svg.b .fillpart{fill:rgba(255,213,79,.45)}
 #stage.lit .bulbwrap .halo{opacity:1}
 #stage.lit .bulbwrap .rays{opacity:1}
-#stage.lit .rw-light{border-color:rgba(255,193,7,.45)}
 /* ceiling fan — blades spin only when ON */
-.fanwrap{position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
-.fanwrap svg{width:24px;height:24px;color:#5d6a83;transition:color .4s}
+.fanwrap{position:relative;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.fanwrap svg{width:22px;height:22px;color:#5d6a83;transition:color .4s}
 .fanwrap .blades{transform-origin:50% 50%}
 #stage.fanon .fanwrap svg{color:#4dd0e1;filter:drop-shadow(0 0 8px rgba(0,188,212,.7))}
 #stage.fanon .fanwrap .blades{animation:spin 1s linear infinite;transform-box:fill-box;transform-origin:center}
 @keyframes spin{to{transform:rotate(360deg)}}
-.door-st,.light-st,.fan-st{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)}
+.door-st,.light-st,.fan-st{font-size:10.5px;font-weight:700;letter-spacing:.06em}
 .door-st{color:#e57373}
 #stage.open .door-st{color:#b6f5cd}
 .light-st{color:var(--mut)}
@@ -327,7 +320,7 @@ input{user-select:text;font-family:inherit}
 .lset .go{margin-left:auto;color:var(--dim)}
 
 /* ============ face module ============ */
-#sat-cam{left:352px;top:56px;width:244px}
+#sat-cam{left:892px;top:376px;width:236px}
 .cambox{position:relative;height:100px;margin:9px 16px 4px;border-radius:12px;
   background:radial-gradient(circle at 50% 42%,#101b2c,#070c16);overflow:hidden}
 .cambox .corner{position:absolute;width:22px;height:22px;border:0 solid var(--cyan);opacity:.9}
@@ -352,7 +345,8 @@ input{user-select:text;font-family:inherit}
 .camsub{padding:0 16px 10px;font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center}
 
 /* ============ context (drives the automations) ============ */
-#sat-ctx{left:352px;top:322px;width:244px}
+#sat-ctx{left:352px;top:376px;width:240px;height:290px}
+#sat-ctx .ctx-rows{gap:18px;padding-top:14px}
 .ctx-rows{padding:10px 16px 10px;display:flex;flex-direction:column;gap:12px}
 .ctx{display:flex;flex-direction:column;gap:7px}
 .ctx-l{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink)}
@@ -369,7 +363,7 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
   background:var(--cyan);box-shadow:0 0 8px rgba(62,224,255,.6);cursor:grab}
 
 /* ============ web dashboard ============ */
-#sat-web{left:620px;top:56px;width:484px}
+#sat-web{left:352px;top:56px;width:398px}
 .bw-bar{display:flex;align-items:center;gap:6px;margin:9px 16px 0;padding:6px 12px;border-radius:8px;
   background:rgba(148,170,220,.08);font-size:11.5px;color:var(--mut);letter-spacing:.05em}
 .bw-bar i{width:8px;height:8px;border-radius:50%;background:rgba(148,170,220,.3)}
@@ -402,12 +396,12 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 .hasw.on i{left:19px;background:#fff}
 
 /* ============ home assistant: web panel + companion app ============ */
-#sat-ha{left:1128px;top:56px;width:428px}
+#sat-ha{left:780px;top:56px;width:776px}
 #sat-ha .sat-head svg{color:#41bdf5}
 #sat-ha .ha-note{margin:9px 14px 2px}
 .ha-body{padding:8px 14px 12px}
 .ha-sec{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:4px 0 6px}
-.ha-ents{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ha-ents{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .hent{border:1px solid var(--line);border-radius:11px;background:rgba(148,170,220,.05);
   padding:8px 10px;display:flex;flex-direction:column;gap:7px}
 .hent .ht{display:flex;align-items:center;gap:7px;min-width:0}
@@ -423,7 +417,7 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 .hent .st{font-size:9.5px;letter-spacing:.05em;color:var(--mut);white-space:nowrap}
 .hent .st.on{color:#b6f5cd}
 .ha-sec.aut{margin-top:12px}
-.ha-autom{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ha-autom{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .hauto{border:1px solid var(--line);border-radius:9px;background:rgba(148,170,220,.05);
   padding:6px 9px;display:flex;align-items:center;gap:7px}
 .hauto .an{flex:1;min-width:0}
@@ -436,20 +430,20 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 .ha-note.show{display:block}
 .ha-note b{font-weight:600}
 /* ═══ HA companion app (vertical phone) ═══ */
-#sat-hamob{left:1128px;top:472px;width:428px;height:384px;display:flex;flex-direction:column}
-.hamob-wrap{flex:1;display:flex;justify-content:center;padding:4px 0 12px}
+#sat-hamob{left:1156px;top:376px;width:400px;height:480px;display:flex;flex-direction:column}
+.hamob-wrap{flex:1;display:flex;justify-content:center;padding:6px 0 14px}
 .ha-app{
-  width:280px;height:100%;border-radius:26px;position:relative;
+  width:300px;height:100%;border-radius:26px;position:relative;
   background:#0b101c;border:5px solid #1c2436;box-shadow:0 16px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;overflow:hidden;
 }
 .ha-app .notch{position:absolute;left:50%;top:6px;transform:translateX(-50%);width:56px;height:5px;
   border-radius:99px;background:#2a3550;z-index:5}
-.ha-app .ab{display:flex;align-items:center;gap:8px;padding:13px 13px 8px;background:#12203a;
+.ha-app .ab{display:flex;align-items:center;gap:8px;padding:16px 13px 9px;background:#12203a;
   font-size:11px;font-weight:600;letter-spacing:.04em}
 .ha-app .ab .dot{width:18px;height:18px;border-radius:50%;background:var(--grad);flex:none}
 .ha-app .ab small{margin-left:auto;font-size:8.5px;color:var(--ok);letter-spacing:.05em}
-.ha-arow{display:flex;align-items:center;gap:9px;margin:0 12px;padding:4.5px 2px;
+.ha-arow{display:flex;align-items:center;gap:9px;margin:0 13px;padding:5.5px 2px;
   border-bottom:1px solid rgba(148,170,220,.1);font-size:11px;color:var(--mut)}
 .ha-arow:last-child{border-bottom:0}
 .ha-arow .aic{width:22px;height:22px;border-radius:50%;background:rgba(65,189,245,.12);
@@ -501,20 +495,21 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
   background:var(--indigo);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
 
 /* ============ system log ============ */
-#sat-log{left:620px;top:568px;width:484px;height:288px;display:flex;flex-direction:column}
-/* ═══ ML agent — live on-chip SGD network ═══ */
-#sat-ml{left:352px;top:616px;width:244px;height:240px;display:flex;flex-direction:column}
-#nnviz{width:100%;height:auto;display:block;padding:4px 10px 0}
-.nnrow{display:flex;gap:7px;padding:2px 13px 0}
-.nnp{flex:1;border:1px solid var(--line);border-radius:9px;background:rgba(148,170,220,.05);padding:6px 9px}
-.nnp small{display:block;font-size:8.5px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
-.nnp b{display:block;font-size:11px;color:var(--cyan);font-weight:700;margin-top:2px;white-space:nowrap}
-.nnfoot{display:flex;align-items:center;gap:10px;padding:8px 13px 11px;margin-top:auto}
-.nnfoot .pill2{font-size:9.5px;padding:3px 12px;cursor:default}
-.nnfoot .pill2.auto{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.08)}
+#sat-log{left:782px;top:696px;width:374px;height:160px;display:flex;flex-direction:column}
+#sat-log .logbody{font-size:10px;line-height:1.75}
+/* ═══ ML agent — live on-chip SGD network (horizontal) ═══ */
+#sat-ml{left:352px;top:696px;width:400px;height:160px;display:flex;flex-direction:column}
+#nnviz{width:100%;height:76px;display:block;padding:2px 14px 0}
+.nnrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:2px 14px 0}
+.nnp{border:1px solid var(--line);border-radius:9px;background:rgba(148,170,220,.05);padding:5px 9px}
+.nnp small{display:block;font-size:8px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+.nnp b{display:block;font-size:11px;color:var(--cyan);font-weight:700;margin-top:1px;white-space:nowrap}
+.nnfoot{display:flex;align-items:center;gap:12px;padding:6px 14px 10px;margin-top:auto}
+.nnfoot .pill2{font-size:9px;padding:2px 10px;cursor:default}
 .nnfoot .loss{display:flex;align-items:center;gap:5px;font-family:ui-monospace,Consolas,monospace;
   font-size:8.5px;color:var(--dim)}
 .nnfoot .eta{margin-left:auto;font-family:ui-monospace,Consolas,monospace;font-size:9px;color:var(--dim);letter-spacing:.08em}
+.nnfoot .pill2.auto{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.08)}
 #sat-log .sat-head{gap:12px}
 .logfilters{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap}
 .lf{padding:3px 10px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:9px;
@@ -582,30 +577,31 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
         <div class="usbc"></div>
       </div>
     </div>
-    <div id="real" class="pop2" style="--d:1.15s">
-      <div class="rw rw-door">
-        <span class="rl">Solenoid lock · GPIO</span>
+    <div id="real" class="sat pop2" style="--d:1.15s">
+      <div class="sat-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/></svg>
+        Real world <span class="sub">GPIO · relay</span><i class="live"></i>
+      </div>
+      <div class="rwr">
         <div class="ibox"><div class="doorframe"><div class="door"></div><span class="bolt"></span></div></div>
-        <span class="door-st" id="door-st">LOCKED</span>
+        <div class="rt"><b>Solenoid lock</b><span class="door-st" id="door-st">LOCKED</span></div>
       </div>
-      <div class="rw rw-light clk" title="Toggle the real light">
-        <span class="rl">Ceiling light · relay</span>
+      <div class="rwr clk rw-light" title="Toggle the real light">
         <div class="ibox bulbwrap">
-          <span class="rays"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="rays"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="halo"></span>
-          <svg class="b" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path class="fillpart" d="M12 3a6 6 0 0 0-3.6 10.8c.7.55 1.1 1.3 1.1 2.2h5c0-.9.4-1.65 1.1-2.2A6 6 0 0 0 12 3Z"/><path d="M9 18h6M10 21h4"/></svg>
+          <svg class="b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path class="fillpart" d="M12 3a6 6 0 0 0-3.6 10.8c.7.55 1.1 1.3 1.1 2.2h5c0-.9.4-1.65 1.1-2.2A6 6 0 0 0 12 3Z"/><path d="M9 18h6M10 21h4"/></svg>
         </div>
-        <span class="light-st" id="light-st">OFF</span>
+        <div class="rt"><b>Ceiling light</b><span class="light-st" id="light-st">OFF</span></div>
       </div>
-      <div class="rw rw-fan clk" title="Toggle the real fan">
-        <span class="rl">Ceiling fan · GPIO</span>
+      <div class="rwr clk rw-fan" title="Toggle the real fan">
         <div class="ibox fanwrap">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
             <g class="blades"><path d="M12 10c0-4 2-6 4-6s3 2 1 4c-1.3 1.3-3 1.4-5 2Zm2 2c4 0 6 2 6 4s-2 3-4 1c-1.3-1.3-1.4-3-2-5Zm-2 2c0 4-2 6-4 6s-3-2-1-4c1.3-1.3 3-1.4 5-2Zm-2-2c-4 0-6-2-6-4s2-3 4-1c1.3 1.3 1.4 3 2 5Z"/></g>
             <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/>
           </svg>
         </div>
-        <span class="fan-st" id="fan-st">OFF</span>
+        <div class="rt"><b>Ceiling fan</b><span class="fan-st" id="fan-st">OFF</span></div>
       </div>
     </div>
 
@@ -761,16 +757,16 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10" r="1.4" fill="currentColor" stroke="none"/><path d="M9 15.2c.9.9 2 1.3 3 1.3s2.1-.4 3-1.3"/></svg>
         ML Agent <span class="sub">on-chip SGD</span><i class="live"></i>
       </div>
-      <svg id="nnviz" viewBox="0 0 212 120"></svg>
+      <svg id="nnviz" viewBox="0 0 400 100"></svg>
       <div class="nnrow">
         <div class="nnp"><small>Light head</small><b id="nn-light">—</b></div>
         <div class="nnp"><small>Fan head</small><b id="nn-fan">—</b></div>
         <div class="nnp"><small>Samples</small><b id="nn-samples">0</b></div>
+        <div class="nnp"><small>Mode</small><b id="nn-mode">SHADOW</b></div>
       </div>
       <div class="nnfoot">
-        <span class="pill2" id="nn-mode">SHADOW</span>
         <span class="loss">loss<svg width="56" height="20"><polyline id="nn-loss-line" fill="none" stroke="#4ade80" stroke-width="1.4"/></svg></span>
-        <span class="eta">η=0.08 · NVS</span>
+        <span class="eta">η=0.08 · updates on every manual action · persisted to NVS</span>
       </div>
     </div>
 
@@ -963,18 +959,17 @@ function publish(topic,val,src){
 
 /* ═════════ wires ═════════ */
 const WIRES=[
-  {id:'w-lcd', d:'M 322,307 C 460,307 560,312 618,378', cls:'local',
-   label:'8-bit parallel · I²C · PWM', lx:470, ly:307, dur:2.6, del:0},
-  {id:'w-cam', d:'M 598,160 C 612,230 618,290 626,352', cls:'local', dur:2.2, del:.5},
-  {id:'w-ctx', d:'M 598,452 C 606,448 612,442 618,436', cls:'local', dur:2.2, del:1},
-  {id:'w-ml',  d:'M 598,704 C 606,640 614,530 622,456', cls:'local', dur:2.2, del:1.3},
-  {id:'w-gpio1',d:'M 700,448 L 698,472', cls:'local gpio', dur:1.6, del:.2},
-  {id:'w-gpio2',d:'M 862,448 L 862,472', cls:'local gpio', dur:1.6, del:.8},
-  {id:'w-gpio3',d:'M 896,448 C 960,456 1000,462 1026,472', cls:'local gpio', dur:1.6, del:1.2},
-  {id:'w-log', d:'M 800,540 L 800,566', cls:'local', dur:1.4, del:.2},
-  {id:'w-web', d:'M 898,358 C 940,350 980,338 1004,328', cls:'net', dur:1.4, del:.3},
-  {id:'w-ha',  d:'M 900,412 C 990,402 1060,370 1126,310', cls:'net', dur:1.7, del:.9},
-  {id:'w-bale',d:'M 640,446 C 560,520 430,560 324,660', cls:'net', dur:2.3, del:1.4},
+  {id:'w-lcd', d:'M 322,300 C 336,360 480,366 596,368 C 606,370 614,382 618,398', cls:'local',
+   label:'8-bit parallel · I²C · PWM', lx:470, ly:362, dur:2.6, del:0},
+  {id:'w-cam', d:'M 890,502 C 894,478 897,458 900,438', cls:'local', dur:2.2, del:.5},
+  {id:'w-ctx', d:'M 594,454 C 604,450 612,444 618,436', cls:'local', dur:2.2, del:1},
+  {id:'w-ml',  d:'M 640,450 C 560,606 500,682 384,696', cls:'local', dur:2.2, del:1.3},
+  {id:'w-bale',d:'M 622,434 C 560,590 470,668 324,682', cls:'net', dur:2.3, del:1.4},
+  {id:'w-gpio1',d:'M 690,448 L 690,474', cls:'local gpio', dur:1.6, del:.2},
+  {id:'w-gpio2',d:'M 780,448 L 780,474', cls:'local gpio', dur:1.6, del:.8},
+  {id:'w-gpio3',d:'M 850,448 L 850,474', cls:'local gpio', dur:1.6, del:1.2},
+  {id:'w-log', d:'M 740,668 C 790,678 820,686 848,694', cls:'local', dur:1.4, del:.2},
+  {id:'w-web', d:'M 898,358 C 840,352 770,348 726,346', cls:'net', dur:1.4, del:.3},
 ];
 function buildWires(){
   const NS='http://www.w3.org/2000/svg', svg=$('#wires');
@@ -1215,21 +1210,21 @@ const feats=()=>{const t=S.temp/32,l=S.lux/400,p=S.presence?1:0;
 function buildNN(){       // horizontal layout: 12 inputs on top → 2 sigmoid heads below
   const NS='http://www.w3.org/2000/svg', svg=$('#nnviz');
   const mk=(t,at)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);return e;};
-  const cap=mk('text',{x:106,y:9,'text-anchor':'middle',fill:'#5d6a83','font-size':7.5,'letter-spacing':2});
+  const cap=mk('text',{x:200,y:10,'text-anchor':'middle',fill:'#5d6a83','font-size':8,'letter-spacing':2.2});
   cap.textContent='12 CONTEXT FEATURES'; svg.appendChild(cap);
-  const outs=[[58,'Light'],[154,'Fan']], YIN=26, YOUT=98;
+  const outs=[[110,'Light'],[290,'Fan']], YIN=34, YOUT=76;
   for(let i=0;i<12;i++){
-    const x=10+i*17.4;
-    svg.appendChild(mk('circle',{cx:x,cy:YIN,r:3,fill:'#0a1322',stroke:'#3ee0ff','stroke-width':1.2}));
+    const x=14+i*33.4;
+    svg.appendChild(mk('circle',{cx:x,cy:YIN,r:3.4,fill:'#0a1322',stroke:'#3ee0ff','stroke-width':1.2}));
     [0,1].forEach(j=>{
       const ox=outs[j][0];
       svg.appendChild(mk('path',{id:'nnw'+j+i,fill:'none',
-        d:`M ${x} ${YIN+4} C ${x} 58, ${ox} 52, ${ox} ${YOUT-9}`}));
+        d:`M ${x} ${YIN+4} C ${x} 56, ${ox} 52, ${ox} ${YOUT-8}`}));
     });
   }
   outs.forEach(([ox,lab])=>{
     svg.appendChild(mk('circle',{cx:ox,cy:YOUT,r:6.5,fill:'#0a1322',stroke:'#7c8cff','stroke-width':2}));
-    const t=mk('text',{x:ox,y:YOUT+20,'text-anchor':'middle',fill:'#eef3fb','font-size':10,'font-weight':600});
+    const t=mk('text',{x:ox,y:YOUT+21,'text-anchor':'middle',fill:'#eef3fb','font-size':10,'font-weight':600});
     t.textContent=lab; svg.appendChild(t);
   });
 }
