@@ -199,6 +199,12 @@ idf.py build                 # firmware picks up the new weights
 
 ---
 
+## License
+
+This project is proprietary — **all rights reserved**. See [LICENSE](LICENSE).
+Reuse, redistribution, or derivative work is not permitted without written permission.
+For inquiries: mohammadsoroushrabiei@gmail.com
+
 <div align="center">
 
 <img src="docs/proposal/logo_iut.png" width="64" alt="Isfahan University of Technology logo"/><br>
