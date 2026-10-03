@@ -121,7 +121,7 @@ input{user-select:text;font-family:inherit}
   background:rgba(6,10,20,.85);border:1px solid var(--line);border-radius:6px;padding:3px 8px;transform:translate(-50%,-50%)}
 @keyframes labelIn{from{opacity:0;transform:translate(-50%,-30%)}to{opacity:1;transform:translate(-50%,-50%)}}
 .broker{
-  position:absolute;left:1016px;top:322px;width:64px;height:64px;border-radius:50%;z-index:4;
+  position:absolute;left:1020px;top:380px;width:64px;height:64px;border-radius:50%;z-index:4;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   background:radial-gradient(circle at 34% 30%,#1c2942,#0c1220);border:1.5px solid rgba(124,140,255,.5);
   box-shadow:0 0 24px rgba(124,140,255,.25);transition:all .4s;
@@ -185,33 +185,49 @@ input{user-select:text;font-family:inherit}
   background:repeating-linear-gradient(90deg,#d7e2f2 0 4px,#131c2c 4px 8px);opacity:.7}
 .usbc{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);width:42px;height:11px;
   border-radius:4px 4px 0 0;background:linear-gradient(#aeb9c9,#5f6b7d)}
-.btn-chip{position:absolute;width:14px;height:14px;border-radius:3px;background:#232f45;border:1px solid #33415c}
-.b-boot{right:62px;top:58px}.b-rst{right:62px;top:80px}
-/* the real world: solenoid lock + relay light */
-#real{position:absolute;left:620px;top:524px;width:360px;height:92px;z-index:6}
+/* the real world: solenoid lock + relay light — distinct on/off shapes */
+#real{position:absolute;left:620px;top:532px;width:360px;height:88px;z-index:6}
 .rw{position:absolute;top:0;height:88px;border:1px solid var(--line);border-radius:14px;
-  background:rgba(14,20,36,.75);display:flex;align-items:center;justify-content:center;gap:12px}
+  background:rgba(14,20,36,.75);display:flex;align-items:center;justify-content:center;gap:14px;
+  transition:border-color .5s,box-shadow .5s}
 .rw .rl{position:absolute;left:12px;top:7px;font-size:9px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
 .rw-door{left:0;width:172px}
 .rw-light{right:0;width:172px}
-.door{position:relative;width:64px;height:60px;border-radius:6px 10px 10px 6px;
-  background:linear-gradient(160deg,#2a3550,#1a2438);border:2px solid rgba(148,170,220,.35);
-  transition:box-shadow .5s}
-.door::before{content:"";position:absolute;right:9px;top:22px;width:5px;height:16px;border-radius:3px;
-  background:#8fa0bd}
-.bolt{position:absolute;right:-11px;top:26px;width:14px;height:8px;border-radius:2px;
-  background:linear-gradient(#e8eef7,#9fb0c9);border:1px solid #5d6a83;transition:transform .5s var(--ease)}
-#stage.open .bolt{transform:translateX(11px);background:linear-gradient(#b6f5cd,#4caf50);border-color:#2e7d32}
-#stage.open .door{box-shadow:0 0 22px rgba(76,175,80,.35)}
-.door-st{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--mut)}
+.doorframe{position:relative;width:74px;height:62px;perspective:220px}
+.door{position:absolute;inset:0;border-radius:5px 9px 9px 5px;transform-origin:left center;
+  background:linear-gradient(160deg,#3a4663,#232e48);border:2px solid rgba(148,170,220,.4);
+  display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  transition:transform .8s var(--ease),background .5s;transform-style:preserve-3d}
+.door::before{content:"";width:5px;height:16px;border-radius:3px;background:#8fa0bd}
+.bolt{position:absolute;left:68px;top:27px;width:13px;height:8px;border-radius:2px;
+  background:linear-gradient(#ff8a80,#c62828);border:1px solid #8e1f1f;transition:all .5s var(--ease)}
+#stage.open .door{transform:rotateY(58deg);background:linear-gradient(160deg,#2c4a3c,#1c3329)}
+#stage.open .bolt{opacity:0;transform:translateX(10px)}
+#stage.open .doorframe{filter:drop-shadow(0 0 12px rgba(76,175,80,.45))}
+#stage.open .rw-door{border-color:rgba(76,175,80,.5)}
+.door-st{font-size:12.5px;font-weight:700;letter-spacing:.1em;color:#e57373}
 #stage.open .door-st{color:#b6f5cd}
-.bulbwrap{position:relative;width:56px;height:60px;display:flex;align-items:center;justify-content:center}
-.bulbwrap svg{transition:filter .4s;color:#77839c}
-.bulbwrap .halo{position:absolute;width:56px;height:56px;border-radius:50%;
-  background:radial-gradient(circle,rgba(255,193,7,.55),transparent 70%);opacity:0;transition:opacity .5s}
-#stage.lit .bulbwrap svg{color:#ffd54f;filter:drop-shadow(0 0 10px rgba(255,193,7,.8))}
+.bulbwrap{position:relative;width:58px;height:62px;display:flex;align-items:center;justify-content:center}
+.bulbwrap svg.b{transition:filter .4s,color .4s;color:#5d6a83}
+.bulbwrap svg.b .fillpart{fill:transparent;transition:fill .4s}
+.bulbwrap .halo{position:absolute;width:60px;height:60px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,193,7,.6),transparent 70%);opacity:0;transition:opacity .5s}
+.bulbwrap .rays{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none}
+.bulbwrap .rays i{position:absolute;left:50%;top:50%;width:2.5px;height:7px;border-radius:2px;
+  background:#ffd54f;transform-origin:50% 0}
+.bulbwrap .rays i:nth-child(1){transform:translate(-50%,-28px) rotate(0deg)}
+.bulbwrap .rays i:nth-child(2){transform:translate(-50%,-27px) rotate(45deg)}
+.bulbwrap .rays i:nth-child(3){transform:translate(-50%,-27px) rotate(-45deg)}
+.bulbwrap .rays i:nth-child(4){transform:translate(-50%,-25px) rotate(90deg)}
+.bulbwrap .rays i:nth-child(5){transform:translate(-50%,-25px) rotate(-90deg)}
+.bulbwrap .rays i:nth-child(6){transform:translate(-50%,-22px) rotate(135deg)}
+.bulbwrap .rays i:nth-child(7){transform:translate(-50%,-22px) rotate(-135deg)}
+#stage.lit .bulbwrap svg.b{color:#ffd54f;filter:drop-shadow(0 0 10px rgba(255,193,7,.8))}
+#stage.lit .bulbwrap svg.b .fillpart{fill:rgba(255,213,79,.45)}
 #stage.lit .bulbwrap .halo{opacity:1}
-.light-st{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--mut)}
+#stage.lit .bulbwrap .rays{opacity:1}
+#stage.lit .rw-light{border-color:rgba(255,193,7,.45)}
+.light-st{font-size:12.5px;font-weight:700;letter-spacing:.1em;color:var(--mut)}
 #stage.lit .light-st{color:#ffe082}
 
 /* ============ LCD — faithful replica of the firmware UI ============ */
@@ -301,7 +317,7 @@ input{user-select:text;font-family:inherit}
 .lset .go{margin-left:auto;color:var(--dim)}
 
 /* ============ face module ============ */
-#sat-cam{left:352px;top:64px;width:244px}
+#sat-cam{left:352px;top:56px;width:244px}
 .cambox{position:relative;height:100px;margin:9px 16px 4px;border-radius:12px;
   background:radial-gradient(circle at 50% 42%,#101b2c,#070c16);overflow:hidden}
 .cambox .corner{position:absolute;width:22px;height:22px;border:0 solid var(--cyan);opacity:.9}
@@ -326,21 +342,22 @@ input{user-select:text;font-family:inherit}
 .camsub{padding:0 16px 10px;font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center}
 
 /* ============ context (drives the automations) ============ */
-#sat-ctx{left:352px;top:330px;width:244px}
-.ctx-rows{padding:10px 16px 12px;display:flex;flex-direction:column;gap:11px}
-.ctx-row{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--mut)}
-.ctx-row b{width:74px;flex:none;font-weight:600;color:var(--ink);font-size:12px}
-.ctx-row .val{margin-left:auto;font-size:12px;color:var(--cyan);font-weight:700;white-space:nowrap}
-.pill2{display:inline-flex;padding:4px 14px;border-radius:999px;cursor:pointer;font-family:inherit;
+#sat-ctx{left:352px;top:354px;width:244px}
+.ctx-rows{padding:10px 16px 10px;display:flex;flex-direction:column;gap:12px}
+.ctx{display:flex;flex-direction:column;gap:7px}
+.ctx-l{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink)}
+.ctx-l b{font-weight:600}
+.ctx-l .val{font-size:12px;color:var(--cyan);font-weight:700;white-space:nowrap}
+.pill2{display:inline-flex;padding:4px 16px;border-radius:999px;cursor:pointer;font-family:inherit;
   font-size:11px;font-weight:700;letter-spacing:.12em;border:1px solid var(--line);color:var(--mut);
   background:rgba(148,170,220,.08);transition:all .3s}
 .pill2.home{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.1)}
 .pill2.away{color:#ffc46b;border-color:rgba(255,152,0,.5);background:rgba(255,152,0,.08)}
-input.ctxs{-webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:99px;outline:none;cursor:pointer;
+input.ctxs{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer;
   background:rgba(148,170,220,.18)}
 input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
   background:var(--cyan);box-shadow:0 0 8px rgba(62,224,255,.6);cursor:grab}
-.ctx-note{margin:0 16px 12px;padding:8px 11px;border-radius:9px;border:1px dashed rgba(62,224,255,.3);
+.ctx-note{margin:2px 16px 12px;padding:8px 11px;border-radius:9px;border:1px dashed rgba(62,224,255,.3);
   font-size:10px;color:var(--dim);line-height:1.6;letter-spacing:.03em}
 
 /* ============ web dashboard ============ */
@@ -349,18 +366,19 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
   background:rgba(148,170,220,.08);font-size:11.5px;color:var(--mut);letter-spacing:.05em}
 .bw-bar i{width:8px;height:8px;border-radius:50%;background:rgba(148,170,220,.3)}
 .bw-bar .url{margin-left:8px;flex:1;text-align:center}
-.wtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:11px 16px 4px}
-.wtile{border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;
-  display:flex;flex-direction:column;gap:7px;align-items:flex-start;padding:10px 12px;font-family:inherit;
+.wtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:10px 16px 4px}
+.wtile{border:1px solid var(--line);border-radius:11px;background:var(--card);cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;font-family:inherit;
   color:var(--ink);transition:all .25s;text-align:left}
 .wtile:hover{border-color:rgba(62,224,255,.4);background:rgba(62,224,255,.06)}
-.wtile b{font-size:12.5px;font-weight:600;white-space:nowrap}
+.wtile b{font-size:12px;font-weight:600;white-space:nowrap}
+.wtile .val{font-size:12px;font-weight:700;color:var(--cyan);white-space:nowrap}
+.wtile.dis{cursor:default}
 .wbadge{padding:3px 10px;border-radius:999px;font-size:10px;letter-spacing:.14em;font-weight:700;
-  color:var(--mut);border:1px solid var(--line)}
+  color:var(--mut);border:1px solid var(--line);flex:none}
 .wbadge.on{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.12);box-shadow:0 0 16px rgba(74,222,128,.25)}
 .wbadge.cy{color:var(--cyan);border-color:rgba(62,224,255,.45);background:rgba(62,224,255,.08)}
 .wbadge.gr{color:#b6f5cd;border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.12)}
-.wtile .val{font-size:12.5px;font-weight:700;color:var(--cyan);white-space:nowrap}
 .wrow{display:flex;align-items:center;gap:12px;padding:9px 16px 5px;font-size:11.5px;color:var(--mut)}
 .wrow .sw-name{width:110px;font-size:11px;color:var(--ink);font-weight:600}
 .wchart{margin:7px 16px 13px;height:44px;border-radius:10px;border:1px solid var(--line);
@@ -380,64 +398,64 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 #sat-ha .sat-head svg{color:#41bdf5}
 .ha-body{display:flex;gap:12px;padding:10px 14px 13px}
 .ha-panel{flex:1;min-width:0}
-.ha-ov{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:1px 0 7px}
-.ha-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.hcard{border:1px solid var(--line);border-radius:11px;background:var(--card);cursor:pointer;
-  padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-family:inherit;color:var(--ink);
-  text-align:left;transition:all .25s}
-.hcard:hover{border-color:rgba(65,189,245,.45)}
-.hcard .hc-top{display:flex;align-items:center;gap:6px}
-.hcard .hc-ic{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:10.5px;background:rgba(65,189,245,.12);flex:none}
-.hcard .hc-ic.orange{background:rgba(255,152,0,.14)}
-.hcard .hc-ic.cyan{background:rgba(0,188,212,.14)}
-.hcard .hc-ic.green{background:rgba(76,175,80,.14)}
-.hcard b{font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hcard .hc-st{font-size:9.5px;letter-spacing:.08em;color:var(--mut);text-transform:uppercase}
-.hcard .hc-st.on{color:#b6f5cd}
-.ha-sec{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:10px 0 6px}
-.ha-autom{display:flex;flex-direction:column;gap:5px}
-.hauto{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:9px;
+.ha-sec{font-size:10px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin:2px 0 5px}
+.ha-ents{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
+.hent{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:10px;
+  background:rgba(148,170,220,.05);border:1px solid var(--line)}
+.hent .hic{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;background:rgba(65,189,245,.12);flex:none}
+.hent .hic.orange{background:rgba(255,152,0,.14)}
+.hent .hic.cyan{background:rgba(0,188,212,.14)}
+.hent .hic.green{background:rgba(76,175,80,.14)}
+.hent .eid{flex:1;min-width:0;font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hent .eid b{color:var(--ink);font-weight:600}
+.hent button.hent-click{cursor:pointer}
+.hent .st{font-size:10px;letter-spacing:.08em;color:var(--mut);text-transform:uppercase;flex:none}
+.hent .st.on{color:#b6f5cd}
+.ha-sec+.ha-autom{margin-bottom:0}
+.ha-autom{display:flex;flex-direction:column;gap:4px}
+.hauto{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;
   background:rgba(148,170,220,.05);border:1px solid var(--line)}
 .hauto .an{flex:1;min-width:0}
 .hauto .an b{display:block;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hauto .an small{display:block;font-size:8.5px;color:var(--dim);letter-spacing:.02em}
-.hauto .fire{font-size:8.5px;color:var(--dim);letter-spacing:.06em;white-space:nowrap}
+.hauto .fire{font-size:8.5px;color:var(--dim);letter-spacing:.06em;white-space:nowrap;flex:none}
 .hauto .fire.recent{color:var(--ok)}
 .hauto .hasw{transform:scale(.8);transform-origin:right center}
-.ha-note{margin-top:8px;padding:7px 10px;border-radius:9px;border:1px solid rgba(255,82,82,.4);
-  background:rgba(255,82,82,.07);color:#ffcdd2;font-size:10px;line-height:1.5;display:none}
+.ha-note{margin-top:9px;padding:7px 10px;border-radius:9px;border:1px solid rgba(255,82,82,.4);
+  background:rgba(255,82,82,.07);color:#ffcdd2;font-size:10px;line-height:1.5;display:none;direction:rtl}
 .ha-note.show{display:block}
 .ha-note b{font-weight:600}
 /* companion app phone */
 .ha-app{
-  width:136px;height:404px;border-radius:20px;flex:none;
+  width:148px;height:100%;min-height:330px;border-radius:20px;flex:none;
   background:#0b101c;border:5px solid #1c2436;box-shadow:0 16px 40px rgba(0,0,0,.5);
   display:flex;flex-direction:column;overflow:hidden;
 }
-.ha-app .ab{display:flex;align-items:center;gap:7px;padding:9px 10px;background:#12203a;
-  font-size:10px;font-weight:600;letter-spacing:.04em}
-.ha-app .ab .dot{width:16px;height:16px;border-radius:50%;background:var(--grad);flex:none}
-.ha-hero{margin:9px 9px 0;border-radius:11px;padding:9px 11px;
+.ha-app .ab{display:flex;align-items:center;gap:7px;padding:10px 11px;background:#12203a;
+  font-size:10.5px;font-weight:600;letter-spacing:.04em}
+.ha-app .ab .dot{width:17px;height:17px;border-radius:50%;background:var(--grad);flex:none}
+.ha-hero{margin:10px 10px 0;border-radius:11px;padding:10px 12px;
   background:linear-gradient(140deg,#1d3a5f,#12314f);border:1px solid rgba(65,189,245,.3)}
 .ha-hero small{font-size:8.5px;letter-spacing:.16em;color:#8fc3ee;text-transform:uppercase}
-.ha-hero .v{font-size:19px;font-weight:700;color:#d9efff;line-height:1.2}
+.ha-hero .v{font-size:20px;font-weight:700;color:#d9efff;line-height:1.25}
 .ha-hero .s{font-size:9px;color:#8fc3ee}
-.ha-arow{display:flex;align-items:center;gap:7px;margin:0 9px;padding:7.5px 2px;
-  border-bottom:1px solid rgba(148,170,220,.1);font-size:10.5px;color:var(--mut)}
-.ha-arow .aic{width:20px;height:20px;border-radius:50%;background:rgba(65,189,245,.12);
-  display:flex;align-items:center;justify-content:center;font-size:10px;flex:none}
+.ha-arow{display:flex;align-items:center;gap:8px;margin:0 10px;padding:10px 2px;
+  border-bottom:1px solid rgba(148,170,220,.1);font-size:11.5px;color:var(--mut)}
+.ha-arow:last-child{border-bottom:0}
+.ha-arow .aic{width:23px;height:23px;border-radius:50%;background:rgba(65,189,245,.12);
+  display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
 .ha-arow span{flex:1}
-.ha-arow .hasw{transform:scale(.85);transform-origin:right center}
-.ha-arow .st{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.ha-arow .hasw{transform:scale(.95);transform-origin:right center}
+.ha-arow .st{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
 .ha-arow .st.on{color:#b6f5cd}
 
 /* ============ bale phone (full bot) ============ */
-#sat-bale{left:1206px;top:512px;width:282px;padding:8px;border-radius:34px;
+#sat-bale{left:1210px;top:480px;width:300px;padding:8px;border-radius:34px;
   background:linear-gradient(#1a2233,#0d1322);border:1px solid rgba(148,170,220,.3);
   box-shadow:0 30px 70px rgba(0,0,0,.55), inset 0 0 0 3px #0a0f1a}
 .ph-screen{position:relative;border-radius:26px;overflow:hidden;background:#0d1424;
-  display:flex;flex-direction:column;height:344px}
+  display:flex;flex-direction:column;height:360px}
 .ph-notch{position:absolute;left:50%;top:7px;transform:translateX(-50%);width:64px;height:6px;
   border-radius:99px;background:#2a3550;z-index:5}
 .ph-appbar{display:flex;align-items:center;gap:9px;padding:20px 12px 9px;background:#141d33;
@@ -474,7 +492,7 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
   background:var(--indigo);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
 
 /* ============ system log ============ */
-#sat-log{left:352px;top:640px;width:768px;height:216px;display:flex;flex-direction:column}
+#sat-log{left:352px;top:650px;width:768px;height:206px;display:flex;flex-direction:column}
 #sat-log .sat-head{gap:12px}
 .logfilters{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap}
 .lf{padding:3px 10px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:9px;
@@ -493,7 +511,7 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 .tline .v{color:var(--mut)}
 
 /* ============ legend & credits ============ */
-#legend{left:44px;top:622px;width:276px;padding:14px 18px;font-size:11.5px;color:var(--mut);line-height:1.95}
+#legend{left:44px;top:624px;width:276px;height:232px;padding:16px 18px;font-size:11.5px;color:var(--mut);line-height:2}
 #legend h5{font-size:10px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;margin-bottom:5px;font-weight:600}
 #legend .li{display:flex;align-items:center;gap:10px}
 #legend .sw{width:26px;height:0;border-top:1.6px dashed rgba(124,170,230,.55);flex:none}
@@ -504,8 +522,7 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
 #legend .cr{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
   font-size:10.5px;letter-spacing:.05em;color:var(--dim)}
 #legend .cr b{color:var(--mut);font-weight:600}
-#hint2{position:absolute;left:44px;bottom:16px;z-index:30;font-size:10px;letter-spacing:.14em;
-  color:#3d4a63;text-transform:uppercase}
+#legend .tip{margin-top:6px;font-size:10px;letter-spacing:.12em;color:#4d5b78;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -535,20 +552,21 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
         <div class="antenna"></div>
         <div class="shield"><i>ESP32-S3</i><u>N16R8</u></div>
         <div class="pcbname">ESP32-S3-DEVKITC-1</div>
-        <div class="btn-chip b-boot"></div><div class="btn-chip b-rst"></div>
         <div class="usbc"></div>
       </div>
     </div>
     <div id="real" class="pop2" style="--d:1.15s">
       <div class="rw rw-door">
         <span class="rl">Solenoid lock · GPIO</span>
-        <div class="door"><span class="bolt"></span></div>
+        <div class="doorframe"><div class="door"></div><span class="bolt"></span></div>
         <span class="door-st" id="door-st">LOCKED</span>
       </div>
       <div class="rw rw-light">
         <span class="rl">Ceiling light · relay</span>
-        <div class="bulbwrap"><span class="halo"></span>
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.55 1.1 1.3 1.1 2.2h5c0-.9.4-1.65 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>
+        <div class="bulbwrap">
+          <span class="rays"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="halo"></span>
+          <svg class="b" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path class="fillpart" d="M12 3a6 6 0 0 0-3.6 10.8c.7.55 1.1 1.3 1.1 2.2h5c0-.9.4-1.65 1.1-2.2A6 6 0 0 0 12 3Z"/><path d="M9 18h6M10 21h4"/></svg>
         </div>
         <span class="light-st" id="light-st">OFF</span>
       </div>
@@ -686,16 +704,16 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
         Context <span class="sub">drives automations</span><i class="live"></i>
       </div>
       <div class="ctx-rows">
-        <div class="ctx-row"><b>Presence</b>
-          <button class="pill2 home" id="ctx-pres">🏠 HOME</button>
+        <div class="ctx">
+          <div class="ctx-l"><b>Presence</b><button class="pill2 home" id="ctx-pres">🏠 HOME</button></div>
         </div>
-        <div class="ctx-row"><b>Ambient lux</b>
+        <div class="ctx">
+          <div class="ctx-l"><b>Ambient lux</b><span class="val" id="ctx-lux-v">45 lx</span></div>
           <input type="range" class="ctxs" id="ctx-lux" min="5" max="400" value="45">
-          <span class="val" id="ctx-lux-v">45 lx</span>
         </div>
-        <div class="ctx-row"><b>Temperature</b>
+        <div class="ctx">
+          <div class="ctx-l"><b>Temperature</b><span class="val" id="ctx-temp-v">23.4 °C</span></div>
           <input type="range" class="ctxs" id="ctx-temp" min="20" max="32" step="0.1" value="23.4">
-          <span class="val" id="ctx-temp-v">23.4 °C</span>
         </div>
       </div>
       <div class="ctx-note">Move lux &lt; 150 while HOME → Auto Light fires · temp &gt; 27 → Auto Fan · go AWAY → Away Mode · wrong code → Security Alert.</div>
@@ -712,14 +730,15 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
         <button class="wtile" id="w-light"><b>💡 Light</b><span class="wbadge" id="wb-light">OFF</span></button>
         <button class="wtile" id="w-fan"><b>🌀 Fan</b><span class="wbadge" id="wb-fan">OFF</span></button>
         <button class="wtile" id="w-lock"><b>🔒 Lock</b><span class="wbadge" id="wb-lock">LOCKED</span></button>
-        <div class="wtile"><b>🌡 Climate</b><span class="val" id="wb-clim">23.4°C · 42%</span></div>
+        <div class="wtile dis"><b>🌡 Temp</b><span class="val" id="wb-temp">23.4°C</span></div>
+        <div class="wtile dis"><b>💧 Humidity</b><span class="val" id="wb-hum">42%</span></div>
+        <div class="wtile dis"><b>🎈 Pressure</b><span class="val" id="wb-press">1013</span></div>
       </div>
       <div class="wrow">
         <span class="sw-name">🧠 ML autonomy</span>
         <button class="hasw" id="w-ml"><i></i></button>
-        <span class="sw-name" style="width:auto">☀ Backlight</span>
-        <input type="range" class="ctxs" id="w-bright" min="10" max="100" value="78">
-        <span class="val" id="w-bright-v">78%</span>
+        <span style="flex:1"></span>
+        <span id="wb-ml-t" style="font-size:10.5px;letter-spacing:.1em;color:var(--mut);text-transform:uppercase">Shadow</span>
       </div>
       <div class="wchart"><svg id="wchart" viewBox="0 0 452 44" preserveAspectRatio="none">
         <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
@@ -739,12 +758,12 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
       </div>
       <div class="ha-body">
         <div class="ha-panel">
-          <div class="ha-ov">Overview</div>
-          <div class="ha-cards">
-            <button class="hcard" id="hp-light"><span class="hc-top"><span class="hc-ic orange">💡</span><b>light.bedroom</b></span><span class="hc-st" id="hp-light-t">Off</span></button>
-            <button class="hcard" id="hp-fan"><span class="hc-top"><span class="hc-ic cyan">🌀</span><b>fan.living_room</b></span><span class="hc-st" id="hp-fan-t">Off</span></button>
-            <div class="hcard"><span class="hc-top"><span class="hc-ic green">🔒</span><b>lock.front_door</b></span><span class="hc-st" id="hp-lock-t">Locked</span></div>
-            <div class="hcard"><span class="hc-top"><span class="hc-ic">🌡</span><b>sensor.climate</b></span><span class="hc-st" id="hp-clim-t">23.4 °C · 42 %</span></div>
+          <div class="ha-sec">Entities</div>
+          <div class="ha-ents">
+            <div class="hent"><span class="hic orange">💡</span><span class="eid"><b>light</b>.bedroom</span><span class="st" id="hp-light-t">Off</span><button class="hasw" id="hp-light"><i></i></button></div>
+            <div class="hent"><span class="hic cyan">🌀</span><span class="eid"><b>fan</b>.living_room</span><span class="st" id="hp-fan-t">Off</span><button class="hasw" id="hp-fan"><i></i></button></div>
+            <div class="hent"><span class="hic green">🔒</span><span class="eid"><b>lock</b>.front_door</span><span class="st" id="hp-lock-t">Locked</span></div>
+            <div class="hent"><span class="hic">🌡</span><span class="eid"><b>sensor</b>.climate</span><span class="st" id="hp-clim-t">23.4 °C · 42 %</span></div>
           </div>
           <div class="ha-sec">Automations</div>
           <div class="ha-autom" id="ha-autom"></div>
@@ -795,8 +814,8 @@ input.ctxs::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
       <div class="li"><span class="sw"></span> MQTT over WiFi</div>
       <div class="li"><span class="dots"><i style="background:#3ee0ff"></i><i style="background:#7c8cff"></i><i style="background:#41bdf5"></i><i style="background:#c58cff"></i><i style="background:#4ade80"></i><i style="background:#ff9800"></i></span> log colour = source</div>
       <div class="cr"><b>Mohammad Soroush Rabiei</b> · Isfahan University of Technology</div>
+      <div class="tip">Everything clickable · demo code 1234</div>
     </div>
-    <div id="hint2">Everything clickable · demo code 1234</div>
 
     <!-- ═══ system log ═══ -->
     <div id="sat-log" class="sat pop2" style="--d:1.35s">
@@ -849,6 +868,8 @@ function set(k,v,src='lcd'){
                ml:'home/ml/mode',wifi:null,mqtt:null,bright:'display/brightness',
                presence:'home/presence',lux:'home/lux',temp:'home/climate'}[k];
   if(topic && k!=='lux' && k!=='temp') publish(topic, fmt(k,v), src);
+  if(k==='light') stage.classList.toggle('lit',v);
+  if(k==='unlocked') stage.classList.toggle('open',v);
   if(k==='wifi'){ stage.classList.toggle('offline',!v); log('network/wifi',v?'connected · '+S.ssid:'disconnected','sys'); }
   if(k==='mqtt'){ stage.classList.toggle('nomqtt',!v); log('network/mqtt',v?'connected':'disconnected — Bale bot keeps working','sys'); }
   if(k==='presence'){ log('home/presence',v?'HOME':'AWAY','sensor'); if(oldPresence&&!v) autoFire('away'); }
@@ -878,17 +899,17 @@ function publish(topic,val,src){
 
 /* ═════════ wires ═════════ */
 const WIRES=[
-  {id:'w-lcd', d:'M 322,318 C 460,318 560,320 618,338', cls:'local',
-   label:'8-bit parallel · I²C · PWM', lx:470, ly:316, dur:2.6, del:0},
-  {id:'w-cam', d:'M 598,184 C 612,242 618,292 624,336', cls:'local', dur:2.2, del:.5},
-  {id:'w-ctx', d:'M 598,462 C 606,452 612,444 620,436', cls:'local', dur:2.2, del:1},
-  {id:'w-gpio1',d:'M 700,482 L 700,522', cls:'local gpio', dur:1.6, del:.2},
-  {id:'w-gpio2',d:'M 900,482 L 900,522', cls:'local gpio', dur:1.6, del:.8},
-  {id:'w-log', d:'M 980,446 C 1012,486 1042,556 1054,638', cls:'local', dur:1.8, del:.4},
-  {id:'w-up',  d:'M 980,400 C 996,392 1004,380 1014,368', cls:'net', dur:1.6, del:0},
-  {id:'w-web', d:'M 1048,320 L 1048,302', cls:'net', dur:1.2, del:.3},
-  {id:'w-ha',  d:'M 1080,354 C 1100,362 1118,378 1134,394', cls:'net', dur:1.7, del:.9},
-  {id:'w-bale',d:'M 1048,386 C 1060,478 1130,588 1202,656', cls:'net', dur:2.3, del:1.4},
+  {id:'w-lcd', d:'M 322,318 C 460,318 560,322 618,358', cls:'local',
+   label:'8-bit parallel · I²C · PWM', lx:470, ly:318, dur:2.6, del:0},
+  {id:'w-cam', d:'M 598,160 C 612,230 618,300 626,356', cls:'local', dur:2.2, del:.5},
+  {id:'w-ctx', d:'M 598,472 C 606,466 612,458 618,450', cls:'local', dur:2.2, del:1},
+  {id:'w-gpio1',d:'M 700,504 L 700,530', cls:'local gpio', dur:1.6, del:.2},
+  {id:'w-gpio2',d:'M 900,504 L 900,530', cls:'local gpio', dur:1.6, del:.8},
+  {id:'w-log', d:'M 800,622 L 800,646', cls:'local', dur:1.4, del:.2},
+  {id:'w-up',  d:'M 980,428 C 996,420 1006,410 1018,400', cls:'net', dur:1.6, del:0},
+  {id:'w-web', d:'M 1004,308 C 1020,336 1038,360 1048,376', cls:'net', dur:1.4, del:.3},
+  {id:'w-ha',  d:'M 1084,412 C 1102,414 1120,416 1134,420', cls:'net', dur:1.7, del:.9},
+  {id:'w-bale',d:'M 1052,444 C 1064,520 1130,590 1202,656', cls:'net', dur:2.3, del:1.4},
 ];
 function buildWires(){
   const NS='http://www.w3.org/2000/svg', svg=$('#wires');
@@ -993,8 +1014,11 @@ function render(){
   $('#wb-fan').className='wbadge'+(S.fan?' cy':'');
   $('#wb-lock').textContent=S.unlocked?'UNLOCKED':'LOCKED';
   $('#wb-lock').className='wbadge'+(S.unlocked?' gr':'');
-  $('#wb-clim').textContent=S.temp.toFixed(1)+'°C · '+Math.round(S.hum)+'%';
+  $('#wb-temp').textContent=S.temp.toFixed(1)+'°C';
+  $('#wb-hum').textContent=Math.round(S.hum)+'%';
+  $('#wb-press').textContent=Math.round(S.press);
   $('#w-ml').classList.toggle('on',S.ml);
+  $('#wb-ml-t').textContent=S.ml?'Auto':'Shadow';
 
   $('#hp-light-t').textContent=S.light?'On':'Off';
   $('#hp-light-t').classList.toggle('on',S.light);
@@ -1020,7 +1044,6 @@ function render(){
   $('#s-temp').textContent=S.temp.toFixed(1)+'°';
   $('#s-hum').textContent=Math.round(S.hum)+'%';
   $('#s-press').textContent=Math.round(S.press);
-  $('#wb-clim').textContent=S.temp.toFixed(1)+'°C · '+Math.round(S.hum)+'%';
   $('#ctx-lux-v').textContent=Math.round(S.lux)+' lx';
   $('#ctx-temp-v').textContent=S.temp.toFixed(1)+' °C';
   $('#ctx-pres').className='pill2 '+(S.presence?'home':'away');
@@ -1106,15 +1129,8 @@ $('#l-ml').addEventListener('click',()=>set('ml',!S.ml,'lcd'));
 $('#l-bright').addEventListener('input',e=>{
   S.bright=+e.target.value;
   $('#lcdscr').style.setProperty('--bright',.45+S.bright/100*.55);
-  $('#w-bright').value=S.bright; $('#w-bright-v').textContent=S.bright+'%';
 });
 $('#l-bright').addEventListener('change',e=>publish('display/brightness',e.target.value+'%','lcd'));
-$('#w-bright').addEventListener('input',e=>{
-  S.bright=+e.target.value;
-  $('#lcdscr').style.setProperty('--bright',.45+S.bright/100*.55);
-  $('#l-bright').value=S.bright; $('#w-bright-v').textContent=S.bright+'%';
-});
-$('#w-bright').addEventListener('change',e=>publish('display/brightness',e.target.value+'%','web'));
 
 /* ── keypad overlay (shared: unlock / settings / wifi password / change password) ── */
 let kpMode=null, kpBuf='', kpTarget=null;
