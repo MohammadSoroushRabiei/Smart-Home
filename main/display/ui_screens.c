@@ -424,11 +424,12 @@ void ui_screens_init(void)
     lv_label_set_text(settings_label, LV_SYMBOL_SETTINGS);
     lv_obj_center(settings_label);
 
-    lv_obj_t *card_temp = create_sensor_card(scr, "Temp", NULL,
+    // هر سه کارت واحد دارند → طبق create_sensor_card، عددها در یک راستا (y+2) می‌نشینند
+    lv_obj_t *card_temp = create_sensor_card(scr, "Temp", "Celsius",
         lv_palette_main(LV_PALETTE_ORANGE), &s_temp_value_label);
     lv_obj_align(card_temp, LV_ALIGN_BOTTOM_MID, -104, -14);
 
-    lv_obj_t *card_hum = create_sensor_card(scr, "Humidity", NULL,
+    lv_obj_t *card_hum = create_sensor_card(scr, "Humidity", "% RH",
         lv_palette_main(LV_PALETTE_BLUE), &s_hum_value_label);
     lv_obj_align(card_hum, LV_ALIGN_BOTTOM_MID, 0, -14);
 
@@ -629,12 +630,14 @@ void ui_update_sensor_status(float temp, float hum, float pressure)
         return;
     }
 
+    // واحد هر کمیت زیر عدد نشان داده می‌شود (لیبل واحد در create_sensor_card)
+    // پس اینجا فقط عدد خام می‌گذاریم تا هر سه در یک راستا بمانند.
     char buf[16];
 
-    snprintf(buf, sizeof(buf), "%.1f°", temp);
+    snprintf(buf, sizeof(buf), "%.1f", temp);
     lv_label_set_text(s_temp_value_label, buf);
 
-    snprintf(buf, sizeof(buf), "%.0f%%", hum);
+    snprintf(buf, sizeof(buf), "%.0f", hum);
     lv_label_set_text(s_hum_value_label, buf);
 
     snprintf(buf, sizeof(buf), "%.0f", pressure);
