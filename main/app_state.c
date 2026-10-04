@@ -3,6 +3,7 @@
 #include "freertos/semphr.h"
 #include "esp_log.h"
 #include "led.h"
+#include "fan.h"
 #include "lcd_driver.h"
 #include "ui_screens.h"
 #include "mqtt_manager.h"
@@ -118,8 +119,7 @@ bool app_state_get_fan(void)
     return value;
 }
 
-// فن فعلاً مجازی است (بدون GPIO/رله) - وضعیت + publish + UI + observer.
-// با اتصال رله واقعی، همین‌جا set_level اضافه می‌شود.
+// فن روی LED واقعی (GPIO47) سوار است - وضعیت + GPIO + publish + UI + observer.
 static void set_fan_core(bool on, bool from_ml)
 {
     xSemaphoreTake(s_mutex, portMAX_DELAY);
@@ -134,6 +134,7 @@ static void set_fan_core(bool on, bool from_ml)
     ESP_LOGI(TAG, "Fan set to: %s (%s)", on ? "ON" : "OFF",
              from_ml ? "ML" : "user");
 
+    fan_set(on);
     mqtt_manager_publish_fan_state(on);
 
     if (s_lcd_available) {

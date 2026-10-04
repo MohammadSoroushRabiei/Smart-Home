@@ -55,7 +55,7 @@ void app_state_register_device_cb(app_state_device_cb_t cb);
 void app_state_set_light_auto(bool on);
 
 /**
- * @brief وضعیت و کنترل فن (فعلاً مجازی - سخت‌افزار واقعی در گام بعد).
+ * @brief وضعیت و کنترل فن (LED واقعی روی GPIO47 - درایور fan.c).
  *        set_fan = مسیر کاربر (آموزش مدل)، set_fan_auto = مسیر مدل.
  */
 bool app_state_get_fan(void);

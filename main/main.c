@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "led.h"
+#include "fan.h"
 #include "Button.h"
 #include "wifi_manager.h"
 #include "http_server.h"
@@ -145,6 +146,7 @@ void app_main(void)
     led_init();
     btn_init();
     lock_init();
+    fan_init();
 
     // عامل ML باید قبل از هر تعامل کاربر observer خودش را ثبت کند تا هیچ
     // اقدام دستی‌ای از قلم نیفتد؛ خودش تا sync شدن ساعت منتظر می‌ماند.
