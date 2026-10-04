@@ -19,7 +19,7 @@ while time.time() - start < 30:
 
 ser.close()
 data = b"".join(lines)
-with open(r"D:\Project\Smart-Home\tools\boot_log.txt", "wb") as f:
+with open(r"D:\02-Projects\Smart-Home\tools\boot_log.txt", "wb") as f:
     f.write(data)
 text = data.decode("utf-8", errors="replace")
 print("TOTAL BYTES:", len(data))

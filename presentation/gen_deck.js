@@ -6,7 +6,7 @@ const BG_DARK = "16283F", BG = "FFFFFF", SURFACE = "F2F6FA", SURF2 = "EAF0F7";
 const PRIMARY = "1E3A5F", PRIMARY_MID = "2F5D8C", ACCENT = "C9962E";
 const TEXT = "1A2433", MUTED = "5B6B7E", HAIR = "D8E0EA", LIGHT_ON_DARK = "C7D4E3";
 const TF = "Pinar Black", BF = "Sahel";
-const FIGS = "D:/Project/Smart-Home/report/figs";
+const FIGS = "D:/02-Projects/Smart-Home/report/figs";
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE";
@@ -631,6 +631,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   s.addNotes("پایان ارائه. آماده پاسخ به پرسش‌ها. اسلایدهای ۱۴ و ۱۶ برای بازگشت سریع در پرسش‌های ML مناسب‌اند.");
 }
 
-pres.writeFile({ fileName: "D:/Project/Smart-Home/presentation/SmartHome-Defense.pptx" })
+pres.writeFile({ fileName: "D:/02-Projects/Smart-Home/presentation/SmartHome-Defense.pptx" })
   .then(() => console.log("WRITTEN OK"))
   .catch(e => { console.error("FAIL", e); process.exit(1); });

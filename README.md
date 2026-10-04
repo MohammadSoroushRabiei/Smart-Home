@@ -49,6 +49,31 @@ self-learning behavior agent, and a fully local service stack — no cloud requi
 - 🔒 **Privacy by architecture** — every core service runs on the home LAN; the
   internet is optional and used only for outbound sync and notifications.
 
+## 🎬 Interactive Live Hub — the whole system in your browser
+
+**[`presentation/motion-hub.html`](presentation/motion-hub.html)** is a self-contained,
+zero-dependency replica of the entire running system. Open it in any browser — no build,
+no server, no hardware — and every part of the platform comes alive on one screen:
+
+- 🖥️ **The real LCD** — working keypad + face-unlock QR, Wi-Fi scan & join, MQTT
+  provisioning, settings (enroll QR, manage faces, door/settings passwords) and the
+  dual-mode attendance screen, exactly like the firmware.
+- 🌐 **Live web dashboard** — per-device tiles and three live charts; a **Google Sheet**
+  tab records every attendance scan (odd scans = entry, even scans = exit).
+- 🏠 **Home Assistant** — a web panel with the four real automations from
+  `automations.yaml` plus a companion-app view; every state change is two-way.
+- 🤖 **Bale bot** — the full command set (`/status`, `/open` with a 2-minute password
+  TTL, `/light_on`, `/fan_on`, …) with notifications for door and attendance events.
+- 🧠 **The ML agent, live** — the two logistic heads with their trained weights; every
+  manual action you click becomes a real on-page SGD training step.
+- 🎙️ **A guided auto-demo** — a narrated 12-step spotlight tour of all of the above.
+- 🌍 **Trilingual UI** — English · فارسی · 中文, switchable from the pills in the top bar.
+
+**▶ Open it live:** <https://mohammadsoroushrabiei.github.io/Smart-Home/presentation/motion-hub.html>
+(once GitHub Pages is enabled: *Settings → Pages → Deploy from branch → main / root*),
+or simply download `presentation/motion-hub.html` and double-click it — everything,
+including the fonts, is embedded in that single file.
+
 ## 🏗️ Architecture
 
 The board is the edge node: it owns the UI, the face engine, the ML agent and all
