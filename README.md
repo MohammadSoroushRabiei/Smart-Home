@@ -224,11 +224,17 @@ idf.py build                 # firmware picks up the new weights
 
 ---
 
+## License
+
+This project is proprietary — **all rights reserved**. See [LICENSE](LICENSE).
+Reuse, redistribution, or derivative work is not permitted without written permission.
+For inquiries: mohammadsoroushrabiei@gmail.com
+
 <div align="center">
 
 <img src="docs/proposal/logo_iut.png" width="64" alt="Isfahan University of Technology logo"/><br>
 
-**Soroush Rabiei** — Undergraduate Final Project, [Isfahan University of Technology](https://www.iut.ac.ir/)
+**Mohammad Soroush Rabiei** — Undergraduate Final Project, [Isfahan University of Technology](https://www.iut.ac.ir/)
 
 [![GitHub](https://img.shields.io/badge/GitHub-@MohammadSoroushRabiei-181717?logo=github&logoColor=white)](https://github.com/MohammadSoroushRabiei)
 
