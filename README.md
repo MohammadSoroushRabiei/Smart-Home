@@ -51,6 +51,8 @@ self-learning behavior agent, and a fully local service stack — no cloud requi
 
 ## 🎬 Interactive Live Hub — the whole system in your browser
 
+[![Interactive Live Hub — open it in your browser](docs/img/motion-hub.png)](https://mohammadsoroushrabiei.github.io/Smart-Home/presentation/motion-hub.html)
+
 **[`presentation/motion-hub.html`](presentation/motion-hub.html)** is a self-contained,
 zero-dependency replica of the entire running system. Open it in any browser — no build,
 no server, no hardware — and every part of the platform comes alive on one screen:
@@ -70,9 +72,8 @@ no server, no hardware — and every part of the platform comes alive on one scr
 - 🌍 **Trilingual UI** — English · فارسی · 中文, switchable from the pills in the top bar.
 
 **▶ Open it live:** <https://mohammadsoroushrabiei.github.io/Smart-Home/presentation/motion-hub.html>
-(once GitHub Pages is enabled: *Settings → Pages → Deploy from branch → main / root*),
-or simply download `presentation/motion-hub.html` and double-click it — everything,
-including the fonts, is embedded in that single file.
+— or download `presentation/motion-hub.html` and double-click it; everything, including
+the fonts, is embedded in that single file.
 
 ## 🏗️ Architecture
 
