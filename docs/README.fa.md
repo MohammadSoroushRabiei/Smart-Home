@@ -1,22 +1,55 @@
 <div align="center">
 
-[🇬🇧 English](../README.md) · **🇮🇷 فارسی**
+[🇬🇧 English](../README.md) · **🇮🇷 فارسی** · [🇨🇳 中文](README.zh.md)
 
-# خانه هوشمند ESP32-S3
+# 🏠 خانه هوشمند — اتوماسیون خانگی اول-لبه روی ESP32-S3
 
-سیستم کنترل خانه‌ی هوشمند روی برد **ESP32-S3-DevKitC-1 (N16R8)**: نمایشگر LCD لمسی
-(ST7796 + GT911) با رابط LVGL، باز کردن درب با تشخیص چهره، مدل ML رفتاری برای
-کنترل خودکار چراغ و فن، وب‌داشبورد (HTTPS)، حضور و غیاب با QR و دوربین گوشی،
-ربات کنترل بله، سنسور BME280 و یکپارچگی با Home Assistant.
+**پلتفرمی خودمیزبان برای خانه هوشمند با تشخیص چهره روی خود دستگاه، عامل رفتاری
+خودآموخته روی تراشه و پشته‌ی سرویس‌های کاملاً لوکال — بدون ابر.**
 
-<img src="../presentation/Images/Board%20Image.jpg" width="480" alt="نمونه‌ی واقعی روی میز کار — برد ESP32-S3، داشبورد LVGL روی LCD و اپ Home Assistant روی گوشی"/>
+[![MCU](https://img.shields.io/badge/ESP32--S3-N16R8-E7352C?logo=espressif&logoColor=white)](hardware/pin-mapping.md)
+[![Framework](https://img.shields.io/badge/ESP--IDF-6.0.2-3C5CA8?logo=espressif&logoColor=white)](https://docs.espressif.com/projects/esp-idf/)
+[![RTOS](https://img.shields.io/badge/FreeRTOS-dual--core-2B6CB0)](#)
+[![UI](https://img.shields.io/badge/LVGL-9.5-18BC9C)](#)
+[![C](https://img.shields.io/badge/C-11-555555?logo=c&logoColor=white)](#)
+[![C++](https://img.shields.io/badge/C%2B%2B-ESP--DL-00599C?logo=cplusplus&logoColor=white)](#)
 
-*نمونه‌ی واقعی روی میز کار — گره‌ی لبه‌ی ESP32-S3 با داشبورد LVGL روی LCD،
-و اپ همراه Home Assistant به‌صورت زنده روی گوشی.*
+[![MQTT](https://img.shields.io/badge/MQTT-Mosquitto-660066?logo=mqtt&logoColor=white)](#)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-integration-41BDF5?logo=home-assistant&logoColor=white)](#)
+[![FastAPI](https://img.shields.io/badge/FastAPI-servers-009688?logo=fastapi&logoColor=white)](#)
+[![Docker](https://img.shields.io/badge/Docker-deployment-2496ED?logo=docker&logoColor=white)](#)
+[![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white)](#)
+[![Google Sheets](https://img.shields.io/badge/Google%20Sheets-archive-34A853?logo=googlesheets&logoColor=white)](#)
+
+<img src="../report/figs/fig1_architecture.png" width="100%" alt="معماری سیستم — گوشی، گره لبه ESP32-S3، سرور خانگی و اینترنت اختیاری"/>
+
+*تمام هوشمندی روی گره‌ی لبه اجرا می‌شود — گوشی فقط دوربینش را قرض می‌دهد و سرورها لوکال می‌مانند.*
 
 </div>
 
-## 📸 تصاویر واقعی و ویدیوهای اجرا
+## ✨ ویژگی‌های برجسته
+
+- 🔓 **قفل درب با تشخیص چهره روی میکروکنترلر** — خط پردازش CNN با ESP-DL
+  (آشکارسازی → استخراج بردار → تطبیق کسینوسی) کاملاً روی ESP32-S3 اجرا می‌شود؛
+  گوشی فقط یک JPEG را از طریق HTTPS بارگذاری می‌کند و تصاویر محلی پردازش می‌شوند و هرگز ذخیره نمی‌شوند.
+- 🧠 **عامل رفتاری که کاربرش را یاد می‌گیرد** — دو سر سیگموئید (چراغ، فن) با
+  پیش‌آموزش آفلاین به دقت اعتبارسنجی **۹۴٫۲٪ / ۹۳٫۶٪**، که سپس با SGD از هر اقدام
+  دستی شما، **روی خود تراشه** یادگیری را ادامه می‌دهند.
+- 🖥️ **داشبورد لمسی کامل** — رابط LVGL 9 با ابعاد ۳۲۰×۴۸۰ شامل راه‌اندازی وای‌فای،
+  پیکربندی MQTT، تنظیمات سیستم، حضور و غیاب و کنترل روشنایی، مستقیماً روی خود دستگاه.
+- 📅 **حضور و غیاب اول-آفلاین** — توکن QR روی LCD، تطبیق چهره با دوربین گوشی،
+  رکوردها در صف NVS صف می‌شوند و با FastAPI/SQLite، گوگل‌شیت (تقویم جلالی) و
+  اعلان‌های بله همگام می‌شوند.
+- 🏡 **Home Assistant دوطرفه** — وضعیت همه‌ی دستگاه‌ها از طریق MQTT منتشر و از
+  داشبوردها و اتوماسیون‌های HA قابل کنترل است؛ ربات بله هم کنترل از راه دور از
+  طریق چت با ۸ دستور، اعلان رخدادها و لاگ امنیتی اضافه می‌کند.
+- 🛡️ **مهندسی‌شده برای روشن‌ماندن** — دو گذرگاه I²C، سگ‌نگهبان ریست سخت‌افزاری
+  برای کنترلر لمس، سگ‌نگهبان وظایف، اتصال مجدد شبکه‌آگاه وای‌فای/MQTT و وضعیت
+  ماندگار در NVS، قطعی‌ها را به‌خوبی تاب می‌آورند.
+- 🔒 **حریم خصوصی با معماری** — همه‌ی سرویس‌های اصلی روی LAN خانگی اجرا می‌شوند؛
+  اینترنت اختیاری است و فقط برای همگام‌سازی خروجی و اعلان‌ها استفاده می‌شود.
+
+## 📸 اجرای واقعی — عکس‌ها و ویدیوها
 
 هیچ‌کدام از این‌ها رندر یا ماکت نیست — همه‌چیز از سیستم در حال اجرا ضبط شده است:
 برد فیزیکی، LCD واقعی، کانتینرهای مستقر و اپلیکیشن‌ها.
@@ -119,71 +152,194 @@ Google Sheets بایگانی می‌شود و ربات بله خبر می‌ده
 کل زیرساخت پلتفرم روی یک سرور خانگی: سرویس حضور و غیاب، Mosquitto، Home
 Assistant و ربات بله — چهار کانتینر با چند صد مگابایت رم.
 
-## ساختار مخزن
+## 🎬 هاب زنده‌ی تعاملی — کل سیستم در مرورگر شما
+
+[![هاب زنده‌ی تعاملی — در مرورگر باز کنید](img/motion-hub.png)](https://mohammadsoroushrabiei.github.io/Smart-Home/presentation/motion-hub.html)
+
+**[`presentation/motion-hub.html`](../presentation/motion-hub.html)** بازسازی
+کاملی مستقل و بدون وابستگی از کل سیستم در حال اجراست. آن را در هر مرورگری باز
+کنید — بدون بیلد، بدون سرور، بدون سخت‌افزار — و هر بخش از پلتفرم روی یک صفحه
+زنده می‌شود:
+
+- 🖥️ **LCD واقعی** — کیبورد کارا + QR باز کردن با چهره، اسکن و اتصال وای‌فای،
+  پیکربندی MQTT، تنظیمات (QR ثبت چهره، مدیریت چهره‌ها، رمز درب/تنظیمات) و
+  صفحه‌ی دومُد حضور و غیاب، دقیقاً مثل فرمور.
+- 🌐 **وب‌داشبورد زنده** — کاشی‌های هر دستگاه و سه نمودار زنده؛ تب **Google
+  Sheet** هر اسکن حضور را ثبت می‌کند (اسکن‌های فرد = ورود، زوج = خروج).
+- 🏠 **Home Assistant** — پنل وب با چهار اتوماسیون واقعی از `automations.yaml`
+  به‌همراه نمای اپ همراه؛ هر تغییر وضعیت دوطرفه است.
+- 🤖 **ربات بله** — مجموعه‌ی کامل دستورها (`/status`، `/open` با رمز ۲ دقیقه‌ای،
+  `/light_on`، `/fan_on` و…) با اعلان رخدادهای درب و حضور.
+- 🧠 **عامل ML به‌صورت زنده** — دو سر لجستیک با وزن‌های آموزش‌دیده؛ هر اقدام دستی
+  که کلیک می‌کنید یک گام واقعی SGD روی همان صفحه است.
+- 🎙️ **دموی خودراهنما** — تور نورافکنی ۱۲ مرحله‌ای از همه‌ی موارد بالا.
+- 🌍 **رابط سه‌زبانه** — English · فارسی · 中文، قابل تعویض از دکمه‌های نوار بالا.
+
+**▶ باز کردن زنده:** <https://mohammadsoroushrabiei.github.io/Smart-Home/presentation/motion-hub.html>
+— یا فایل `presentation/motion-hub.html` را دانلود و دوبارکلیک کنید؛ همه‌چیز
+از جمله فونت‌ها در همان یک فایل جاسازی شده است.
+
+## 🏗️ معماری
+
+برد، گره‌ی لبه است: مالک رابط کاربری، موتور چهره، عامل ML و تمام ورودی/خروجی‌ها.
+یک سرور خانگی Docker میزبان Mosquitto، Home Assistant و سرویس حضور و غیاب است.
+همه‌چیز روی LAN وای‌فای محلی گفت‌وگو می‌کند — ابر، یک خط‌چین است.
+
+<img src="../report/figs/fig7_block_diagram.png" width="100%" alt="بلوک‌دیاگرام فرمور — درون گره لبه ESP32-S3 و جانبی‌ها"/>
+
+جریان داده‌ی زمان اجرا بین زیرسیستم‌های فرمور:
+
+<img src="img/fig_runtime_flow.png" width="100%" alt="جریان داده‌ی زمان اجرا — رابط LVGL، وظیفه سنسور، عامل ML، سرور HTTPS و کلاینت MQTT حول app_state مشترک"/>
+
+## 🧠 یادگیری ماشین روی دستگاه
+
+مدلی عمداً کوچک با خط لوله‌ای جدی: ۱۲ ویژگی زمینه‌ای (زمان روز به‌صورت سیکلی،
+تقویم، حضور، لوکس، دما، رطوبت) به دو سر سیگموئید می‌رسد — یکی برای هر دستگاه —
+که روی دیتاست مصنوعی ۶٬۹۱۲ نمونه‌ای پیش‌آموزش دیده‌اند و سپس **روی خود تراشه**
+پالایش می‌شوند: هر اقدام دستی یک نمونه‌ی آموزشی برای SGD برخط می‌شود که حداکثر
+هر ۳۰ ثانیه یک‌بار در NVS ماندگار می‌شود.
+
+<img src="../report/figs/fig_ml_model.png" width="100%" alt="طراحی ML — ویژگی‌ها، شبکه تک‌لایه، قاعده تصمیم، گیت ارتقا"/>
+
+| | چراغ | فن |
+|---|---|---|
+| دقت اعتبارسنجی (پیش‌آموزش آفلاین) | **۹۴٫۲٪** | **۹۳٫۶٪** |
+| یادگیری برخط | SGD روی تراشه (η = ۰٫۰۸) | SGD روی تراشه (η = ۰٫۰۸) |
+| ماندگاری | فضای‌نام NVS `mlbrain` | فضای‌نام NVS `mlbrain` |
+
+چرخه‌ی عمر ایمن‌گرا، عامل را صادق نگه می‌دارد: در فاز **SHADOW** شروع می‌کند
+(پیش‌بینی می‌کند، در MQTT گزارش می‌کند، اقدام نمی‌کند) و تنها پس از پنجره‌ی
+متحرکی با ≥ ۱۵ تصمیم و دقت ≥ ۸۵٪ به **AUTO** ارتقا می‌یابد — و اقدام دستی همیشه
+و بلافاصله برنده است. **قفل در هرگز تحت کنترل مدل نیست.**
+
+یادگیری عامل را از صفر ببینید — هر اقدام دستی وزن‌ها را می‌لرزاند، منحنی
+احتمال شکل می‌گیرد و پس از برآورده‌شدن گیت ارتقا، حالت به AUTO تغییر می‌کند:
+
+<img src="../report/figs/fig_ml_learning.gif" width="90%" alt="انیمیشن — یادگیری برخط رفتار کاربر، به‌روزرسانی وزن‌ها در هر اقدام دستی"/>
+
+<details>
+<summary>🔍 عمق بیشتر: گیت ارتقای SHADOW → AUTO</summary>
+<br>
+<img src="../report/figs/fig5_ml_agent.png" width="100%" alt="چرخه عمر عامل ML — فاز سایه، گیت ارتقا، حالت خودکار، یادگیری برخط"/>
+</details>
+
+## 🔓 تشخیص چهره و کنترل دسترسی
+
+تمام خط پردازش روی برد است: مرورگر عکس را می‌گیرد، رمزگشای JPEG سخت‌افزاری آن را
+به بافر RGB565 در PSRAM تبدیل می‌کند و CNN با ESP-DL بردار ویژگی‌ای تولید می‌کند
+که با پایگاه چهره روی دستگاه تطبیق داده می‌شود — شباهت کسینوسی، آستانه ۰٫۷۰،
+ثبت چندنمونه‌ای.
+
+<img src="../report/figs/fig2_face_pipeline.png" width="100%" alt="خط پردازش تشخیص چهره — دوربین گوشی، بارگذاری HTTPS، رمزگشایی سخت‌افزاری JPEG، ESP-DL، تصمیم تطبیق"/>
+
+- ثبت/ویرایش/حذف چهره از رابط دستگاه یا وب‌داشبورد (پشت رمز)
+- لینک‌های ثبت‌چهره با توکن QR که ظرف ۳ دقیقه منقضی می‌شوند
+- رخدادهای باز کردن با منبعشان (چهره، کیبورد، وب، ربات) لاگ و به‌صورت اعلان ارسال می‌شوند
+
+## 📅 سیستم حضور و غیاب
+
+پشته‌ی سه‌لایه‌ای با صفر وابستگی ابری: LCD توکن QR چرخان را نشان می‌دهد
+(اعتبار ۱۰ دقیقه + شمارش معکوس)، گوشی کاربر صفحه‌ای را باز می‌کند و چهره را
+تطبیق می‌دهد و رخدادها روی سرور محلی FastAPI/SQLite می‌نشینند — که آن‌ها را با
+تاریخ‌های جلالی در Google Sheets بایگانی و ربات بله را خبر می‌کند. اگر سرور یا
+اینترنت قطع باشد، رکوردها در صندوق‌خروج ۳۲ خانه‌ای NVS روی برد می‌مانند و بعداً
+ارسال می‌شوند.
+
+<img src="../report/figs/fig4_attendance.png" width="100%" alt="پشته حضور و غیاب — لایه دستگاه، لایه سرور محلی، تحویل اینترنتی اختیاری"/>
+
+## 🧱 پشته فناوری
+
+<img src="../report/figs/fig6_stack.png" width="100%" alt="پشته نرم‌افزاری — سخت‌افزار، ESP-IDF + FreeRTOS، کتابخانه‌ها، ماژول‌های کاربردی، زیرساخت محلی"/>
+
+## 🔌 سخت‌افزار
+
+| قطعه | مشخصات | رابط |
+|---|---|---|
+| MCU | ESP32-S3-DevKitC-1 (N16R8 — فلش ۱۶ مگابایت، PSRAM اکتال ۸ مگابایت) | — |
+| نمایشگر | TFT ۳۲۰×۴۸۰ (ST7796)، موازی ۸ بیتی، بک‌لایت PWM | گذرگاه GPIO |
+| لمس | کنترلر خازنی GT911 | I²C (گذرگاه مستقل) |
+| محیط | BME280 (دما / رطوبت / فشار) + LDR (لوکس) | I²C / ADC |
+| قفل | قفل برقی با رله | GPIO |
+| متفرقه | LED وضعیت، دکمه فیزیکی، WS2812 روی برد | GPIO |
+
+نقشه‌ی کامل پین‌ها با GPIOهای آزاد/اشغال: [`hardware/pin-mapping.md`](hardware/pin-mapping.md)
+
+## 📁 ساختار مخزن
 
 ```
 Smart-Home/
-├── main/                  فریمور اصلی ESP-IDF (کامپوننت main)
-│   ├── display/           درایور LCD/تاچ + تمام صفحات LVGL
-│   └── certs/             گواهی self-signed برای HTTPS (امبد در باینری)
-├── demo/                  دموی ارائه روی PC: همان منطق فریمور + سخت‌افزار مجازی SDL2
-├── server/                سرویس‌های سمت رایانه (Docker)
-│   ├── attendance/        سرور حضور و غیاب (FastAPI + SQLite + Google Sheets + بله)
-│   └── bale_bot/          ربات کنترل و اعلان بله (FastAPI + SQLite)
-├── homeassistant/         docker-compose دراپر HA + پیکربندی Mosquitto
-├── ml/                    خط لوله یادگیری ماشین: تولید داده → آموزش → وزن‌های C
-├── tools/                 ابزارهای جانبی (serial_peek.py، نوت‌بوک تست API چهره)
-├── docs/                  مستندات و مراجع
-│   ├── hardware/          دیتاشیت‌های ESP32-S3 و LCD + جدول پین‌مپینگ
-│   ├── proposal/          پروپوزال پروژه (docx/pdf)
-│   ├── attendance/        راهنمای راه‌اندازی حضور و غیاب + اسکریپت Google Sheets
-│   ├── ml-design.md       طراحی سیستم ML
-│   └── roadmap.md         نقشه‌ی راه پروژه
-├── report/                گزارش پروژه (تولید docx/pdf با generate.js)
-├── presentation/          اسلایدهای دفاع (تولید pptx با gen_deck.js)
-├── CMakeLists.txt         پروژه‌ی ESP-IDF 6.0.2
+├── main/                  فرمور اصلی ESP-IDF (اپلیکیشن + display/ رابط کاربری + certs/)
+├── demo/                  دموی PC — منطق و UI واقعی فرمور روی سخت‌افزار مجازی SDL2
+├── server/
+│   ├── attendance/        سرور حضور و غیاب (FastAPI + SQLite + Sheets + بله)
+│   └── bale_bot/          ربات بله (FastAPI + SQLite)
+├── homeassistant/         دراپ‌این docker-compose ها + پیکربندی Mosquitto
+├── ml/                    خط لوله ML: داده مصنوعی → آموزش → هدر وزن‌های C
+├── tools/                 ابزارهای سمت میزبان (نظاره‌گر لاگ سری، نوت‌بوک تست API چهره)
+├── docs/                  دیتاشیت‌ها، نقشه پین، اسناد طراحی، پروپوزال، README فارسی
+├── report/                گزارش پروژه (تولیدکننده docx/pdf + شکل‌ها)
+├── presentation/          اسلایدهای دفاع (تولیدکننده pptx)
+├── CMakeLists.txt         پروژه ESP-IDF 6.0.2
 ├── partitions.csv         جدول پارتیشن‌های فلش
-└── sdkconfig.defaults     پیکربندی پیش‌فرض بیلد
+└── sdkconfig.defaults     پیش‌فرض‌های بیلد
 ```
 
-## ساخت و فلش فریمور
+## 🚀 شروع به کار
 
-نیازمند [ESP-IDF 6.0.2](https://docs.espressif.com/projects/esp-idf/) (نصب با EIM) —
-دستورات از ریشه‌ی مخزن:
+**فرمور** (نیازمند [ESP-IDF 6.0.2](https://docs.espressif.com/projects/esp-idf/)):
 
 ```bash
+git clone https://github.com/MohammadSoroushRabiei/Smart-Home.git
+cd Smart-Home
 idf.py set-target esp32s3
 idf.py build flash monitor
 ```
 
-جزئیات پین‌ها و پین‌های آزاد/اشغال‌شده: [`hardware/pin-mapping.md`](hardware/pin-mapping.md)
-
-## دموی رومیزی (اختیاری)
-
-همان منطق و UI فریمور روی PC با SDL2 (مستقل از بیلد فریمور):
+**دموی رومیزی** — همان منطق و UI فرمور روی سخت‌افزار مجازی SDL2 (بدون نیاز به برد):
 
 ```bash
-cmake -S demo -B demo/build
-cmake --build demo/build
+cmake -S demo -B demo/build && cmake --build demo/build
 ./demo/build/smartdemo
 ```
 
-## سرویس‌ها
-
-- حضور و غیاب و ربات بله هرکدام `docker-compose.yml` دارند؛ راهنما:
-  [`attendance/README.md`](attendance/README.md) و [`../server/bale_bot/README.md`](../server/bale_bot/README.md)
-- بازتولید داشبورد/اتوماسیون‌های Home Assistant: [`../homeassistant/`](../homeassistant/)
-
-## یادگیری ماشین
+**سرویس‌ها** (Docker، از پوشه‌ی هر سرویس):
 
 ```bash
-python ml/generate_data.py   # داده‌ی فرضی ۳۰ روز
-python ml/train.py           # آموزش و تولید main/ml_model_weights.h
+cd server/attendance && docker compose up -d --build
+cd server/bale_bot    && docker compose up -d --build
 ```
 
-طراحی: [`ml-design.md`](ml-design.md) — بعد از تغییر وزن‌ها فریمور باید دوباره بیلد شود.
+**خط لوله ML** — بازتولید و آموزش مجدد مدل رفتاری:
 
-## اسناد و ارائه
+```bash
+python ml/generate_data.py   # دیتاست مصنوعی ۳۰ روزه
+python ml/train.py           # می‌نویسد main/ml_model_weights.h
+idf.py build                 # فرمور وزن‌های جدید را برمی‌دارد
+```
 
-- گزارش پروژه: `../report/generate.js` (Node) → خروجی `../report/SmartHome-Project-Report.docx`
-- اسلایدهای دفاع: `../presentation/gen_deck.js` (Node) → خروجی `../presentation/SmartHome-Defense.pptx`
+## 📚 مستندات
+
+- 📄 [گزارش پروژه (PDF، ۵۳ صفحه)](../report/render/SmartHome-Project-Report.pdf)
+- 🔌 [نقشه پین و مرجع GPIOهای آزاد](hardware/pin-mapping.md)
+- 🧠 [طراحی سیستم ML](ml-design.md)
+- 📅 [راهنمای راه‌اندازی حضور و غیاب](attendance/README.md)
+- 💬 [راهنمای ربات بله](../server/bale_bot/README.md)
+- 🇬🇧 [English README](../README.md) · 🇨🇳 [中文说明](README.zh.md)
+
+---
+
+## مجوز
+
+این پروژه اختصاصی است — **تمام حقوق محفوظ است**. بخش [LICENSE](../LICENSE) را
+ببینید. بازاستفاده، بازتوزیع یا کار مشتق بدون اجازه‌ی کتبی مجاز نیست.
+برای مکاتبه: mohammadsoroushrabiei@gmail.com
+
+<div align="center">
+
+<img src="proposal/logo_iut.png" width="64" alt="نشان دانشگاه صنعتی اصفهان"/><br>
+
+**محمد سروش ربیعی** — پروژه تخصصی کارشناسی، [دانشگاه صنعتی اصفهان](https://www.iut.ac.ir/)
+
+[![GitHub](https://img.shields.io/badge/GitHub-@MohammadSoroushRabiei-181717?logo=github&logoColor=white)](https://github.com/MohammadSoroushRabiei)
+
+</div>

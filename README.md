@@ -28,7 +28,7 @@ on the LCD, and the Home Assistant companion app live on the phone.*
 
 *All intelligence runs on the edge node — the phone only lends its camera, the servers stay local.*
 
-**[English](README.md)** · [🇮🇷 فارسی](docs/README.fa.md)
+**[English](README.md)** · [🇮🇷 فارسی](docs/README.fa.md) · [🇨🇳 中文](docs/README.zh.md)
 
 </div>
 
@@ -157,7 +157,7 @@ all within seconds.
 </div>
 
 The whole backend of the platform on one home server: the attendance service,
-Mosquitto, Home Assistant and the Bale bot — seven containers at a few hundred
+Mosquitto, Home Assistant and the Bale bot — four containers at a few hundred
 megabytes of RAM.
 
 ## 🎬 Interactive Live Hub — the whole system in your browser
