@@ -19,6 +19,11 @@ self-learning behavior agent, and a fully local service stack — no cloud requi
 [![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white)](#)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-archive-34A853?logo=googlesheets&logoColor=white)](#)
 
+<img src="presentation/Images/Board%20Image.jpg" width="480" alt="The real setup — ESP32-S3 edge node on the bench, LVGL dashboard on the LCD, Home Assistant companion app on the phone"/>
+
+*The real setup on the bench — the ESP32-S3 edge node with its LVGL dashboard
+on the LCD, and the Home Assistant companion app live on the phone.*
+
 <img src="report/figs/fig1_architecture.png" width="100%" alt="System architecture — phone, ESP32-S3 edge node, home server, optional internet"/>
 
 *All intelligence runs on the edge node — the phone only lends its camera, the servers stay local.*
@@ -48,6 +53,112 @@ self-learning behavior agent, and a fully local service stack — no cloud requi
   NVS-persisted state survive outages gracefully.
 - 🔒 **Privacy by architecture** — every core service runs on the home LAN; the
   internet is optional and used only for outbound sync and notifications.
+
+## 📸 Real Hardware & Live Recordings
+
+Nothing staged — everything below is captured from the running system: the
+physical board, the real LCD, the deployed containers and the companion apps.
+The test recordings play right on this page, served by GitHub's video CDN.
+
+### 🖥️ The On-Device UI, captured from the real LCD
+
+| | | |
+|:---:|:---:|:---:|
+| <img src="presentation/Images/LCD%20UI/Main%20Screen.png" width="300" alt="Main screen — Wi-Fi status, Attend and Web Dashboard buttons, light/fan/ML tiles, environment readouts"/> | <img src="presentation/Images/LCD%20UI/Unlock%20Screen.png" width="300" alt="Unlock screen — face unlock and manual door controls"/> | <img src="presentation/Images/LCD%20UI/Wifi%20List.png" width="300" alt="Wi-Fi list — on-device network scan and selection"/> |
+| <img src="presentation/Images/LCD%20UI/Wifi%20Enter%20Password.png" width="300" alt="Wi-Fi password entry with an on-screen keyboard"/> | <img src="presentation/Images/LCD%20UI/Mqtt%20Setting.png" width="300" alt="MQTT broker provisioning on the device"/> | <img src="presentation/Images/LCD%20UI/Setting%20Screen.png" width="300" alt="Settings — passwords, brightness and system options"/> |
+| <img src="presentation/Images/LCD%20UI/Faces%20List.png" width="300" alt="Faces list — enrolled faces managed on the device"/> | <img src="presentation/Images/LCD%20UI/Attend%20QR%20Code.png" width="300" alt="Attendance QR token with countdown"/> | <img src="presentation/Images/LCD%20UI/Web%20QR%20Code.png" width="300" alt="QR that opens the web dashboard on any phone"/> |
+
+*Main dashboard · face unlock · Wi-Fi scan & join with the on-screen keyboard ·
+MQTT provisioning · settings & passwords · face enrollment · the dual-mode
+attendance QR · the QR that opens the web dashboard on any phone.*
+
+*Live test on the real display — touch, unlock, sensors (38 s):*
+
+<div align="center">
+
+<video controls width="360" src="https://github.com/user-attachments/assets/3fca52ed-e168-4575-a4f6-300e99fccbfe"></video>
+
+</div>
+
+### 🌐 Web Dashboard — served by the attendance server
+
+<div align="center">
+
+<img src="presentation/Images/Web%20Dashboard.png" width="360" alt="Web dashboard — device tiles, door lock with PIN and Face ID, live environment readouts, ML agent status"/>
+
+</div>
+
+Device tiles, door lock (PIN + Face ID), live environment readouts and the ML
+agent's SHADOW/AUTO status — served on the LAN; any phone reaches it by
+scanning the QR shown on the LCD.
+
+*Dashboard test — toggles, door unlock, live values (43 s):*
+
+<div align="center">
+
+<video controls width="300" src="https://github.com/user-attachments/assets/7c6d9063-2cdd-453c-a8b2-fb2aef746ac0"></video>
+
+</div>
+
+### 🏠 Home Assistant — the companion app on a real phone
+
+<div align="center">
+
+<img src="presentation/Images/Smart%20Home%20%E2%80%93%20Home%20Assistant_Dashboard.png" width="420" alt="Home Assistant dashboard on a phone — environment cards, device controls, access status and automations"/>
+
+</div>
+
+Environment cards, light / fan / ML-autonomy controls, access status and the
+four real automations — every state flows two-way over MQTT.
+
+*Mobile app test — live state & control (58 s):*
+
+<div align="center">
+
+<video controls width="300" src="https://github.com/user-attachments/assets/a053339e-497f-4105-baa8-8d17881ceb84"></video>
+
+</div>
+
+### 🤖 Bale Bot — remote control from chat
+
+| | | |
+|:---:|:---:|:---:|
+| <img src="presentation/Images/Bale_1.jpg" width="300" alt="Bale bot — reply-keyboard control with instant confirmations"/> | <img src="presentation/Images/Bale_2.jpg" width="300" alt="Bale bot — door opening through a two-minute one-time password"/> | <img src="presentation/Images/Bale_3.jpg" width="300" alt="Bale bot — the full slash-command menu"/> |
+
+*Reply-keyboard control with instant confirmations · door opening via a
+2-minute one-time password · the full slash-command menu.*
+
+### 📅 Attendance — end to end
+
+The record lands on the local FastAPI/SQLite server, is archived to Google
+Sheets with a Jalali date and entry/exit type, and the Bale bot announces it —
+all within seconds.
+
+<div align="center">
+
+<img src="presentation/Images/Google%20Sheet.png" width="480" alt="Google Sheet attendance archive — Jalali dates, times, names, entry/exit rows"/>
+
+</div>
+
+*Face attendance test — QR scan → face match → record + notification (30 s):*
+
+<div align="center">
+
+<video controls width="300" src="https://github.com/user-attachments/assets/4096e28d-9eb9-4661-957a-d4dcb7e40f97"></video>
+
+</div>
+
+### 🐳 The Local Service Stack
+
+<div align="center">
+
+<img src="presentation/Images/Docker.png" width="90%" alt="Docker Desktop — the attendance server, Mosquitto, Home Assistant and Bale bot containers all running"/>
+
+</div>
+
+The whole backend of the platform on one home server: the attendance service,
+Mosquitto, Home Assistant and the Bale bot — seven containers at a few hundred
+megabytes of RAM.
 
 ## 🎬 Interactive Live Hub — the whole system in your browser
 
