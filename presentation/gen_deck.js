@@ -7,6 +7,18 @@ const PRIMARY = "1E3A5F", PRIMARY_MID = "2F5D8C", ACCENT = "C9962E";
 const TEXT = "1A2433", MUTED = "5B6B7E", HAIR = "D8E0EA", LIGHT_ON_DARK = "C7D4E3";
 const TF = "Pinar Black", BF = "Sahel";
 const FIGS = "D:/02-Projects/Smart-Home/report/figs";
+const IMG = "D:/02-Projects/Smart-Home/presentation/Images";
+const POSTERS = "D:/02-Projects/Smart-Home/presentation/posters";
+const { execSync } = require("child_process");
+const os = require("os"), fs = require("fs"), crypto = require("crypto"), path = require("path");
+// silent copy of a test video (video stream copied bit-for-bit, audio dropped) —
+// built in the OS temp dir so no duplicate media lands in the repo
+function silentVideo(src) {
+  const out = path.join(os.tmpdir(), "deck-" + crypto.randomBytes(4).toString("hex") + ".mp4");
+  try { execSync(`ffmpeg -y -v error -i "${src}" -c:v copy -an "${out}"`); return out; }
+  catch { return src; }
+}
+const coverData = (name) => "image/jpeg;base64," + fs.readFileSync(path.join(POSTERS, name + ".jpg")).toString("base64");
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE";
@@ -15,7 +27,7 @@ pres.author = "Mohammad Soroush Rabiei";
 pres.title = "طراحی و پیاده‌سازی سامانه خانه هوشمند مبتنی بر اینترنت اشیا با هوش مصنوعی روی لبه";
 pres.theme = { headFontFace: TF, bodyFontFace: BF };
 
-const TOTAL = 25;
+const TOTAL = 32;
 const sh = () => ({ type: "outer", color: "1E3A5F", blur: 7, offset: 2, angle: 90, opacity: 0.14 });
 
 function T(s, txt, o = {}) {
@@ -82,7 +94,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
     ["رابط‌های کاربری چندکاناله", "نمایشگر، وب موبایل، داشبورد و اپ HA"],
     ["حضور و غیاب مبتنی بر چهره", "معماری سه‌لایه با صف پایا"],
     ["امنیت و حریم خصوصی", "TLS، توکن‌ها، قواعد سخت قفل"],
-    ["آزمون‌ها، نتایج و جمع‌بندی", "۱۴ سناریوی انتهابه‌انتها + کارهای آینده"],
+    ["آزمون‌ها، اجرای واقعی و جمع‌بندی", "۱۴ سناریوی انتهابه‌انتها + ویدیوهای اجرای واقعی"],
   ];
   const colW = 6.05, rowH = 1.18, y0 = 1.85;
   items.forEach(([t, d], i) => {
@@ -587,10 +599,164 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   s.addNotes("هر چالش: علامت → ریشه → فیکس. نشان‌دهنده مهارت ریشه‌یابی واقعی در سیستم‌های نهفته.");
 }
 
-/* ---------------- S24 — Summary + future ---------------- */
+/* ---------------- S24 — Divider: real hardware ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG_DARK };
+  s.addText("REAL", { x: 0.4, y: 0.75, w: W - 0.8, h: 2.9, fontSize: 115, fontFace: TF, color: "1D3350", align: "center", margin: 0 });
+  imgCard(s, `${IMG}/Board Image.jpg`, M + 0.05, 2.0, 3.6, 4.8);
+  T(s, "فصل ۱۱ — اثبات نهایی", { x: 4.7, y: 2.1, w: 8.13, h: 0.4, fontSize: 15, bold: true, color: ACCENT });
+  T(s, "اجرای واقعی روی سخت‌افزار", { x: 4.7, y: 2.55, w: 8.13, h: 0.9, fontSize: 40, fontFace: TF, color: "FFFFFF" });
+  T(s, "همه‌ی اجزا — همان‌طور که طراحی شدند — روی برد و سرویس‌های واقعی اجرا شده‌اند", { x: 4.7, y: 3.6, w: 8.13, h: 0.5, fontSize: 15.5, color: LIGHT_ON_DARK });
+  T(s, fa(1), { x: 12.18, y: 4.45, w: 0.65, h: 0.55, fontSize: 21, fontFace: TF, color: ACCENT, align: "center" });
+  T(s, "رابط واقعی روی نمایشگر", { x: 4.7, y: 4.45, w: 7.35, h: 0.4, fontSize: 16, bold: true, color: "FFFFFF" });
+  T(s, "نُه صفحه‌ی LVGL — اسکرین‌شات از LCD واقعی و ویدیوی تست لمس", { x: 4.7, y: 4.85, w: 7.35, h: 0.4, fontSize: 13, color: LIGHT_ON_DARK });
+  T(s, fa(2), { x: 12.18, y: 5.55, w: 0.65, h: 0.55, fontSize: 21, fontFace: TF, color: ACCENT, align: "center" });
+  T(s, "تست‌های زنده", { x: 4.7, y: 5.55, w: 7.35, h: 0.4, fontSize: 16, bold: true, color: "FFFFFF" });
+  T(s, "حضور و غیاب با چهره، وب‌داشبورد، اپ Home Assistant و ربات بله", { x: 4.7, y: 5.95, w: 7.35, h: 0.4, fontSize: 13, color: LIGHT_ON_DARK });
+  pageNum(s, 24);
+  s.addNotes("فصل جدید: خروج از شکل‌ها به سخت‌افزار واقعی. عکس میز کار: برد ESP32-S3، LCD روشن و اپ HA روی گوشی.");
+}
+
+/* ---------------- S25 — Real LCD UI gallery ---------------- */
 {
   const s = pres.addSlide(); s.background = { color: BG };
-  header(s, "فصل ۱۱ — جمع‌بندی", "جمع‌بندی و مسیر توسعه آینده");
+  header(s, "اجرای واقعی — نمایشگر لمسی", "نُه صفحه‌ی LVGL، اسکرین‌شات از LCD واقعی", 27);
+  const lcd = [
+    "Main Screen.png", "Unlock Screen.png", "Wifi List.png",
+    "Mqtt Setting.png", "Setting Screen.png", "Attend QR Code.png",
+  ];
+  const cw = 1.72, chh = 2.56, gx = 0.2, gy = 0.2, x0 = 0.6, y0 = 1.62;
+  lcd.forEach((f, i) => {
+    const col = i % 3, row = Math.floor(i / 3);
+    const x = x0 + (2 - col) * (cw + gx); // RTL: first item rightmost
+    const y = y0 + row * (chh + gy);
+    imgCard(s, `${IMG}/LCD UI/${f}`, x, y, cw, chh);
+  });
+  const rows = [
+    ["راه‌اندازی شبکه و بروکر روی خود دستگاه", "اسکن و اتصال وای‌فای با کیبورد لمسی؛ پیکربندی Mosquitto بدون نیاز به رایانه"],
+    ["مدیریت چهره و رمزها از نمایشگر", "ثبت و حذف چهره، رمز صفحه‌ی تنظیمات و رمز درب — همه روی دستگاه"],
+    ["QR دو-حالته‌ی حضور و غیاب", "توکن ۱۰ دقیقه‌ای با شمارش معکوس؛ ورود و خروج روی همان صفحه"],
+    ["یک منبع وضعیت برای همه‌ی کانال‌ها", "همان app_state که وب‌داشبورد، HA و ربات بله نشان می‌دهند"],
+  ];
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, 6.55, 1.85 + i * 1.18, 6.28, { dy: 0.38, dh: 0.6, ds: 12.5 }));
+  T(s, "۶ صفحه از ۹ — سه صفحه‌ی دیگر (ورود رمز وای‌فای، QR وب و فهرست چهره‌ها) در README مخزن آمده است.", { x: 6.55, y: 6.55, w: 6.28, h: 0.45, fontSize: 12, color: MUTED, lineSpacingMultiple: 1.2 });
+  pageNum(s, 25);
+  s.addNotes("اسکرین‌شات مستقیم از LCD ۳۲۰×۴۸۰. تأکید: راه‌اندازی کامل شبکه و بروکر بدون رایانه، فقط با نمایشگر.");
+}
+
+/* ---------------- S26 — Video: LCD touch test ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG };
+  header(s, "اجرای واقعی — ویدیو ۱", "تست لمس نمایشگر روی برد واقعی", 27);
+  const vw = 4.4;
+  s.addShape("roundRect", { x: W - M - vw - 0.08, y: 1.87, w: vw + 0.16, h: vw + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
+  s.addMedia({ type: "video", path: silentVideo(`${IMG}/Lcd Test.mp4`), x: W - M - vw, y: 1.95, w: vw, h: vw, cover: coverData("poster-lcd") });
+  T(s, "ویدیوی تست واقعی — ۳۹ ثانیه", { x: W - M - vw, y: 6.6, w: vw, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+  const rows = [
+    ["لمس و بازخورد فوری رابط", "جابه‌جایی بین صفحه‌ها، کلیدهای چراغ و فن و اسلایدر روشنایی — در حال پردازش هم‌زمان شبکه و رابط گرافیکی"],
+    ["باز کردن درب با رمز و چهره", "کیبورد عددی روی نمایشگر و جریان تشخیص چهره از همان صفحه"],
+    ["سنسورهای زنده", "دما، رطوبت و فشار BME280 به‌صورت لحظه‌ای روی کاشی‌های پایین صفحه"],
+    ["چراغ‌های وضعیت روی برد", "LEDهای بالای قاب، روشن‌شدن هم‌زمان با فرمان چراغ را نشان می‌دهند"],
+  ];
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.18, 7.35, { dy: 0.38, dh: 0.6, ds: 12.5 }));
+  pageNum(s, 26);
+  s.addNotes("ویدیوی جاسازی‌شده — در ارائه کلیک و پخش. لمس صفحه‌های مختلف، رمز درب، سنسورها و پاسخ LEDها.");
+}
+
+/* ---------------- S27 — Video: attendance E2E ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG };
+  header(s, "اجرای واقعی — ویدیو ۲", "تست حضور و غیاب با چهره — انتها به انتها", 27);
+  const vw = 2.13, vh = 4.9, vx = W - M - vw;
+  s.addShape("roundRect", { x: vx - 0.08, y: 1.72, w: vw + 0.16, h: vh + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
+  s.addMedia({ type: "video", path: silentVideo(`${IMG}/Attendance test.mp4`), x: vx, y: 1.8, w: vw, h: vh, cover: coverData("poster-attendance") });
+  T(s, "ویدیوی تست واقعی — ۳۰ ثانیه", { x: vx - 0.2, y: 6.8, w: vw + 0.4, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+  const rows = [
+    ["اسکن QR از روی LCD", "توکن ۱۰ دقیقه‌ای نمایشگر با دوربین گوشی خوانده می‌شود — بدون نصب هیچ اپی"],
+    ["تطبیق چهره روی خود برد", "عکس از مرورگر گوشی → رمزگشایی JPEG سخت‌افزاری → استخراج بردار ویژگی → تطبیق با پایگاه چهره"],
+    ["ثبت رکورد در سرور لوکال", "نوع ورود/خروج با زمان دقیق در FastAPI/SQLite"],
+    ["بایگانی و اعلان — بلافاصله", "شیت جلالی + پیام ربات بله؛ در قطعی شبکه، رکورد در صف NVS می‌ماند و بعداً ارسال می‌شود"],
+  ];
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.18, 9.85, { dy: 0.38, dh: 0.6, ds: 12.5 }));
+  pageNum(s, 27);
+  s.addNotes("کل جریان در یک ویدیو: اسکن QR از LCD، دوربین و تطبیق چهره، ثبت ورود و بنر اعلان بله در پایان.");
+}
+
+/* ---------------- S28 — Video: web dashboard + HA app ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG };
+  header(s, "اجرای واقعی — ویدیو ۳", "وب‌داشبورد و اپ Home Assistant روی گوشی", 27);
+  const vw = 2.13, vh = 4.9, vy = 1.8;
+  const vids = [
+    { f: "Smart Home – Home Assistant_Mobile.mp4", p: "poster-ha", cap: "اپ Home Assistant — ۵۸ ثانیه", x: W - M - vw },
+    { f: "Web Dashboard test.mp4", p: "poster-webdash", cap: "وب‌داشبورد — ۴۳ ثانیه", x: W - M - vw - vw - 0.55 },
+  ];
+  vids.forEach(v => {
+    s.addShape("roundRect", { x: v.x - 0.08, y: vy - 0.08, w: vw + 0.16, h: vh + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
+    s.addMedia({ type: "video", path: silentVideo(`${IMG}/${v.f}`), x: v.x, y: vy, w: vw, h: vh, cover: coverData(v.p) });
+    T(s, v.cap, { x: v.x - 0.25, y: vy + vh + 0.1, w: vw + 0.5, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+  });
+  const rows = [
+    ["وب‌داشبورد خودِ برد", "کلید چراغ و فن، قفل درب با رمز و تشخیص چهره، وضعیت زنده‌ی محیط و عامل ML"],
+    ["اپ Home Assistant با ۱۳ موجودیت", "کشف خودکار MQTT؛ کنترل، اتوماسیون و اعلان — همه‌ی وضعیت‌ها دوطرفه"],
+    ["یک منبع وضعیت", "تغییر از هر کانال، بی‌درنگ در بقیه‌ی کانال‌ها بازتاب می‌یابد"],
+  ];
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.35, 7.4, { dy: 0.38, dh: 0.62, ds: 12.5 }));
+  pageNum(s, 28);
+  s.addNotes("دو ویدیو: اپ HA با اسکرول داشبورد و اتوماسیون‌ها؛ وب‌داشبورد با باز کردن درب و کلیدها.");
+}
+
+/* ---------------- S29 — Real channel screenshots ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG };
+  header(s, "اجرای واقعی — نمای ثابت", "وب‌داشبورد، اپ HA و ربات بله در یک قاب", 27);
+  const shots = [
+    { f: `${IMG}/Web Dashboard.png`, w: 2.51, label: "وب‌داشبورد" },
+    { f: `${IMG}/Smart Home – Home Assistant_Dashboard.png`, w: 2.70, label: "اپ Home Assistant" },
+    { f: `${IMG}/Bale_1.jpg`, w: 2.12, label: "ربات بله" },
+  ];
+  let sx = W - M;
+  shots.forEach(sh2 => {
+    const h2 = 4.7, x = sx - sh2.w;
+    T(s, sh2.label, { x: x - 0.08, y: 1.58, w: sh2.w + 0.16, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+    imgCard(s, sh2.f, x, 1.95, sh2.w, h2);
+    sx = x - 0.25;
+  });
+  const rows = [
+    ["وب‌داشبورد (نمای موبایل)", "قفل درب با رمز و Face ID، وضعیت محیط و عامل ML در حالت SHADOW"],
+    ["اپ Home Assistant", "کارت‌های محیط، کنترل دستگاه‌ها، دسترسی و چهار اتوماسیون واقعی"],
+    ["ربات بله", "منوی دستورهای فارسی، باز کردن درب با رمز یک‌بارمصرف، اعلان رخدادها"],
+  ];
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.5, 4.2, { dy: 0.4, dh: 0.72, ds: 12, ts: 14 }));
+  pageNum(s, 29);
+  s.addNotes("سه کانال کنار هم: وب‌داشبورد خود برد، اپ HA و ربات بله — همگی از یک منبع وضعیت تغذیه می‌شوند.");
+}
+
+/* ---------------- S30 — Deployment & archive ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG };
+  header(s, "اجرای واقعی — زیرساخت", "استقرار Docker و بایگانی شمسی", 27);
+  imgCard(s, `${IMG}/Docker.png`, W - M - 7.3, 1.9, 7.3, 3.88);
+  imgCard(s, `${IMG}/Google Sheet.png`, 0.6, 1.9, 3.5, 3.73);
+  const cards3 = [
+    "هفت کانتینر سبک: Mosquitto، Home Assistant، attendance و bale-bot",
+    "بایگانی خودکار با تقویم جلالی — ستون‌های ورود و خروج روی شیت",
+    "اعلان بله هم‌زمان با ثبت هر رکورد حضور و غیاب",
+  ];
+  const cw3 = 3.94, cy = 6.0;
+  cards3.forEach((t, i) => {
+    const x = W - M - cw3 - i * (cw3 + 0.25);
+    card(s, x, cy, cw3, 0.75, SURF2);
+    T(s, t, { x: x + 0.15, y: cy, w: cw3 - 0.3, h: 0.75, fontSize: 11.5, color: PRIMARY, valign: "middle", lineSpacingMultiple: 1.15 });
+  });
+  pageNum(s, 30);
+  s.addNotes("سمت راست: Docker Desktop با هفت کانتینر در حال اجرا. سمت چپ: شیت حضور و غیاب با تاریخ جلالی.");
+}
+
+/* ---------------- S31 — Summary + future ---------------- */
+{
+  const s = pres.addSlide(); s.background = { color: BG };
+  header(s, "فصل ۱۲ — جمع‌بندی", "جمع‌بندی و مسیر توسعه آینده");
   const cw = 6.05, y0 = 1.85, chh = 4.9;
   card(s, W - M - cw, y0, cw, chh, SURFACE, false);
   T(s, "آنچه ساخته شد", { x: W - M - cw + 0.3, y: y0 + 0.22, w: cw - 0.6, h: 0.45, fontSize: 17, bold: true, color: PRIMARY });
@@ -614,7 +780,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
     "سنسورهای واقعی حضور/نور، اثر انگشت دو-عاملی و برد اختصاصی (PCB)",
   ];
   next.forEach((t, i) => T(s, t, { x: M + 0.3, y: y0 + 0.8 + i * 0.68, w: cw - 0.6, h: 0.64, fontSize: 12.5, color: TEXT, lineSpacingMultiple: 1.15 }));
-  pageNum(s, 24);
+  pageNum(s, 31);
   s.addNotes("جمع‌بندی: پروژه به همه اهداف طراحی رسید. آینده: فدرال، صوتی، liveness، OTA، امن‌سازی، PCB.");
 }
 
@@ -627,7 +793,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   s.addShape("line", { x: W / 2 - 1.1, y: 4.75, w: 2.2, h: 0, line: { color: "2E4A6E", width: 1 } });
   T(s, "محمد سروش ربیعی — طراحی و پیاده‌سازی سامانه خانه هوشمند مبتنی بر اینترنت اشیا با هوش مصنوعی روی لبه", { x: 1.5, y: 5.0, w: W - 3, h: 0.45, fontSize: 13, color: LIGHT_ON_DARK, align: "center" });
   T(s, "دانشکده مهندسی برق و کامپیوتر، دانشگاه صنعتی اصفهان — مهر ۱۴۰۵", { x: 1.5, y: 5.5, w: W - 3, h: 0.4, fontSize: 12, color: "8FA3BC", align: "center" });
-  pageNum(s, 25);
+  pageNum(s, 32);
   s.addNotes("پایان ارائه. آماده پاسخ به پرسش‌ها. اسلایدهای ۱۴ و ۱۶ برای بازگشت سریع در پرسش‌های ML مناسب‌اند.");
 }
 
