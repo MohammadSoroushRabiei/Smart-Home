@@ -306,7 +306,7 @@ idf.py build                 # 固件加载新权重
 
 ## 📚 文档
 
-- 📄 [项目报告（PDF，53 页）](../report/render/SmartHome-Project-Report.pdf)
+- 📄 [项目报告（PDF，59 页）](../report/render/SmartHome-Project-Report.pdf)
 - 🔌 [引脚映射与空闲 GPIO 参考](hardware/pin-mapping.md)
 - 🧠 [ML 系统设计](ml-design.md)
 - 📅 [考勤系统搭建指南](attendance/README.md)

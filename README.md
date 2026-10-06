@@ -327,7 +327,8 @@ idf.py build                 # firmware picks up the new weights
 
 ## 📚 Documentation
 
-- 📄 [Project report (PDF, 53 pages)](report/render/SmartHome-Project-Report.pdf)
+- 📄 [Project report, Persian (PDF, 59 pages)](report/render/SmartHome-Project-Report.pdf)
+- 📄 [Project report, English (PDF, 51 pages)](report/render/SmartHome-Project-Report-EN.pdf)
 - 🔌 [Pin map & free GPIO reference](docs/hardware/pin-mapping.md)
 - 🧠 [ML system design](docs/ml-design.md)
 - 📅 [Attendance setup guide](docs/attendance/README.md)

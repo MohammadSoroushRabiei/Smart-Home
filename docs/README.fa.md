@@ -324,7 +324,7 @@ idf.py build                 # فرمور وزن‌های جدید را برمی
 
 ## 📚 مستندات
 
-- 📄 [گزارش پروژه (PDF، ۵۳ صفحه)](../report/render/SmartHome-Project-Report.pdf)
+- 📄 [گزارش پروژه (PDF، ۵۹ صفحه)](../report/render/SmartHome-Project-Report.pdf)
 - 🔌 [نقشه پین و مرجع GPIOهای آزاد](hardware/pin-mapping.md)
 - 🧠 [طراحی سیستم ML](ml-design.md)
 - 📅 [راهنمای راه‌اندازی حضور و غیاب](attendance/README.md)

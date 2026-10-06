@@ -457,14 +457,14 @@ body.paused #stage *{animation-play-state:paused!important}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/></svg>
       SMART HOME <em>/ PROJECT TEASER</em>
     </header>
-    <div id="hint">Space pause &nbsp;·&nbsp; ← → scenes &nbsp;·&nbsp; F fullscreen</div>
+    <div id="hint" data-i18n="hint">Space pause &nbsp;·&nbsp; ← → scenes &nbsp;·&nbsp; F fullscreen</div>
     <div id="trail"></div>
 
     <!-- ═══════════ SCENE 1 · TITLE ═══════════ -->
     <section class="scene" id="s1">
       <div class="badges in down" style="--d:.15s">
         <span class="pill"><i></i>ESP32-S3 &nbsp;·&nbsp; FreeRTOS &nbsp;·&nbsp; LVGL 9</span>
-        <span class="pill"><i></i>No cloud required</span>
+        <span class="pill" data-i18n="s1.pill2"><i></i>No cloud required</span>
       </div>
       <svg class="in" style="--d:.4s" width="150" height="120" viewBox="0 0 150 120" fill="none" stroke="url(#gTitle)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <defs><linearGradient id="gTitle" x1="0" y1="0" x2="150" y2="120" gradientUnits="userSpaceOnUse">
@@ -476,34 +476,34 @@ body.paused #stage *{animation-play-state:paused!important}
         <path class="draw" pathLength="1" style="--d:1.6s" d="M65 52v-8M75 52v-8M85 52v-8M65 96v-8M75 96v-8M85 96v-8M57 62h-8M57 72h-8M93 62h8M93 72h8"/>
       </svg>
       <h1 class="in" style="--d:.75s">SMART&nbsp;HOME</h1>
-      <p class="sub in" style="--d:1.05s">An edge-first home automation platform — face recognition, an on-chip
+      <p class="sub in" style="--d:1.05s" data-i18n="s1.sub">An edge-first home automation platform — face recognition, an on-chip
       self-learning agent and a fully local service stack.</p>
       <div class="rule grow" style="--d:1.35s"></div>
       <div class="byline in" style="--d:1.55s">Mohammad <em>Soroush&nbsp;Rabiei</em></div>
-      <div class="mini in" style="--d:1.8s">Isfahan University of Technology</div>
+      <div class="mini in" style="--d:1.8s" data-i18n="s1.mini">Isfahan University of Technology</div>
     </section>
 
     <!-- ═══════════ SCENE 2 · EDGE NODE ═══════════ -->
     <section class="scene" id="s2">
-      <div class="kicker in" style="--d:.1s">01 · The Edge Node</div>
-      <h2 class="in" style="--d:.3s">All the intelligence, <span class="accent">on one chip.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s2.kicker">01 · The Edge Node</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s2.h2">All the intelligence, <span class="accent">on one chip.</span></h2>
       <p class="sub in" style="--d:.5s">ESP32-S3-DevKitC-1 · N16R8 — 16&nbsp;MB flash, 8&nbsp;MB octal PSRAM.</p>
       <div class="cards2">
         <div class="card in" style="--d:.75s">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="10" y="10" width="4" height="4"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg></div>
-          <div><b>Dual-core ESP32-S3</b><span>Xtensa LX7 @ 240&nbsp;MHz · ESP-IDF 6 · dual-core FreeRTOS</span></div>
+          <div data-i18n="s2.c1b"><b>Dual-core ESP32-S3</b><span>Xtensa LX7 @ 240&nbsp;MHz · ESP-IDF 6 · dual-core FreeRTOS</span></div>
         </div>
         <div class="card in" style="--d:.9s">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-          <div><b>320×480 Touch Display</b><span>LVGL&nbsp;9 dashboard UI · GT911 touch · PWM backlight</span></div>
+          <div data-i18n="s2.c2b"><b>320×480 Touch Display</b><span>LVGL&nbsp;9 dashboard UI · GT911 touch · PWM backlight</span></div>
         </div>
         <div class="card in" style="--d:1.05s">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/><path d="M12 9v6"/></svg></div>
-          <div><b>Climate &amp; Light Sensing</b><span>BME280 temperature / humidity / pressure · LDR ambient lux</span></div>
+          <div data-i18n="s2.c3b"><b>Climate &amp; Light Sensing</b><span>BME280 temperature / humidity / pressure · LDR ambient lux</span></div>
         </div>
         <div class="card in" style="--d:1.2s">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 8h18M3 16h18"/><circle cx="7" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="17" cy="16" r="1.6" fill="currentColor" stroke="none"/></svg></div>
-          <div><b>Dual I²C Buses</b><span>Isolated touch / sensor buses · hardware-reset watchdog</span></div>
+          <div data-i18n="s2.c4b"><b>Dual I²C Buses</b><span>Isolated touch / sensor buses · hardware-reset watchdog</span></div>
         </div>
       </div>
     </section>
@@ -525,24 +525,24 @@ body.paused #stage *{animation-play-state:paused!important}
         <div class="scanline"></div>
         <div class="verdict pop" style="--d:2.6s">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-          Authorized · cosine ≥ 0.70
+          <span data-i18n="s3.verdict">Authorized · cosine ≥ 0.70</span>
         </div>
       </div>
       <div>
-        <div class="kicker in" style="--d:.2s">03 · Access Control</div>
-        <h2 class="in" style="--d:.4s">Unlock with <span class="accent">a glance.</span></h2>
+        <div class="kicker in" style="--d:.2s" data-i18n="s3.kicker">03 · Access Control</div>
+        <h2 class="in" style="--d:.4s" data-i18n="s3.h2">Unlock with <span class="accent">a glance.</span></h2>
         <div class="blist">
           <div class="b in" style="--d:.7s">
             <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="10" y="10" width="4" height="4"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg></div>
-            <div><b>Full CNN pipeline, on-chip</b><p>ESP-DL detect → embed → cosine match, decoded in PSRAM by the hardware JPEG engine.</p></div>
+            <div data-i18n="s3.b1b"><b>Full CNN pipeline, on-chip</b><p data-i18n="s3.b1p">ESP-DL detect → embed → cosine match, decoded in PSRAM by the hardware JPEG engine.</p></div>
           </div>
           <div class="b in" style="--d:.9s">
             <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5c0 5 3.2 8.4 7.5 10 4.3-1.6 7.5-5 7.5-10V6Z"/><path d="m9 11.5 2 2 4-4.5"/></svg></div>
-            <div><b>Private by architecture</b><p>Frames are processed locally and never stored — the internet stays optional.</p></div>
+            <div data-i18n="s3.b2b"><b>Private by architecture</b><p data-i18n="s3.b2p">Frames are processed locally and never stored — the internet stays optional.</p></div>
           </div>
           <div class="b in" style="--d:1.1s">
             <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h5V4M20 15h-5v5M4 15h5v5M20 9h-5V4" stroke-linecap="round"/></svg></div>
-            <div><b>Enrollment made safe</b><p>Multi-sample face database, editable on-device · QR links expire in 3 minutes.</p></div>
+            <div data-i18n="s3.b3b"><b>Enrollment made safe</b><p data-i18n="s3.b3p">Multi-sample face database, editable on-device · QR links expire in 3 minutes.</p></div>
           </div>
         </div>
       </div>
@@ -550,8 +550,8 @@ body.paused #stage *{animation-play-state:paused!important}
 
     <!-- ═══════════ SCENE 4 · ON-DEVICE LCD DASHBOARD ═══════════ -->
     <section class="scene" id="s4">
-      <div class="kicker in" style="--d:.1s">02 · On-Device Dashboard</div>
-      <h2 class="in" style="--d:.3s">A full touch UI, <span class="accent">on the wall.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s4.kicker">02 · On-Device Dashboard</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s4.h2">A full touch UI, <span class="accent">on the wall.</span></h2>
       <div class="split">
         <div class="lcdwrap">
           <div class="lcd pop" style="--d:.55s">
@@ -573,15 +573,15 @@ body.paused #stage *{animation-play-state:paused!important}
           <div class="blist">
             <div class="b in" style="--d:.8s">
               <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 9.5a15 15 0 0 1 19 0M5.5 13a10.5 10.5 0 0 1 13 0M8.5 16.4a6 6 0 0 1 7 0"/><circle cx="12" cy="19.6" r="1.3" fill="currentColor" stroke="none"/></svg></div>
-              <div><b>Provisioning on the spot</b><p>Wi-Fi setup and MQTT broker settings live on the device — no PC needed.</p></div>
+              <div data-i18n="s4.b1b"><b>Provisioning on the spot</b><p data-i18n="s4.b1p">Wi-Fi setup and MQTT broker settings live on the device — no PC needed.</p></div>
             </div>
             <div class="b in" style="--d:1s">
               <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h5V4M20 15h-5v5M4 15h5v5M20 9h-5V4" stroke-linecap="round"/></svg></div>
-              <div><b>Attendance kiosk</b><p>A rotating QR token with countdown; the employee's phone matches the face.</p></div>
+              <div data-i18n="s4.b2b"><b>Attendance kiosk</b><p data-i18n="s4.b2p">A rotating QR token with countdown; the employee's phone matches the face.</p></div>
             </div>
             <div class="b in" style="--d:1.2s">
               <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5 5l1.8 1.8M17.2 17.2 19 19M19 5l-1.8 1.8M6.8 17.2 5 19"/></svg></div>
-              <div><b>Comfort at a fingertip</b><p>Live climate, device toggles and PWM brightness — right where you walk in.</p></div>
+              <div data-i18n="s4.b3b"><b>Comfort at a fingertip</b><p data-i18n="s4.b3p">Live climate, device toggles and PWM brightness — right where you walk in.</p></div>
             </div>
           </div>
         </div>
@@ -590,27 +590,27 @@ body.paused #stage *{animation-play-state:paused!important}
 
     <!-- ═══════════ SCENE 5 · ML AGENT ═══════════ -->
     <section class="scene" id="s5">
-      <div class="kicker in" style="--d:.1s">04 · Behavior Agent</div>
-      <h2 class="in" style="--d:.3s">It learns <span class="accent">how you live.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s5.kicker">04 · Behavior Agent</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s5.h2">It learns <span class="accent">how you live.</span></h2>
       <svg id="net" viewBox="0 0 1040 360" fill="none" aria-hidden="true"></svg>
       <div class="mbars">
-        <div class="mbar in" style="--d:1.5s"><div class="t"><b>Light head</b><span>94.2%</span></div><div class="track"><div class="fill" style="--d:1.7s;--w:94.2%"></div></div></div>
-        <div class="mbar in" style="--d:1.65s"><div class="t"><b>Fan head</b><span>93.6%</span></div><div class="track"><div class="fill" style="--d:1.85s;--w:93.6%"></div></div></div>
+        <div class="mbar in" style="--d:1.5s"><div class="t" data-i18n="s5.m1"><b>Light head</b><span>94.2%</span></div><div class="track"><div class="fill" style="--d:1.7s;--w:94.2%"></div></div></div>
+        <div class="mbar in" style="--d:1.65s"><div class="t" data-i18n="s5.m2"><b>Fan head</b><span>93.6%</span></div><div class="track"><div class="fill" style="--d:1.85s;--w:93.6%"></div></div></div>
       </div>
       <div class="gate in" style="--d:2.1s">
-        <span class="pill"><i></i>Pre-trained · 6,912 samples</span>
+        <span class="pill" data-i18n="s5.g1"><i></i>Pre-trained · 6,912 samples</span>
         <span class="arrow">→</span>
-        <span class="pill"><i></i>Shadow → Auto gate</span>
+        <span class="pill" data-i18n="s5.g2"><i></i>Shadow → Auto gate</span>
         <span class="arrow">→</span>
-        <span class="pill"><i></i>On-chip SGD → NVS</span>
+        <span class="pill" data-i18n="s5.g3"><i></i>On-chip SGD → NVS</span>
       </div>
-      <p class="foot in" style="--d:2.5s"><b>Manual control always wins</b> — and the door lock is never under model control.</p>
+      <p class="foot in" style="--d:2.5s" data-i18n="s5.foot"><b>Manual control always wins</b> — and the door lock is never under model control.</p>
     </section>
 
     <!-- ═══════════ SCENE 6 · TELEMETRY ═══════════ -->
     <section class="scene" id="s6">
-      <div class="kicker in" style="--d:.1s">05 · Real-Time Telemetry</div>
-      <h2 class="in" style="--d:.3s">Every state, <span class="accent">published live.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s6.kicker">05 · Real-Time Telemetry</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s6.h2">Every state, <span class="accent">published live.</span></h2>
       <svg id="flowsvg" viewBox="0 0 1240 320" fill="none" aria-hidden="true">
         <path class="line flow" style="--d:1s" d="M250 160 H500" stroke="rgba(62,224,255,.4)" stroke-width="1.6"/>
         <path class="line flow" style="--d:1.3s" d="M620 160 C740 160 810 58 986 58" stroke="rgba(124,140,255,.4)" stroke-width="1.6"/>
@@ -619,12 +619,12 @@ body.paused #stage *{animation-play-state:paused!important}
         <g class="svgpop" style="--d:.5s">
           <rect class="dev" x="40" y="118" width="210" height="84" rx="16"/>
           <text class="devlab" x="145" y="155" text-anchor="middle">ESP32-S3</text>
-          <text class="sublab" x="145" y="180" text-anchor="middle">edge node · sensors · events</text>
+          <text class="sublab" x="145" y="180" text-anchor="middle" data-i18n="s6.n1">edge node · sensors · events</text>
         </g>
         <g class="svgpop" style="--d:.85s">
           <circle class="dev" cx="560" cy="160" r="60"/>
           <text class="devlab" x="560" y="155" text-anchor="middle" font-size="17">MQTT</text>
-          <text class="sublab" x="560" y="178" text-anchor="middle">Mosquitto broker</text>
+          <text class="sublab" x="560" y="178" text-anchor="middle" data-i18n="s6.n2">Mosquitto broker</text>
         </g>
         <g class="svgpop" style="--d:1.5s">
           <rect class="nodebox" x="986" y="26" width="234" height="64" rx="14"/>
@@ -653,30 +653,30 @@ body.paused #stage *{animation-play-state:paused!important}
 
     <!-- ═══════════ SCENE 7 · AUTOMATION & ATTENDANCE ═══════════ -->
     <section class="scene" id="s7">
-      <div class="kicker in" style="--d:.1s">06 · Automation &amp; Attendance</div>
-      <h2 class="in" style="--d:.3s">Automations that act. <span class="accent">Records that stay.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s7.kicker">06 · Automation &amp; Attendance</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s7.h2">Automations that act. <span class="accent">Records that stay.</span></h2>
       <div class="duo">
         <div class="panel in" style="--d:.6s">
           <div class="panel-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/></svg>Home Assistant</div>
-          <div class="fchip in" style="--d:.95s"><span class="fa">→</span>Trigger · presence after 18:00</div>
-          <div class="fchip in" style="--d:1.2s"><span class="fa">→</span>Condition · ambient lux &lt; 100</div>
-          <div class="fchip act in" style="--d:1.45s"><span class="fa">⚡</span>Action · light turns itself ON</div>
-          <p class="pnote in" style="--d:1.75s">Two-way MQTT — every state visible in HA, every device controllable from its dashboards.</p>
+          <div class="fchip in" style="--d:.95s" data-i18n="s7.f1"><span class="fa">→</span>Trigger · presence after 18:00</div>
+          <div class="fchip in" style="--d:1.2s" data-i18n="s7.f2"><span class="fa">→</span>Condition · ambient lux &lt; 100</div>
+          <div class="fchip act in" style="--d:1.45s" data-i18n="s7.f3"><span class="fa">⚡</span>Action · light turns itself ON</div>
+          <p class="pnote in" style="--d:1.75s" data-i18n="s7.p1">Two-way MQTT — every state visible in HA, every device controllable from its dashboards.</p>
         </div>
         <div class="panel in" style="--d:.78s">
           <div class="panel-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h5V4M20 15h-5v5M4 15h5v5M20 9h-5V4" stroke-linecap="round"/></svg>Attendance</div>
-          <div class="fchip in" style="--d:1.1s"><span class="fa">→</span>QR token on the LCD · 10-min validity</div>
-          <div class="fchip in" style="--d:1.35s"><span class="fa">→</span>Face matched by the employee's phone</div>
-          <div class="fchip act in" style="--d:1.6s"><span class="fa">✓</span>SQLite → Google Sheets (Jalali) → Bale ping</div>
-          <p class="pnote in" style="--d:1.9s">Server or internet down? A 32-slot NVS outbox on the board flushes it all later.</p>
+          <div class="fchip in" style="--d:1.1s" data-i18n="s7.f4"><span class="fa">→</span>QR token on the LCD · 10-min validity</div>
+          <div class="fchip in" style="--d:1.35s" data-i18n="s7.f5"><span class="fa">→</span>Face matched by the employee's phone</div>
+          <div class="fchip act in" style="--d:1.6s" data-i18n="s7.f6"><span class="fa">✓</span>SQLite → Google Sheets (Jalali) → Bale ping</div>
+          <p class="pnote in" style="--d:1.9s" data-i18n="s7.p2">Server or internet down? A 32-slot NVS outbox on the board flushes it all later.</p>
         </div>
       </div>
     </section>
 
     <!-- ═══════════ SCENE 8 · WEB DASHBOARD ═══════════ -->
     <section class="scene" id="s8">
-      <div class="kicker in" style="--d:.1s">07 · Web Dashboard</div>
-      <h2 class="in" style="--d:.3s">Your whole home, <span class="accent">in a browser tab.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s8.kicker">07 · Web Dashboard</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s8.h2">Your whole home, <span class="accent">in a browser tab.</span></h2>
       <div class="browser pop" style="--d:.55s">
         <div class="bw-bar">
           <i></i><i></i><i></i>
@@ -690,7 +690,7 @@ body.paused #stage *{animation-play-state:paused!important}
           <div class="tile enroll in" style="--d:1.55s">
             <b>Face enrollment</b>
             <span class="slider big"><i class="fill" style="--d:2s;--w:100%"></i></span>
-            <span class="okline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Soroush — enrolled</span>
+            <span class="okline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n="s8.ok">Soroush — enrolled</span></span>
           </div>
         </div>
       </div>
@@ -698,8 +698,8 @@ body.paused #stage *{animation-play-state:paused!important}
 
     <!-- ═══════════ SCENE 9 · BALE MESSENGER BOT ═══════════ -->
     <section class="scene" id="s9">
-      <div class="kicker in" style="--d:.1s">08 · Bale Messenger</div>
-      <h2 class="in" style="--d:.3s">Control and alerts, <span class="accent">from your chat.</span></h2>
+      <div class="kicker in" style="--d:.1s" data-i18n="s9.kicker">08 · Bale Messenger</div>
+      <h2 class="in" style="--d:.3s" data-i18n="s9.h2">Control and alerts, <span class="accent">from your chat.</span></h2>
       <div class="split2">
         <div class="phonewrap">
           <div class="phone pop" style="--d:.55s">
@@ -710,23 +710,23 @@ body.paused #stage *{animation-play-state:paused!important}
               <div class="msg me in" style="--d:1.95s">/status</div>
               <div class="msg in" style="--d:2.35s">🌡 23.4°C · 💧 42% · 🔒 locked</div>
             </div>
-            <div class="ph-note">8 commands · snapshots every 10 min · security log</div>
-            <div class="notif"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2.5"/></svg>Door unlocked — face match · Soroush</div>
+            <div class="ph-note" data-i18n="s9.note">8 commands · snapshots every 10 min · security log</div>
+            <div class="notif"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2.5"/></svg><span data-i18n="s9.notif">Door unlocked — face match · Soroush</span></div>
           </div>
         </div>
         <div>
           <div class="blist">
             <div class="b in" style="--d:.85s">
               <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-5 6 5 6M16 6l5 6-5 6M13.5 4.5l-3 15"/></svg></div>
-              <div><b>Remote control</b><p>Eight commands — lights, fan, lock, status — straight from the chat window.</p></div>
+              <div data-i18n="s9.b1b"><b>Remote control</b><p data-i18n="s9.b1p">Eight commands — lights, fan, lock, status — straight from the chat window.</p></div>
             </div>
             <div class="b in" style="--d:1.05s">
               <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg></div>
-              <div><b>Instant notifications</b><p>Unlock events, attendance check-ins and failed keypad attempts are pushed to Bale.</p></div>
+              <div data-i18n="s9.b2b"><b>Instant notifications</b><p data-i18n="s9.b2p">Unlock events, attendance check-ins and failed keypad attempts are pushed to Bale.</p></div>
             </div>
             <div class="b in" style="--d:1.25s">
               <div class="bic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5c0 5 3.2 8.4 7.5 10 4.3-1.6 7.5-5 7.5-10V6Z"/><path d="M12 8v4M12 15h.01"/></svg></div>
-              <div><b>Security log</b><p>Every event is stored with its source, plus a periodic snapshot of the whole home.</p></div>
+              <div data-i18n="s9.b3b"><b>Security log</b><p data-i18n="s9.b3p">Every event is stored with its source, plus a periodic snapshot of the whole home.</p></div>
             </div>
           </div>
         </div>
@@ -735,16 +735,16 @@ body.paused #stage *{animation-play-state:paused!important}
 
     <!-- ═══════════ SCENE 10 · CLOSING ═══════════ -->
     <section class="scene" id="s10">
-      <div class="pill in down" style="--d:.1s"><i></i>Smart Home · By the numbers</div>
+      <div class="pill in down" style="--d:.1s" data-i18n="s10.pill"><i></i>Smart Home · By the numbers</div>
       <div class="stats">
-        <div class="stat in" style="--d:.35s"><div><span class="num" data-count="94.2" data-dec="1" data-start="600" data-dur="1700">0.0</span><span class="unit">%</span></div><div class="cap">Light-head accuracy</div></div>
-        <div class="stat in" style="--d:.5s"><div><span class="num" data-count="93.6" data-dec="1" data-start="750" data-dur="1700">0.0</span><span class="unit">%</span></div><div class="cap">Fan-head accuracy</div></div>
-        <div class="stat in" style="--d:.65s"><div><span class="num" data-count="12" data-dec="0" data-start="900" data-dur="1500">0</span></div><div class="cap">Context features</div></div>
-        <div class="stat in" style="--d:.8s"><div><span class="num" data-count="8" data-dec="0" data-start="1050" data-dur="1400">0</span></div><div class="cap">Chat commands</div></div>
-        <div class="stat in" style="--d:.95s"><div><span class="num" data-count="0" data-dec="0" data-start="1200" data-dur="1200">0</span></div><div class="cap">Cloud dependencies</div></div>
+        <div class="stat in" style="--d:.35s"><div><span class="num" data-count="94.2" data-dec="1" data-start="600" data-dur="1700">0.0</span><span class="unit">%</span></div><div class="cap" data-i18n="s10.c1">Light-head accuracy</div></div>
+        <div class="stat in" style="--d:.5s"><div><span class="num" data-count="93.6" data-dec="1" data-start="750" data-dur="1700">0.0</span><span class="unit">%</span></div><div class="cap" data-i18n="s10.c2">Fan-head accuracy</div></div>
+        <div class="stat in" style="--d:.65s"><div><span class="num" data-count="12" data-dec="0" data-start="900" data-dur="1500">0</span></div><div class="cap" data-i18n="s10.c3">Context features</div></div>
+        <div class="stat in" style="--d:.8s"><div><span class="num" data-count="8" data-dec="0" data-start="1050" data-dur="1400">0</span></div><div class="cap" data-i18n="s10.c4">Chat commands</div></div>
+        <div class="stat in" style="--d:.95s"><div><span class="num" data-count="0" data-dec="0" data-start="1200" data-dur="1200">0</span></div><div class="cap" data-i18n="s10.c5">Cloud dependencies</div></div>
       </div>
-      <div class="ty in" style="--d:1.3s">Thank <span class="accent">you.</span></div>
-      <p class="who in" style="--d:1.6s">Soroush Rabiei — Undergraduate Final Project · Isfahan University of Technology</p>
+      <div class="ty in" style="--d:1.3s" data-i18n="s10.ty">Thank <span class="accent">you.</span></div>
+      <p class="who in" style="--d:1.6s" data-i18n="s10.who">Soroush Rabiei — Undergraduate Final Project · Isfahan University of Technology</p>
       <p class="gh in" style="--d:1.8s">github.com/MohammadSoroushRabiei/Smart-Home</p>
     </section>
 
@@ -1005,6 +1005,184 @@ window.__seek=(i,ms)=>{
   barfill.style.width=((STARTS[i]+ms)/TOTAL*100)+'%';
   updateHud();
 };
+</script>
+<style>
+#langs{position:fixed;top:12px;right:14px;z-index:80;display:flex;gap:4px}
+#langs button{appearance:none;border:1px solid rgba(255,255,255,.18);background:rgba(10,16,28,.55);color:#c9d6e8;font:600 12px/1 'Space Grotesk',Tahoma,sans-serif;padding:7px 10px;border-radius:999px;cursor:pointer;backdrop-filter:blur(6px)}
+#langs button.on{background:linear-gradient(135deg,#3ee0ff,#7c8cff);color:#071120;border-color:transparent}
+html[lang='fa'] [data-i18n]{font-family:Tahoma,'Segoe UI',sans-serif;letter-spacing:0}
+html[lang='zh'] [data-i18n]{font-family:'Space Grotesk','Microsoft YaHei','PingFang SC','Noto Sans SC',sans-serif}
+</style>
+<div id="langs" role="group" aria-label="Language">
+<button data-lang="en" class="on">EN</button>
+<button data-lang="fa">فا</button>
+<button data-lang="zh">中文</button>
+</div>
+<script>
+(function(){
+  var I18N={
+  fa:{
+    'hint':'Space توقف · ← → صحنه‌ها · F تمام‌صفحه',
+    's1.pill2':'بدون نیاز به ابر',
+    's1.sub':'پلتفرم اتوماسیون خانه‌ی هوشمند اول-لبه — تشخیص چهره، عامل خودآموخته روی تراشه و پشته‌ی سرویس کاملاً لوکال.',
+    's1.mini':'دانشگاه صنعتی اصفهان',
+    's2.kicker':'۰۱ · گره لبه',
+    's2.h2':'همه‌ی هوشمندی، <span class="accent">روی یک تراشه.</span>',
+    's2.c1b':'دو هسته‌ای ESP32-S3',
+    's2.c2b':'نمایشگر لمسی ۳۲۰×۴۸۰',
+    's2.c3b':'سنجش دما و نور',
+    's2.c4b':'دو گذرگاه I²C',
+    's2.c4s':'گذرگاه‌های لمس/سنسور مجزا · سگ‌نگهبان ریست سخت‌افزاری',
+    's3.kicker':'۰۳ · کنترل دسترسی',
+    's3.h2':'باز کردن درب، <span class="accent">با یک نگاه.</span>',
+    's3.verdict':'تأیید شد · تشابه ≥ ۰٫۷۰',
+    's3.b1b':'خط CNN کامل، روی تراشه',
+    's3.b1p':'آشکارسازی ← استخراج بردار ← تطبیق کسینوسی با ESP-DL؛ رمزگشایی در PSRAM با موتور JPEG سخت‌افزاری.',
+    's3.b2b':'حریم خصوصی با معماری',
+    's3.b2p':'فریم‌ها محلی پردازش و هرگز ذخیره نمی‌شوند — اینترنت اختیاری می‌ماند.',
+    's3.b3b':'ثبت‌چهره‌ی امن',
+    's3.b3p':'پایگاه چهره چندنمونه‌ای، قابل ویرایش روی دستگاه · لینک‌های QR ظرف ۳ دقیقه منقضی می‌شوند.',
+    's4.kicker':'۰۲ · داشبورد روی دستگاه',
+    's4.h2':'رابط لمسی کامل، <span class="accent">روی دیوار.</span>',
+    's4.b1b':'راه‌اندازی در همان‌جا',
+    's4.b1p':'تنظیمات وای‌فای و کارگزار MQTT روی خود دستگاه است — بدون رایانه.',
+    's4.b2b':'کیوسک حضور و غیاب',
+    's4.b2p':'توکن QR چرخان با شمارش معکوس؛ چهره با گوشی کارمند تطبیق داده می‌شود.',
+    's4.b3b':'آسایش در نوک انگشت',
+    's4.b3p':'وضعیت زنده‌ی محیط، کلیدهای دستگاه و روشنایی PWM — درست جای ورود.',
+    's5.kicker':'۰۴ · عامل رفتاری',
+    's5.h2':'الگوی زندگی‌تان را <span class="accent">یاد می‌گیرد.</span>',
+    's5.m1':'مدل چراغ',
+    's5.m2':'مدل فن',
+    's5.g1':'پیش‌آموزش · ۶٬۹۱۲ نمونه',
+    's5.g2':'گیت سایه → خودکار',
+    's5.g3':'SGD روی تراشه → NVS',
+    's5.foot':'<b>کنترل دستی همیشه برنده است</b> — و قفل در هرگز تحت کنترل مدل نیست.',
+    's6.kicker':'۰۵ · تله‌متری زنده',
+    's6.h2':'هر وضعیتی، <span class="accent">انتشار زنده.</span>',
+    's6.n1':'گره لبه · سنسورها · رخدادها',
+    's6.n2':'کارگزار Mosquitto',
+    's7.kicker':'۰۶ · اتوماسیون و حضور و غیاب',
+    's7.h2':'اتوماسیون‌هایی که عمل می‌کنند. <span class="accent">رکوردهایی که می‌مانند.</span>',
+    's7.f1':'محرک · حضور بعد از ۱۸:۰۰',
+    's7.f2':'شرط · لوکس محیط < ۱۰۰',
+    's7.f3':'اقدام · چراغ خودش روشن می‌شود',
+    's7.p1':'MQTT دوطرفه — هر وضعیتی در HA دیده می‌شود و هر دستگاهی از داشبوردهایش کنترل‌پذیر است.',
+    's7.f4':'توکن QR روی LCD · اعتبار ۱۰ دقیقه',
+    's7.f5':'تطبیق چهره با گوشی کارمند',
+    's7.f6':'SQLite → Google Sheets (جلالی) → اعلان بله',
+    's7.p2':'سرور یا اینترنت قطع است؟ صندوق‌خروج ۳۲ خانه‌ای NVS روی برد، همه را بعداً ارسال می‌کند.',
+    's8.kicker':'۰۷ · وب‌داشبورد',
+    's8.h2':'تمام خانه‌تان، <span class="accent">در یک تب مرورگر.</span>',
+    's8.ok':'Soroush — ثبت شد',
+    's9.kicker':'۰۸ · پیام‌رسان بله',
+    's9.h2':'کنترل و هشدار، <span class="accent">از دل چت شما.</span>',
+    's9.note':'۸ دستور · اسنپ‌شات هر ۱۰ دقیقه · لاگ امنیتی',
+    's9.notif':'درب باز شد — تطبیق چهره · Soroush',
+    's9.b1b':'کنترل از راه دور',
+    's9.b1p':'هشت دستور — چراغ، فن، قفل، وضعیت — مستقیم از پنجره‌ی چت.',
+    's9.b2b':'اعلان‌های فوری',
+    's9.b2p':'رخدادهای باز کردن، ثبت حضور و تلاش‌های ناموفق کیبورد به بله ارسال می‌شوند.',
+    's9.b3b':'لاگ امنیتی',
+    's9.b3p':'هر رخداد با منبعش ذخیره می‌شود، به‌علاوه اسنپ‌شات دوره‌ای از کل خانه.',
+    's10.pill':'خانه هوشمند · به روایت اعداد',
+    's10.c1':'دقت مدل چراغ',
+    's10.c2':'دقت مدل فن',
+    's10.c3':'ویژگی‌های زمینه‌ای',
+    's10.c4':'دستورهای چت',
+    's10.c5':'وابستگی ابری',
+    's10.ty':'سپاس <span class="accent">از شما.</span>',
+    's10.who':'سروش ربیعی — پروژه تخصصی کارشناسی · دانشگاه صنعتی اصفهان'
+  },
+  zh:{
+    'hint':'空格 暂停 · ← → 场景 · F 全屏',
+    's1.pill2':'无需云端',
+    's1.sub':'边缘优先的家庭自动化平台 — 人脸识别、片上自学习代理与完全本地的服务栈。',
+    's1.mini':'伊斯法罕理工大学',
+    's2.kicker':'01 · 边缘节点',
+    's2.h2':'所有智能，<span class="accent">集于一芯。</span>',
+    's2.c1b':'双核 ESP32-S3',
+    's2.c2b':'320×480 触摸屏',
+    's2.c3b':'环境与光照传感',
+    's2.c4b':'双 I²C 总线',
+    's2.c4s':'触摸 / 传感器总线隔离 · 硬件复位看门狗',
+    's3.kicker':'03 · 门禁控制',
+    's3.h2':'看一眼，<span class="accent">即可解锁。</span>',
+    's3.verdict':'已授权 · 余弦 ≥ 0.70',
+    's3.b1b':'完整 CNN 流水线，片上运行',
+    's3.b1p':'ESP-DL 检测 → 嵌入 → 余弦匹配，由硬件 JPEG 引擎在 PSRAM 中解码。',
+    's3.b2b':'架构级隐私',
+    's3.b2p':'画面在本地处理且从不存储 — 互联网始终是可选的。',
+    's3.b3b':'安全的录入',
+    's3.b3p':'多样本人脸库，可在设备上编辑 · 二维码链接 3 分钟后过期。',
+    's4.kicker':'02 · 设备端仪表盘',
+    's4.h2':'完整的触摸界面，<span class="accent">就在墙上。</span>',
+    's4.b1b':'就地完成配置',
+    's4.b1p':'Wi-Fi 与 MQTT 代理设置就在设备上 — 无需电脑。',
+    's4.b2b':'考勤终端',
+    's4.b2p':'轮换的二维码令牌带倒计时；员工手机完成人脸匹配。',
+    's4.b3b':'指尖上的舒适',
+    's4.b3p':'实时环境、设备开关与 PWM 亮度 — 就在入口处。',
+    's5.kicker':'04 · 行为代理',
+    's5.h2':'它学习<span class="accent">你的生活方式。</span>',
+    's5.m1':'灯光模型',
+    's5.m2':'风扇模型',
+    's5.g1':'预训练 · 6,912 样本',
+    's5.g2':'影子 → 自动 门控',
+    's5.g3':'片上 SGD → NVS',
+    's5.foot':'<b>手动控制永远优先</b> — 门锁绝不受模型控制。',
+    's6.kicker':'05 · 实时遥测',
+    's6.h2':'每个状态，<span class="accent">实时发布。</span>',
+    's6.n1':'边缘节点 · 传感器 · 事件',
+    's6.n2':'Mosquitto 代理',
+    's7.kicker':'06 · 自动化与考勤',
+    's7.h2':'会执行的自动化。<span class="accent">会留存的记录。</span>',
+    's7.f1':'触发 · 18:00 后有人',
+    's7.f2':'条件 · 环境光照 < 100',
+    's7.f3':'动作 · 灯自动打开',
+    's7.p1':'双向 MQTT — 每个状态在 HA 可见，每个设备都可从其仪表盘控制。',
+    's7.f4':'LCD 上的二维码令牌 · 10 分钟有效',
+    's7.f5':'由员工手机完成人脸匹配',
+    's7.f6':'SQLite → Google Sheets（波斯历）→ Bale 通知',
+    's7.p2':'服务器或网络中断？板上的 32 槽 NVS 发件箱稍后会全部补发。',
+    's8.kicker':'07 · 网页仪表盘',
+    's8.h2':'整个家，<span class="accent">就在浏览器标签页里。</span>',
+    's8.ok':'Soroush — 已录入',
+    's9.kicker':'08 · Bale 消息应用',
+    's9.h2':'控制与提醒，<span class="accent">来自你的聊天。</span>',
+    's9.note':'8 个命令 · 每 10 分钟快照 · 安全日志',
+    's9.notif':'门已解锁 — 人脸匹配 · Soroush',
+    's9.b1b':'远程控制',
+    's9.b1p':'八个命令 — 灯、风扇、门锁、状态 — 直接在聊天窗口完成。',
+    's9.b2b':'即时通知',
+    's9.b2p':'开锁事件、考勤签到与键盘错误尝试都会推送到 Bale。',
+    's9.b3b':'安全日志',
+    's9.b3p':'每个事件都连同来源存储，并定期快照整个家庭状态。',
+    's10.pill':'智能家居 · 数字一览',
+    's10.c1':'灯光模型准确率',
+    's10.c2':'风扇模型准确率',
+    's10.c3':'上下文特征',
+    's10.c4':'聊天命令',
+    's10.c5':'云端依赖',
+    's10.ty':'感谢<span class="accent">观看。</span>',
+    's10.who':'Soroush Rabiei — 本科毕业设计 · 伊斯法罕理工大学'
+  }};
+  var BASE = new Map();
+  document.querySelectorAll('[data-i18n]').forEach(function(el){ BASE.set(el, el.innerHTML); });
+  function setLang(l){
+    document.documentElement.lang = l;
+    document.querySelectorAll('#langs button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-lang') === l); });
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var d = I18N[l], k = el.getAttribute('data-i18n');
+      el.innerHTML = (d && d[k] !== undefined) ? d[k] : BASE.get(el);
+      el.setAttribute('dir', 'auto');
+    });
+  }
+  window.__setLang = setLang;
+  document.querySelectorAll('#langs button').forEach(function(b){
+    b.addEventListener('click', function(){ setLang(b.getAttribute('data-lang')); });
+  });
+})();
 </script>
 </body>
 </html>
