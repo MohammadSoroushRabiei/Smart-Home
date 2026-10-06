@@ -1,5 +1,5 @@
-// Chapters 10-11 + references
-const { P, Pm, B, NItem, H1, H2, H3, FIG, TBL } = require("./helpers");
+// Chapters 10-12 + references
+const { P, Pm, B, NItem, H1, H2, H3, FIG, FIGGRID, TBL } = require("./helpers");
 const { Paragraph, TextRun, AlignmentType, HeadingLevel } = require("docx");
 const { en, FONT_EN } = require("./helpers");
 
@@ -32,27 +32,64 @@ const ch10 = [
     [24, 26, 32, 18], { cellSize: 22 }),
 
   H2("۱۰-۳ نتایج عامل یادگیری رفتاری"),
-  P("مدل نهایی روی داده اعتبارسنجی شش روز پایانی به دقت ۹۴٫۲ درصد برای چراغ و ۹۳٫۶ درصد برای فن رسید؛ سقف نظری (بیزی) این مسئله با توجه به نویز برچسب عمدی ۴ تا ۵ درصدی حدود ۹۵ درصد است و مدل عملاً به مرز مسئله رسیده است. سه سناریوی رفتاری مرجع نیز روی فریمور مستقر بازآزمایی شد: شب + حضور + تاریکی (p≈۰٫۹۹ → روشن کردن)، ظهر با چراغ روشن (p≤۰٫۰۵ → خاموش کردن) و ظهر با چراغ خاموش (p≈۰٫۰۷ → بدون اقدام). ارتقای خودکار از فاز سایه به خودکار نیز پس از حداقل ۱۵ تصمیم صحیح در پنجره ۲۰تایی، در آزمون عملی مشاهده شد."),
+  P("مدل نهایی روی داده اعتبارسنجی شش روز پایانی به دقت ۹۴٫۲ درصد برای چراغ و ۹۳٫۶ درصد برای فن رسید؛ سقف نظری (بیزی) این مسئله با توجه به نویز برچسب عمدی ۴ تا ۵ درصدی حدود ۹۵ درصد است و مدل عملاً به مرز مسئله رسیده است. سه سناریوی رفتاری مرجع نیز روی فرمور مستقر بازآزمایی شد: شب + حضور + تاریکی (p≈۰٫۹۹ → روشن کردن)، ظهر با چراغ روشن (p≤۰٫۰۵ → خاموش کردن) و ظهر با چراغ خاموش (p≈۰٫۰۷ → بدون اقدام). ارتقای خودکار از فاز سایه به خودکار نیز پس از حداقل ۱۵ تصمیم صحیح در پنجره ۲۰تایی، در آزمون عملی مشاهده شد."),
 
   H2("۱۰-۴ چالش‌های مهندسی حل‌شده"),
   P("در مسیر پیاده‌سازی، چند مسئله واقعی ریشه‌یابی و حل شد که هر یک درس مهندسی مستقلی داشت:"),
   NItem("۱. کمبود حافظه در هندشیک TLS پس از افزودن وب‌گرافیک: ریشه‌یابی نشان داد بافرهای رندر LVGL حافظه داخلی را اشغال کرده‌اند؛ جابه‌جایی بافرها به PSRAM همراه با تنظیم keep-alive لایه شبکه (بیکار ۳۰ / فاصله ۵ / شمار ۳)، فعال‌سازی lru_purge و ۱۶ سوکت lwIP مشکل را به‌طور پایدار رفع کرد."),
   NItem("۲. قفل‌شدگی گذرگاه I2C کنترلر لمس GT911: نشتی mutex در مسیر خطا به بن‌بست می‌رسید؛ با اصلاح مسیر آزادسازی قفل و افزودن «سگ‌نگهبان لمس» با توالی ریست سخت‌افزاری (RST و INT)، سامانه از این خرابی خودبازیاب شد."),
   NItem("۳. حلقه‌های panic سگ‌نگهبان در وظیفه چهره: انسداد طولانی انتظار برای کار جدید باعث گرسنگی وظیفه سنجش شد؛ ثبت دوره‌ای TWDT (حداکثر هر ۵ ثانیه) در حلقه انتظار و مهلت ۲۰ ثانیه‌ای برای دریافت بدنه تصویر، پایداری را تضمین کرد."),
-  NItem("۴. رفتار منفعل مدل رفتاری با دقت بالا: به‌کارگیری ویژگی «وضعیت خود دستگاه» باعث پسماند و بی‌عملی در حالت خودکار می‌شد؛ بازطراحی بردار ویژگی به فرم صرفاً زمینه‌ای، مسئله را ریشه‌ای حل کرد (فصل ۶)."),
+  NItem("۴. رفتار منفعل مدل رفتاری با دقت بالا: به‌کارگیری ویژگی «وضعیت خود دستگاه» باعث لختی و بی‌عملی در حالت خودکار می‌شد؛ بازطراحی بردار ویژگی به فرم صرفاً زمینه‌ای، مسئله را ریشه‌ای حل کرد (فصل ۶)."),
 
   H2("۱۰-۵ ارزیابی کلی"),
-  P("ارزیابی کلی نشان می‌دهد سامانه به اهداف طراحی رسیده است: چرخه کامل بازکردن در با چهره داخل شبکه محلی و روی میکروکنترلر اجرا می‌شود؛ زیرساخت MQTT و Home Assistant لوکال در قطعی اینترنت بی‌وقفه کار می‌کند؛ چهار کانال کاربری تصویر سازگاری از وضعیت ارائه می‌دهند؛ سامانه حضور و غیاب با صف پایا و تاریخ شمسی در محیط واقعی کارکرد داشته است؛ و فریمور در کارکرد طولانی بدون ریست غیرعمدی پایدار مانده است. مکانیزم‌های پایداری حل‌شده (سگ‌نگهبان‌ها، اتصال مجدد شبکه‌آگاه و پایش حافظه) تجربه عملی ارزشمندی در مهندسی سیستم‌های نهفته مقیاس‌پذیر فراهم کردند."),
+  P("ارزیابی کلی نشان می‌دهد سامانه به اهداف طراحی رسیده است: چرخه کامل بازکردن در با چهره داخل شبکه محلی و روی میکروکنترلر اجرا می‌شود؛ زیرساخت MQTT و Home Assistant لوکال در قطعی اینترنت بی‌وقفه کار می‌کند؛ چهار کانال کاربری تصویر سازگاری از وضعیت ارائه می‌دهند؛ سامانه حضور و غیاب با صف پایا و تاریخ شمسی در محیط واقعی کارکرد داشته است؛ و فرمور در کارکرد طولانی بدون ریست غیرعمدی پایدار مانده است. مکانیزم‌های پایداری حل‌شده (سگ‌نگهبان‌ها، اتصال مجدد شبکه‌آگاه و پایش حافظه) تجربه عملی ارزشمندی در مهندسی سیستم‌های نهفته مقیاس‌پذیر فراهم کردند."),
+];
+
+const ch11real = [
+  H1("فصل ۱۱: اجرای واقعی روی سخت‌افزار", { pageBreakBefore: true }),
+
+  H2("۱۱-۱ محیط استقرار و تجهیزات واقعی"),
+  P("صحت‌سنجی نهایی هر سامانه‌ی نهفته، استقرار و کارکرد آن در محیط واقعی است. در این فصل، تصاویر مستند از وضعیت استقرار سامانه ارائه می‌شود؛ از برد ESP32-S3 و نمایشگر لمسی روی میز کار تا اپ همراه Home Assistant روی گوشی، ربات بله، بایگانی Google Sheets و کانتینرهای Docker در حال اجرا. ویدیوهای کامل تست‌های زنده نیز در مخزن پروژه نگهداری می‌شوند."),
+  P("شکل ۱۱-۱ وضعیت نهایی میز کار را نشان می‌دهد: برد ESP32-S3-DevKitC-1 از طریق آداپتورهای FPC به نمایشگر ۳۲۰×۴۸۰ متصل است، مدارهای ورودی/خروجی (رله‌ی قفل، LEDهای وضعیت و دکمه) روی بردبرد بسته‌بندی شده‌اند و در کنار آن، اپ همراه Home Assistant روی گوشی، وضعیت زنده‌ی سامانه را نمایش می‌دهد."),
+  ...FIG("../presentation/Images/Board Image.jpg", "شکل ۱۱-۱: نمونه‌ی مستقرشده‌ی سامانه روی میز کار — برد، نمایشگر و اپ همراه", 380),
+
+  H2("۱۱-۲ رابط کاربری واقعی روی نمایشگر"),
+  P("نُه صفحه‌ی رابط کاربری LVGL (داشبورد اصلی، باز کردن درب، اسکن و اتصال وای‌فای، ورود رمز، پیکربندی MQTT، تنظیمات، فهرست چهره‌ها و دو صفحه‌ی QR حضور و وب) مستقیماً از نمایشگر واقعی برد ثبت شده و در شکل ۱۱-۲ آمده است. این تصاویر نشان می‌دهند تمام چرخه‌ی راه‌اندازی — از اتصال به شبکه و پیکربندی کارگزار تا مدیریت چهره‌ها و رمزها — بدون نیاز به رایانه و فقط با نمایشگر لمسی قابل انجام است."),
+  ...FIGGRID("شکل ۱۱-۲: نُه صفحه‌ی رابط کاربری LVGL — اسکرین‌شات از نمایشگر واقعی برد", [
+    "../presentation/Images/LCD UI/Main Screen.png",
+    "../presentation/Images/LCD UI/Unlock Screen.png",
+    "../presentation/Images/LCD UI/Wifi List.png",
+    "../presentation/Images/LCD UI/Wifi Enter Password.png",
+    "../presentation/Images/LCD UI/Mqtt Setting.png",
+    "../presentation/Images/LCD UI/Setting Screen.png",
+    "../presentation/Images/LCD UI/Faces List.png",
+    "../presentation/Images/LCD UI/Attend QR Code.png",
+    "../presentation/Images/LCD UI/Web QR Code.png",
+  ]),
+
+  H2("۱۱-۳ کانال‌های کاربر در عمل"),
+  P("شکل ۱۱-۳ وب‌داشبورد سامانه را در نمای موبایل نشان می‌دهد: کلیدهای چراغ و فن، قفل درب با رمز و گزینه‌ی باز کردن با چهره، وضعیت زنده‌ی محیط و حالت عامل یادگیری (SHADOW/AUTO). این داشبورد توسط سرور محلی سرو می‌شود و ورود به آن با اسکن QR نمایش‌داده‌شده روی برد انجام می‌گیرد."),
+  ...FIG("../presentation/Images/Web Dashboard.png", "شکل ۱۱-۳: وب‌داشبورد سامانه در نمای موبایل", 320),
+  P("شکل ۱۱-۴ داشبورد اپ همراه Home Assistant روی گوشی واقعی است: کارت‌های محیط، کنترل دستگاه‌ها، وضعیت دسترسی و چهار اتوماسیون واقعی تعریف‌شده در automations.yaml — همه‌ی وضعیت‌ها دوطرفه از طریق MQTT همگام می‌شوند."),
+  ...FIG("../presentation/Images/Smart Home – Home Assistant_Dashboard.png", "شکل ۱۱-۴: داشبورد اپ همراه Home Assistant روی گوشی", 320),
+  P("شکل ۱۱-۵ ربات بله را در عمل نشان می‌دهد: منوی دستورهای فارسی، کنترل چراغ و فن با کیبورد پاسخ‌گو، بازکردن درب با رمز یک‌بارمصرف دو دقیقه‌ای و اعلان‌های لحظه‌ای رخدادها (باز شدن درب، ورود و خروج ساکنان)."),
+  ...FIG("../presentation/Images/Bale_1.jpg", "شکل ۱۱-۵: ربات بله — کنترل دستگاه‌ها و اعلان‌های رخداد", 320),
+
+  H2("۱۱-۴ استقرار سرویس‌ها و بایگانی"),
+  P("شکل ۱۱-۶ وضعیت Docker Desktop روی سرور خانگی را نشان می‌دهد؛ چهار کانتینر سبک (سرویس حضور و غیاب، Mosquitto، Home Assistant و ربات بله) با مجموع مصرف حافظه‌ای در حد چند صد مگابایت، کل زیرساخت پلتفرم را تشکیل می‌دهند."),
+  ...FIG("../presentation/Images/Docker.png", "شکل ۱۱-۶: کانتینرهای در حال اجرای سامانه در Docker Desktop", 600),
+  P("شکل ۱۱-۷ بایگانی حضور و غیاب را در Google Sheets نشان می‌دهد؛ هر رکورد با تاریخ جلالی، ساعت دقیق، نام کاربر و نوع ورود/خروج ثبت می‌شود و هم‌زمان، اعلان آن از طریق ربات بله ارسال می‌گردد. این بایگانی لایه‌ی اختیاریِ تحویل است و در قطعی اینترنت، رکوردها در صف پایای روی برد ماندگار شده و پس از بازگشت اتصال به‌ترتیب ارسال می‌شوند."),
+  ...FIG("../presentation/Images/Google Sheet.png", "شکل ۱۱-۷: بایگانی حضور و غیاب در Google Sheets با تاریخ جلالی", 470),
 ];
 
 const ch11 = [
-  H1("فصل ۱۱: جمع‌بندی و کارهای آینده", { pageBreakBefore: true }),
+  H1("فصل ۱۲: جمع‌بندی و کارهای آینده", { pageBreakBefore: true }),
 
-  H2("۱۱-۱ جمع‌بندی"),
+  H2("۱۲-۱ جمع‌بندی"),
   P("در این پروژه یک سامانه خانه هوشمند کامل مبتنی بر اینترنت اشیا طراحی و پیاده‌سازی شد که ویژگی متمایز آن، انتقال هوش مصنوعی به دستگاه کم‌توان لبه و استفاده از امکانات موجود کاربر برای احراز هویت است: تشخیص چهره به‌طور کامل روی میکروکنترلر اجرا می‌شود، دوربین و رابط کاربری غنی از گوشی هوشمند کاربر به‌عنوان سنسور و میزبان تعامل به کار گرفته می‌شود و زیرساخت (MQTT و Home Assistant) کاملاً لوکال با Docker مستقر است. اجزای اصلی تکمیل‌شده عبارت‌اند از: گره ESP32-S3 با نمایشگر لمسی و وب‌سرور امن؛ خط پردازش چهره روی تراشه با ثبت چندنمونه‌ای؛ یکپارچه‌سازی کشف خودکار با ۱۳ موجودیت HA؛ عامل یادگیری رفتاری با پیش‌آموزش آفلاین و یادگیری برخط (دقت ۹۴٫۲ و ۹۳٫۶ درصد)؛ سامانه حضور و غیاب سه‌لایه با صف پایا، شیت شمسی و اعلان بله؛ و سازوکارهای پایداری (سگ‌نگهبان‌ها و اتصال مجدد شبکه‌آگاه)."),
   P("از منظر یادگیری، این پروژه عمداً به‌گونه‌ای طراحی شد که مروری عملی بر اکثر درس‌های تخصصی مقطع کارشناسی باشد: طراحی منطقی و الکترونیک (گذرگاه‌ها، رله، مقاومت‌های بالاکش)، معماری کامپیوتر و محدودیت‌های سخت‌افزار (حافظه، PSRAM، پارتیشن‌بندی)، سیستم‌عامل و برنامه‌نویسی چندهسته‌ای (FreeRTOS، همروندی، سگ‌نگهبان)، شبکه و پروتکل‌ها (MQTT، HTTPS/TLS، DNS و DHCP)، پایگاه داده و مهندسی نرم‌افزار (معماری ماژولار، صف پایا، Git و توسعه شاخه‌محور)، هوش مصنوعی (کوانتیزه‌سازی مدل، TinyML، یادگیری برخط) و طراحی رابط و تجربه کاربری. محصول نهایی، افزون بر خود سامانه، یک بستر آزمایشگاهی پایدار برای توسعه و آزمایش ایده‌های بعدی — از تشخیص تصویر و فرمان‌های صوتی تا تحلیل الگوهای رفتاری سنسورها — است."),
 
-  H2("۱۱-۲ کارهای آینده"),
+  H2("۱۲-۲ کارهای آینده"),
   P("مسیرهای توسعه آینده پروژه به شرح زیر پیشنهاد می‌شود:"),
   NItem("۱. یادگیری فدرال روی میکروکنترلرها: به‌کارگیری یادگیری فدرال برای آموزش مشترک مدل‌های رفتاری میان چند برد خانه، بدون خروج داده خام از دستگاه‌ها — ادامه طبیعی رویکرد «هوش در لبه با حفظ حریم خصوصی» این پروژه."),
   NItem("۲. هوشمندسازی صوتی: افزودن تشخیص فرمان‌های صوتی روی تراشه با چارچوب ESP-SR به‌عنوان کانال تعامل پنجم."),
@@ -60,7 +97,7 @@ const ch11 = [
   NItem("۴. اثر انگشت به‌عنوان عامل احراز هویت دوم: افزودن سنسور اثر انگشت برای ورود بدون گوشی و اتصال دو-عاملی."),
   NItem("۵. امن‌سازی کارگزار MQTT (احراز هویت و TLS) و ارتقای اعتبارسنجی وب به استاندارد WebAuthn روی بستر توکن‌های موجود."),
   NItem("۶. شناسایی زنده‌بودن (liveness detection) برای مقاوم‌سازی تشخیص چهره در برابر عکس و پخش ویدئو."),
-  NItem("۷. به‌روزرسانی بی‌سیم فریمور (OTA) برای نگهداری آسان‌تر."),
+  NItem("۷. به‌روزرسانی بی‌سیم فرمور (OTA) برای نگهداری آسان‌تر."),
   NItem("۸. شبیه‌ساز LVGL روی رایانه (WSL2 با SDL2) برای چرخه توسعه سریع‌تر رابط گرافیکی."),
   NItem("۹. بهبود داشبورد Home Assistant (نمودارها، اتوماسیون‌ها و مدیریت چهره‌ها از HA) و دکمه بازآموزی مدل."),
   NItem("۱۰. استقرار نهایی روی سخت‌افزار ماندگار: قفل برقی واقعی، جعبه و سیم‌کشی تمیز، مقاومت‌های بالاکش I2C و انتقال سرویس‌ها به رایانه کم‌مصرف همیشه‌روشن."),
@@ -121,7 +158,7 @@ const abstractEN = [
   }),
   ENP("In this project, a complete Internet of Things (IoT) smart-home system was designed and implemented with a distinctive focus on bringing artificial intelligence to low-power edge devices and reusing the hardware the user already owns. Face recognition \u2014 the authentication mechanism of the system \u2014 runs entirely on an ESP32-S3 microcontroller: the camera of the user's smartphone, reached by scanning a QR code shown on the device's touch LCD, acts as the image sensor, so no dedicated camera module is required and the edge hardware is minimized."),
   ENP("The supporting infrastructure is fully local: an MQTT broker (Mosquitto) and the Home Assistant platform run as Docker containers on a home server. The system therefore operates with nothing more than the home modem, survives both international and domestic Internet outages, and even when the global network is available, no cloud service is required \u2014 user data stays inside the home network, preserving privacy and keeping network latency minimal. Four parallel user interfaces are provided: the on-device touch display (LVGL), a mobile web panel opened via QR scan, the Home Assistant web dashboard, and the Home Assistant companion app, all fed by a single source of state on the device."),
-  ENP("Beyond vision, a lightweight behavior-learning agent (two logistic-regression models with offline pre-training at 94.2% / 93.6% validation accuracy and on-chip online SGD) learns user habits for lighting and fan control in a shadow-then-auto lifecycle; the door lock is deliberately never under model control. A three-layer face-based attendance system (device outbox \u2192 local FastAPI/SQLite server \u2192 Jalali-calendar Google Sheets archive and Bale messenger notifications) was also implemented and deployed. Reliability mechanisms \u2014 task watchdogs, a hardware-reset watchdog for the touch controller, and network-aware Wi-Fi/MQTT reconnection \u2014 were validated through end-to-end scenario testing. The project served as a practical rehearsal of the full breadth of undergraduate engineering education and established a stable platform for future research, including federated learning on microcontrollers."),
+  ENP("Beyond vision, a lightweight behavior-learning agent (two logistic-regression models with offline pre-training at 94.2% / 93.6% validation accuracy and on-chip online SGD) learns user habits for lighting and fan control in a shadow-then-auto lifecycle; the door lock is deliberately never under model control. A three-layer face-based attendance system (device outbox \u2192 local FastAPI/SQLite server \u2192 Jalali-calendar Google Sheets archive and Bale messenger notifications) was also implemented and deployed. Reliability mechanisms \u2014 task watchdogs, a hardware-reset watchdog for the touch controller, and network-aware Wi-Fi/MQTT reconnection \u2014 were validated through end-to-end scenario testing, and the deployed system is documented with photographs and screen captures of the board, its display, the companion apps and the running services (chapter 11). The project served as a practical rehearsal of the full breadth of undergraduate engineering education and established a stable platform for future research, including federated learning on microcontrollers."),
   new Paragraph({
     alignment: AlignmentType.JUSTIFIED,
     spacing: { before: 200, line: 360 },
@@ -153,4 +190,4 @@ const titleEN = [
   ENTitleLine("September 2026", 26, false, 500, 0),
 ];
 
-module.exports = { ch10, ch11, refs, abstractEN, titleEN };
+module.exports = { ch10, ch11real, ch11, refs, abstractEN, titleEN };

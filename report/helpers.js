@@ -133,18 +133,39 @@ function FrontTitle(text) {
   });
 }
 
+// Image dimensions: PNG header (bytes 16..24) or JPEG SOF scan
+function imgDims(buf) {
+  if (buf[0] === 0x89 && buf[1] === 0x50) return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  if (buf[0] === 0xFF && buf[1] === 0xD8) {
+    let i = 2;
+    while (i < buf.length - 9) {
+      if (buf[i] !== 0xFF) { i++; continue; }
+      const marker = buf[i + 1];
+      if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+        return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+      }
+      i += 2 + buf.readUInt16BE(i + 2);
+    }
+  }
+  return { w: 1000, h: 750 };
+}
+
+function imgType(p) {
+  const ext = p.toLowerCase().split(".").pop();
+  return ext === "gif" ? "gif" : (ext === "jpg" || ext === "jpeg" ? "jpg" : "png");
+}
+
 // Figure with caption below. widthPx = display width in px (1px = 0.75pt => ~620px fits 15.9cm)
 function FIG(imgPath, caption, widthPx = 600) {
   const buf = fs.readFileSync(path.join(__dirname, imgPath));
-  // aspect ratio from PNG header (bytes 16..24)
-  const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
+  const { w, h } = imgDims(buf);
   const displayH = Math.round(widthPx * h / w);
   return [
     new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
       spacing: { before: 160, after: 40 },
-      children: [new ImageRun({ data: buf, transformation: { width: widthPx, height: displayH }, type: "png" })],
+      children: [new ImageRun({ data: buf, transformation: { width: widthPx, height: displayH }, type: imgType(imgPath) })],
     }),
     new Paragraph({
       bidirectional: true,
@@ -153,6 +174,53 @@ function FIG(imgPath, caption, widthPx = 600) {
       children: [t(caption, { size: 24, bold: true })],
     }),
   ];
+}
+
+// Captioned grid of images (3 per row, borderless) — for screenshot galleries
+function FIGGRID(caption, images, widthPx = 620) {
+  const cols = 3;
+  const cellW = Math.floor(widthPx / cols);
+  const rows = [];
+  for (let i = 0; i < images.length; i += cols) {
+    const cells = [];
+    for (let j = 0; j < cols; j++) {
+      const p = images[i + j];
+      if (p) {
+        const buf = fs.readFileSync(path.join(__dirname, p));
+        const { w, h } = imgDims(buf);
+        const dw = Math.floor(cellW * 0.94), dh = Math.round(dw * h / w);
+        cells.push(new TableCell({
+          width: { size: Math.floor(100 / cols), type: WidthType.PERCENTAGE },
+          borders: { top: NB, bottom: NB, left: NB, right: NB },
+          margins: { top: 40, bottom: 40, left: 40, right: 40 },
+          verticalAlign: VerticalAlign.CENTER,
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new ImageRun({ data: buf, transformation: { width: dw, height: dh }, type: imgType(p) })],
+          })],
+        }));
+      } else {
+        cells.push(new TableCell({
+          width: { size: Math.floor(100 / cols), type: WidthType.PERCENTAGE },
+          borders: { top: NB, bottom: NB, left: NB, right: NB },
+          children: [new Paragraph({ children: [] })],
+        }));
+      }
+    }
+    rows.push(new TableRow({ cantSplit: true, children: cells }));
+  }
+  const grid = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: { top: NB, bottom: NB, left: NB, right: NB, insideHorizontal: NB, insideVertical: NB },
+    rows,
+  });
+  const capPara = new Paragraph({
+    bidirectional: true,
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 80, after: 200, line: 312 },
+    children: [t(caption, { size: 24, bold: true })],
+  });
+  return [grid, capPara];
 }
 
 // Academic three-line RTL table with caption above.
@@ -202,4 +270,4 @@ function TBL(caption, headers, rows, widths, opts = {}) {
   return [capPara, table, after];
 }
 
-module.exports = { FA, EN, FONT_FA, FONT_EN, NB, LINE, t, en, P, Pm, B, NItem, H1, H2, H3, FrontTitle, FIG, TBL, safeText };
+module.exports = { FA, EN, FONT_FA, FONT_EN, NB, LINE, t, en, P, Pm, B, NItem, H1, H2, H3, FrontTitle, FIG, FIGGRID, TBL, safeText };

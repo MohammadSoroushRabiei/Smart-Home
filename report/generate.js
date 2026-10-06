@@ -9,7 +9,7 @@ const { FONT_FA, FONT_EN } = require("./helpers");
 const { ch1, ch2, ch3 } = require("./content1");
 const { ch4, ch5, ch6 } = require("./content2");
 const { ch7, ch8, ch9 } = require("./content3");
-const { ch10, ch11, refs, abstractEN, titleEN } = require("./content4");
+const { ch10, ch11real, ch11, refs, abstractEN, titleEN } = require("./content4");
 const { bismillah, cover, thanks, abstractFa, tocPage, listOfFigures, listOfTables } = require("./frontmatter");
 
 const MARGIN = { top: 1440, bottom: 1440, left: 1417, right: 1701, header: 850, footer: 992 }; // binding edge = right (RTL)
@@ -79,7 +79,7 @@ const doc = new Document({
         page: { ...PAGE, pageNumbers: { start: 1, formatType: NumberFormat.DECIMAL } },
       },
       footers: { default: pageNumFooter() },
-      children: [...ch1, ...ch2, ...ch3, ...ch4, ...ch5, ...ch6, ...ch7, ...ch8, ...ch9, ...ch10, ...ch11, ...refs],
+      children: [...ch1, ...ch2, ...ch3, ...ch4, ...ch5, ...ch6, ...ch7, ...ch8, ...ch9, ...ch10, ...ch11real, ...ch11, ...refs],
     },
     // S4: English abstract (continues numbering)
     {
