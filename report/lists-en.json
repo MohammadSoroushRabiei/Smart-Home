@@ -1,0 +1,31 @@
+{
+  "figures": {
+    "Figure 1-1: Overall block diagram of the edge-processing smart-home system": "2",
+    "Figure 4-1: Software layers of the system": "14",
+    "Figure 5-1: Overall system architecture and local deployment": "17",
+    "Figure 6-1: The face-recognition pipeline on the microcontroller": "20",
+    "Figure 6-2: The shadow phase, promotion gate and online learning of the behavioral agent": "23",
+    "Figure 7-1: The four parallel user-interaction channels of the system": "24",
+    "Figure 8-1: The three-tier architecture of the attendance system": "27",
+    "Figure 11-1: The deployed system on the workbench — board, display and companion app": "34",
+    "Figure 11-2: The nine LVGL interface pages — screenshots from the board's real display": "36",
+    "Figure 11-3: The system's web dashboard in its mobile view": "37",
+    "Figure 11-4: The Home Assistant companion-app dashboard on a phone": "38",
+    "Figure 11-5: The Bale bot — device control and event notifications": "39",
+    "Figure 11-6: The system's running containers in Docker Desktop": "40",
+    "Figure 11-7: The attendance archive in Google Sheets with Jalali dates": "41"
+  },
+  "tables": {
+    "Table 3-1: Functional requirements": "8",
+    "Table 3-2: Non-functional requirements": "9",
+    "Table 4-1: Hardware pin mapping": "12",
+    "Table 4-2: Flash partitioning": "13",
+    "Table 4-3: FreeRTOS tasks in the firmware": "14",
+    "Table 5-1: Main MQTT topics": "18",
+    "Table 5-2: Entities discovered in Home Assistant": "18",
+    "Table 6-1: Input features of the behavioral learning agent": "21",
+    "Table 6-2: Training parameters and agent performance": "22",
+    "Table 7-1: Main web-server endpoints on the board": "25",
+    "Table 10-1: Test scenarios and results": "31"
+  }
+}
