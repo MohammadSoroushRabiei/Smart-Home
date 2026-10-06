@@ -13,10 +13,13 @@ const { execSync } = require("child_process");
 const os = require("os"), fs = require("fs"), crypto = require("crypto"), path = require("path");
 // silent copy of a test video (video stream copied bit-for-bit, audio dropped) —
 // built in the OS temp dir so no duplicate media lands in the repo
-function silentVideo(src) {
+function silentVideo(src, vf) {
   const out = path.join(os.tmpdir(), "deck-" + crypto.randomBytes(4).toString("hex") + ".mp4");
-  try { execSync(`ffmpeg -y -v error -i "${src}" -c:v copy -an "${out}"`); return out; }
-  catch { return src; }
+  try {
+    const codec = vf ? `-vf "${vf}" -c:v libx264 -crf 20 -preset veryfast` : "-c:v copy";
+    execSync(`ffmpeg -y -v error -i "${src}" ${codec} -an "${out}"`);
+    return out;
+  } catch { return src; }
 }
 const coverData = (name) => "image/jpeg;base64," + fs.readFileSync(path.join(POSTERS, name + ".jpg")).toString("base64");
 
@@ -88,7 +91,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   header(s, "نقشه ارائه", "فهرست مطالب");
   const items = [
     ["بیان مسئله و اهداف", "چرا خانه هوشمند بدون ابر؟"],
-    ["معماری، سخت‌افزار و فریمور", "ESP32-S3، FreeRTOS، نمایشگر لمسی"],
+    ["معماری، سخت‌افزار و فرمور", "ESP32-S3، FreeRTOS، نمایشگر لمسی"],
     ["زیرساخت لوکال", "MQTT و Home Assistant با Docker"],
     ["هوش مصنوعی روی لبه", "تشخیص چهره + عامل یادگیری رفتاری (بخش اصلی)"],
     ["رابط‌های کاربری چندکاناله", "نمایشگر، وب موبایل، داشبورد و اپ HA"],
@@ -138,7 +141,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "فصل ۱ — مقدمه", "پاسخ پروژه: همه هوشمندی روی لبه، همه داده در خانه");
   imgCard(s, `${FIGS}/fig7_block_diagram.png`, 0.65, 1.95, 6.45, 4.5);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۱-۱", 0.65, 6.62, 4);
   const rows = [
     ["تشخیص چهره کامل روی ESP32-S3", "از رمزگشایی JPEG تا تطبیق بردار ویژگی — تصویر هرگز از برد خارج نمی‌شود."],
     ["گوشی کاربر = سنسور و رابط", "دوربین و مرورگر گوشی از طریق QR روی نمایشگر؛ بدون ماژول دوربین اختصاصی."],
@@ -204,7 +206,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "فصل ۲ — مبانی", "فناوری‌های به‌کاررفته در یک نگاه");
   imgCard(s, `${FIGS}/fig6_stack.png`, 0.7, 1.95, 5.85, 4.17);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۴-۱", 0.7, 6.28, 4);
   const chips = ["ESP32-S3 (N16R8)", "ESP-IDF 6 + FreeRTOS", "LVGL 9.5", "ESP-DL", "MQTT 3.1.1", "Mosquitto", "Home Assistant", "Docker", "HTTPS / TLS", "FastAPI + SQLite"];
   const cw = 2.75, chh = 0.56, gx = 0.22, gy = 0.2, x0 = 7.0, y0 = 2.05;
   chips.forEach((c, i) => {
@@ -221,12 +222,12 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 /* ---------------- S8 — Hardware & firmware ---------------- */
 {
   const s = pres.addSlide(); s.background = { color: BG };
-  header(s, "فصل ۴ — طراحی سخت‌افزار و فریمور", "سخت‌افزار لبه و ساختار فریمور");
+  header(s, "فصل ۴ — طراحی سخت‌افزار و فرمور", "سخت‌افزار لبه و ساختار فرمور");
   const cw = 6.05, ch = 4.75, y0 = 1.8;
   card(s, W - M - cw, y0, cw, ch, SURFACE, false);
   T(s, "سخت‌افزار", { x: W - M - cw + 0.3, y: y0 + 0.22, w: cw - 0.6, h: 0.45, fontSize: 18, bold: true, color: PRIMARY });
   const hw = [
-    "برد ESP32-S3-DevKitC-1 با ماژول WROOM-1-N16R8: ۱۶MB فلش + ۸MB PSRAM اکتال (۸۰MHz)",
+    "برد ESP32-S3-DevKitC-1 با ماژول WROOM-1-N16R8: ۱۶MB فلش + ۸MB PSRAM اکتال \u200F(۸۰MHz)\u200F",
     "هسته دوگانه Xtensa LX7 تا ۲۴۰MHz با دستورالعمل‌های برداری شتاب‌دهی ML",
     "نمایشگر ST7796 با رزولوشن ۳۲۰×۴۸۰ (رابط موازی ۸ بیتی) + کنترلر لمس GT911 روی I2C",
     "سنسور محیطی BME280: دما، رطوبت و فشار روی I2C مشترک",
@@ -234,18 +235,18 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   ];
   hw.forEach((t, i) => T(s, t, { x: W - M - cw + 0.3, y: y0 + 0.8 + i * 0.78, w: cw - 0.6, h: 0.74, fontSize: 12.5, color: TEXT, lineSpacingMultiple: 1.15 }));
   card(s, M, y0, cw, ch, SURF2, false);
-  T(s, "فریمور (ESP-IDF + FreeRTOS)", { x: M + 0.3, y: y0 + 0.22, w: cw - 0.6, h: 0.45, fontSize: 18, bold: true, color: PRIMARY });
+  T(s, "فرمور (ESP-IDF + FreeRTOS)", { x: M + 0.3, y: y0 + 0.22, w: cw - 0.6, h: 0.45, fontSize: 18, bold: true, color: PRIMARY });
   const fw = [
     "پارتیشن‌بندی اختصاصی فلش: برنامه، NVS و SPIFFS (پایگاه چهره)",
     "وظایف چندهسته‌ای با اولویت و پشته مستقل: رابط گرافیکی، پردازش چهره، شبکه، عامل یادگیری",
     "همگام‌سازی با صف‌های کم‌عمق (مثلاً صف تصویر چهره با عمق ۱) به‌جای اشتراک مستقیم حافظه",
-    "سگ‌نگهبان وظایف (TWDT) + سگ‌نگهبان لمس با ریست سخت‌افزاری (RST/INT)",
+    "سگ‌نگهبان وظایف \u200F(TWDT)\u200F + سگ‌نگهبان لمس با ریست سخت‌افزاری \u200F(RST/INT)\u200F",
     "پایش دوره‌ای حافظه (هر ۳۰ ثانیه) به‌عنوان زنگ هشدار شکستگی حافظه",
   ];
   fw.forEach((t, i) => T(s, t, { x: M + 0.3, y: y0 + 0.8 + i * 0.78, w: cw - 0.6, h: 0.74, fontSize: 12.5, color: TEXT, lineSpacingMultiple: 1.15 }));
   T(s, "نکته پین‌گذاری: GPIO35 تا GPIO37 به دلیل PSRAM اکتال قابل استفاده نیستند.", { x: M, y: 6.68, w: W - 2 * M, h: 0.32, fontSize: 12, color: MUTED });
   pageNum(s, 8);
-  s.addNotes("سمت راست سخت‌افزار، سمت چپ فریمور. تأکید بر PSRAM به‌عنوان عامل امکان‌سنج اجرای هم‌زمان UI+TLS+CNN.");
+  s.addNotes("سمت راست سخت‌افزار، سمت چپ فرمور. تأکید بر PSRAM به‌عنوان عامل امکان‌سنج اجرای هم‌زمان UI+TLS+CNN.");
 }
 
 /* ---------------- S9 — Local infrastructure ---------------- */
@@ -253,11 +254,10 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "فصل ۵ — معماری ارتباطی", "زیرساخت کاملاً لوکال: MQTT و Home Assistant");
   imgCard(s, `${FIGS}/fig1_architecture.png`, 0.65, 1.95, 6.6, 4.27);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۵-۱", 0.65, 6.4, 4);
   const rows = [
     ["MQTT: انتشار/اشتراک با کارگزار مرکزی", "QoS=1 برای وضعیت، پیام‌های Retained و وصیت‌نامه LWT برای تشخیص قطعی برد."],
     ["کشف خودکار (MQTT Discovery)", "۱۳ موجودیت بدون پیکربندی دستی در Home Assistant ثبت می‌شوند."],
-    ["استقرار با Docker روی سرور خانگی", "Mosquitto + Home Assistant (+ سرور حضور و غیاب) — انتقال‌پذیر و بدون ابر."],
+    ["استقرار با Docker روی سرور خانگی", "Mosquitto + Home Assistant \u200F(+ سرور حضور و غیاب)\u200F — انتقال‌پذیر و بدون ابر."],
     ["کارکرد فقط با مودم خانگی", "در قطعی اینترنت بین‌المللی و داخلی بی‌وقفه کار می‌کند؛ تاخیر حداقلی."],
   ];
   rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, 7.55, 2.0 + i * 1.12, 5.3, { dy: 0.37, dh: 0.55, ds: 12.5 }));
@@ -291,18 +291,17 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 {
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "هوش مصنوعی روی لبه — ۱) تشخیص چهره", "خط پردازش کامل تشخیص چهره روی میکروکنترلر", 27);
-  imgCard(s, `${FIGS}/fig2_face_pipeline.png`, (W - 9.0) / 2, 1.58, 9.0, 4.22);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۶-۱", W / 2 - 1.2, 5.92, 2.6);
+  imgCard(s, `${FIGS}/fig2_face_pipeline.png`, (W - 8.9) / 2, 1.62, 8.9, 4.17);
   const notes = [
     "صف ورودی عمق ۱ — پردازش سری‌شده، بدون تداخل حافظه",
     "بافرهای بزرگ در PSRAM — حافظه داخلی برای TLS آزاد می‌ماند",
     "تحویل غیرمسدودکننده با وظیفه face_worker — UI پاسخ‌گو می‌ماند",
   ];
-  const nw = 4.1, ny = 6.42, gap = 0.25;
+  const nw = 4.1, ny = 6.1, gap = 0.25;
   notes.forEach((t, i) => {
     const x = W - M - nw - i * (nw + gap);
-    card(s, x, ny, nw, 0.72, SURF2);
-    T(s, t, { x: x + 0.15, y: ny, w: nw - 0.3, h: 0.72, fontSize: 11.5, color: PRIMARY, valign: "middle", lineSpacingMultiple: 1.15 });
+    card(s, x, ny, nw, 0.85, SURF2);
+    T(s, t, { x: x + 0.15, y: ny, w: nw - 0.3, h: 0.85, fontSize: 12, color: PRIMARY, valign: "middle", lineSpacingMultiple: 1.15 });
   });
   pageNum(s, 11);
   s.addNotes("تصویر JPEG تا ۳۰۰KB از مرورگر گوشی → رمزگشایی سخت‌افزاری به RGB565 ۳۲۰×۲۴۰ در PSRAM → آشکارسازی HumanFaceDetect → استخراج embedding با HumanFaceRecognizer → تطبیق با پایگاه چهره در SPIFFS؛ آستانه ۰٫۷۰.");
@@ -362,10 +361,10 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
     { text: "0.25 < p < 0.75 \u2192 hold (no action)", options: {} },
   ], { x: fx + 0.25, y: 2.6, w: fw2 - 0.5, h: 1.7, fontSize: 14, fontFace: BF, color: TEXT, align: "left", margin: 0, lineSpacingMultiple: 1.25 });
   card(s, fx, 4.7, fw2, 2.1, "FBF4E4", false);
-  T(s, "درس مهندسی: رفتار پسماندی", { x: fx + 0.25, y: 4.88, w: fw2 - 0.5, h: 0.42, fontSize: 14.5, bold: true, color: ACCENT });
+  T(s, "درس مهندسی: رفتار لختی‌وار", { x: fx + 0.25, y: 4.88, w: fw2 - 0.5, h: 0.42, fontSize: 14.5, bold: true, color: ACCENT });
   T(s, "ویژگی «وضعیت خود دستگاه» در نسخه نخست، مدل را با وجود دقت ۹۱٪ در حالت خودکار منفعل کرده بود؛ حذف آن و افزودن همساز سوم، دقت را به ۹۴٪ رساند و رفتار را فعال کرد.", { x: fx + 0.25, y: 5.32, w: fw2 - 0.5, h: 1.4, fontSize: 12.5, color: TEXT, lineSpacingMultiple: 1.28 });
   pageNum(s, 13);
-  s.addNotes("دو مدل مستقل چراغ/فن. ویژگی‌ها کاملاً زمینه‌ای: زمان روی دایره (همسازها)، تعطیلات، حضور، نور/دما/رطوبت. درس کلیدی: حذف ویژگی وضعیت دستگاه → رفع پسماند.");
+  s.addNotes("دو مدل مستقل چراغ/فن. ویژگی‌ها کاملاً زمینه‌ای: زمان روی دایره (همسازها)، تعطیلات، حضور، نور/دما/رطوبت. درس کلیدی: حذف ویژگی وضعیت دستگاه → رفع لختی.");
 }
 
 /* ---------------- S14 — Model figure ---------------- */
@@ -373,7 +372,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "هوش مصنوعی روی لبه — ۲) عامل یادگیری رفتاری", "معماری مدل، فرمول‌ها و قواعد تصمیم", 27);
   imgCard(s, `${FIGS}/fig_ml_model.png`, (W - 8.55) / 2, 1.62, 8.55, 5.52);
-  srcNote(s, "منبع: گزارش پروژه — شکل مدل عامل رفتاری (fig_ml_model)", W / 2 - 2.2, 6.98, 4.6);
   pageNum(s, 14);
   s.addNotes("این شکل کامل‌ترین نمای مدل است: ورودی‌ها، نورون سیگموئید هر دستگاه، قاعده تصمیم با آستانه‌ها، گیت ارتقا، پیش‌آموزش آفلاین، SGD برخط و ماندگاری در NVS. قفل در هرگز تحت کنترل مدل نیست.");
 }
@@ -388,7 +386,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
     ["۳۰ روز، ۸۶۴۰ نمونه (گام ۵ دقیقه)", "دیتاست پیش‌آموزش"],
     ["گرادیان کامل، ۱۵۰۰ تکرار، با L2", "بهینه‌سازی آفلاین"],
     ["۶ روز پایانی داده", "اعتبارسنجی"],
-    ["SGD با نرخ ۰٫۰۸، محدودسازی وزن (±۸)", "یادگیری برخط"],
+    ["SGD با نرخ ۰٫۰۸، محدودسازی وزن \u200F(±۸)\u200F", "یادگیری برخط"],
     ["NVS (~۹۰ بایت، هر ۳۰ ثانیه در صورت تغییر)", "ذخیره‌سازی وزن"],
     ["هر ۳۰ ثانیه", "دوره تصمیم"],
     ["p ≥ ۰٫۷۵ روشن، p ≤ ۰٫۲۵ خاموش", "آستانه عمل"],
@@ -416,7 +414,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "هوش مصنوعی روی لبه — ۲) عامل یادگیری رفتاری", "یادگیری برخط در عمل: از وزن‌های صفر تا الگوی کاربر", 27);
   imgCard(s, `${FIGS}/fig_ml_learning.gif`, 0.7, 1.85, 7.6, 4.12);
-  srcNote(s, "انیمیشن یادگیری آنلاین — هر اقدام کاربر یک گام SGD (fig_ml_learning)", 0.7, 6.1, 6.5);
   const rows = [
     ["شروع در فاز سایه با w = 0", "مدل هیچ چیزی نمی‌داند؛ p خروجی ثابت است."],
     ["هر اقدام دستی = یک گام SGD", "به‌روزرسانی وزن با نرخ یادگیری ۰٫۰۸ و محدودسازی ±۸"],
@@ -434,7 +431,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "هوش مصنوعی روی لبه — ۲) عامل یادگیری رفتاری", "چرخه زندگی مدل: فاز سایه → فاز خودکار", 27);
   imgCard(s, `${FIGS}/fig5_ml_agent.png`, 0.65, 1.85, 7.9, 4.23);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۶-۲", 0.65, 6.22, 4);
   const rows = [
     ["فاز سایه: پیش‌بینی بدون اقدام", "هر ۳۰ ثانیه پیش‌بینی، انتشار در MQTT و ارزیابی."],
     ["گیت ارتقا", "پنجره متحرک ۲۰ تصمیم؛ ارتقا با ≥ ۱۵ تصمیم صحیح و دقت ≥ ۸۵٪ (هر دستگاه مستقل)."],
@@ -464,7 +460,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
     T(s, v, { x, y: sy + 0.22, w: sw, h: 1.0, fontSize: 46, fontFace: TF, color: c, align: "center" });
     T(s, l, { x: x + 0.2, y: sy + 1.35, w: sw - 0.4, h: 0.45, fontSize: 14, color: MUTED, align: "center" });
   });
-  T(s, "سناریوهای رفتاری مرجع — بازآزمایی روی فریمور مستقر:", { x: M, y: 4.35, w: W - 2 * M, h: 0.45, fontSize: 15.5, bold: true, color: PRIMARY });
+  T(s, "سناریوهای رفتاری مرجع — بازآزمایی روی فرمور مستقر:", { x: M, y: 4.35, w: W - 2 * M, h: 0.45, fontSize: 15.5, bold: true, color: PRIMARY });
   const scen = [
     ["شب + حضور + تاریکی", "p ≈ ۰٫۹۹ → روشن کردن چراغ"],
     ["ظهر با چراغ روشن", "p ≤ ۰٫۰۵ → خاموش کردن چراغ"],
@@ -479,7 +475,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   });
   T(s, "برچسب‌های داده عمداً ۴ تا ۵ درصد نویز انسانی دارند؛ با این حال ارتقای خودکار سایه → خودکار در آزمون عملی مشاهده شد.", { x: M, y: 6.45, w: W - 2 * M, h: 0.4, fontSize: 12.5, color: MUTED });
   pageNum(s, 18);
-  s.addNotes("دقت روی ۶ روز پایانی داده. سه سناریوی مرجع روی فریمور واقعی. مدل عملاً به سقف بیزی رسیده.");
+  s.addNotes("دقت روی ۶ روز پایانی داده. سه سناریوی مرجع روی فرمور واقعی. مدل عملاً به سقف بیزی رسیده.");
 }
 
 /* ---------------- S19 — UI channels ---------------- */
@@ -487,9 +483,8 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "فصل ۷ — رابط‌های کاربری", "چهار کانال موازی با یک منبع واحد وضعیت");
   imgCard(s, `${FIGS}/fig3_ui_channels.png`, 0.65, 1.95, 6.35, 3.62);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۷-۱", 0.65, 5.7, 4);
   const rows = [
-    ["وب‌سرور امن روی خود برد", "esp_https_server با گواهی خودامضا؛ TLS پیش‌نیاز فنی دسترسی به دوربین (getUserMedia)."],
+    ["وب‌سرور امن روی خود برد", "esp_https_server با گواهی خودامضا؛ TLS پیش‌نیاز فنی دسترسی به دوربین \u200F(getUserMedia)\u200F."],
     ["ورود کوتاه‌مسیر با QR", "صفحات recognize، enroll و attendance با توکن‌های زمان‌دار و نوسازی خودکار."],
     ["منبع واحد وضعیت (app_state)", "نمایشگر، پنل وب، داشبورد HA و اپ HA همیشه تصویر سازگار نشان می‌دهند."],
     ["تنزل محترمانه در خرابی", "بدون شبکه، نمایشگر همچنان قفل، چراغ و فن را مدیریت می‌کند."],
@@ -505,7 +500,6 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "فصل ۸ — حضور و غیاب", "معماری سه‌لایه با صف پیام پایا");
   imgCard(s, `${FIGS}/fig4_attendance.png`, 0.65, 1.95, 6.5, 3.77);
-  srcNote(s, "منبع: گزارش پروژه — شکل ۸-۱", 0.65, 5.85, 4);
   const rows = [
     ["لایه برد: تولید QR و تطبیق چهره", "QR ده‌دقیقه‌ای با شمارش معکوس؛ ضدتکرار ۶۰ ثانیه‌ای."],
     ["صف پایا در NVS (۳۲ خانه)", "اگر شبکه/سرور در دسترس نباشد رکوردها می‌مانند و بعداً به‌ترتیب ارسال می‌شوند."],
@@ -524,7 +518,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const items = [
     ["حریم خصوصی داده چهره", "تصویر روی خود برد پردازش و آزاد می‌شود؛ خروجی فقط «تصمیم» و بردار ویژگی است — نه تصویر خام، نه سرویس ابری."],
     ["امنیت لایه وب", "TLS با گواهی خودامضا؛ کوکی نشست HttpOnly/Secure/SameSite=Strict با مهلت ۱۰ دقیقه؛ توکن‌های ۳ و ۱۰ دقیقه‌ای؛ تأخیر عمدی ۱ ثانیه در رمز نادرست."],
-    ["امنیت قفل در", "بازکردن فقط از مسیرهای تأییدشده؛ بدون هیچ مسیر فرمان از HA؛ رله با سازوکار ایمن مستقل: در صورت قطع فریمور، بازگشت خودکار به قفل حداکثر پس از ۸ ثانیه."],
+    ["امنیت قفل در", "بازکردن فقط از مسیرهای تأییدشده؛ بدون هیچ مسیر فرمان از HA؛ رله با سازوکار ایمن مستقل: در صورت قطع فرمور، بازگشت خودکار به قفل حداکثر پس از ۸ ثانیه."],
     ["مرز شناخته‌شده و مسیر ارتقا", "Mosquitto فعلاً بدون احراز هویت (انتخاب آگاهانه برای استقرار خانگی)؛ گام بعد: auth+TLS بروکر و WebAuthn — بدون تغییر در برد."],
   ];
   const cw = 6.05, chh = 2.28, y0 = 1.85;
@@ -583,9 +577,9 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   header(s, "فصل ۱۰ — آزمایش‌ها و نتایج", "چالش‌های مهندسی ریشه‌یابی‌شده و حل‌شده");
   const items = [
     ["کمبود حافظه در هندشیک TLS پس از افزودن وب‌گرافیک", "ریشه: اشغال حافظه داخلی توسط بافرهای رندر LVGL → جابه‌جایی بافرها به PSRAM + keep-alive لایه شبکه + lru_purge و ۱۶ سوکت lwIP"],
-    ["قفل‌شدگی گذرگاه I2C کنترلر لمس GT911", "ریشه: نشتی mutex در مسیر خطا → اصلاح مسیر آزادسازی + «سگ‌نگهبان لمس» با توالی ریست سخت‌افزاری (RST/INT) — سامانه خودبازیاب شد"],
+    ["قفل‌شدگی گذرگاه I2C کنترلر لمس GT911", "ریشه: نشتی mutex در مسیر خطا → اصلاح مسیر آزادسازی + «سگ‌نگهبان لمس» با توالی ریست سخت‌افزاری \u200F(RST/INT)\u200F — سامانه خودبازیاب شد"],
     ["حلقه‌های panic سگ‌نگهبان در وظیفه چهره", "ریشه: انسداد طولانی انتظار برای کار جدید → ثبت دوره‌ای TWDT (حداکثر هر ۵ ثانیه) در حلقه انتظار + مهلت ۲۰ ثانیه‌ای برای دریافت بدنه تصویر"],
-    ["رفتار منفعل مدل رفتاری با دقت بالا", "ریشه: ویژگی «وضعیت خود دستگاه» باعث پسماند و بی‌عملی می‌شد → بازطراحی بردار ویژگی به فرم صرفاً زمینه‌ای (فصل ۶)"],
+    ["رفتار منفعل مدل رفتاری با دقت بالا", "ریشه: ویژگی «وضعیت خود دستگاه» باعث لختی و بی‌عملی می‌شد → بازطراحی بردار ویژگی به فرم صرفاً زمینه‌ای (فصل ۶)"],
   ];
   const rowH = 1.22, y0 = 1.85;
   items.forEach(([t, d], i) => {
@@ -639,7 +633,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
     ["یک منبع وضعیت برای همه‌ی کانال‌ها", "همان app_state که وب‌داشبورد، HA و ربات بله نشان می‌دهند"],
   ];
   rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, 6.55, 1.85 + i * 1.18, 6.28, { dy: 0.38, dh: 0.6, ds: 12.5 }));
-  T(s, "۶ صفحه از ۹ — سه صفحه‌ی دیگر (ورود رمز وای‌فای، QR وب و فهرست چهره‌ها) در README مخزن آمده است.", { x: 6.55, y: 6.55, w: 6.28, h: 0.45, fontSize: 12, color: MUTED, lineSpacingMultiple: 1.2 });
+  T(s, "۶ صفحه از ۹ — سه صفحه‌ی دیگر \u200F(ورود رمز وای‌فای، QR وب و فهرست چهره‌ها)\u200F در README مخزن آمده است.", { x: 6.55, y: 6.55, w: 6.28, h: 0.45, fontSize: 12, color: MUTED, lineSpacingMultiple: 1.2 });
   pageNum(s, 25);
   s.addNotes("اسکرین‌شات مستقیم از LCD ۳۲۰×۴۸۰. تأکید: راه‌اندازی کامل شبکه و بروکر بدون رایانه، فقط با نمایشگر.");
 }
@@ -648,17 +642,17 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 {
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "اجرای واقعی — ویدیو ۱", "تست لمس نمایشگر روی برد واقعی", 27);
-  const vw = 4.4;
-  s.addShape("roundRect", { x: W - M - vw - 0.08, y: 1.87, w: vw + 0.16, h: vw + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
-  s.addMedia({ type: "video", path: silentVideo(`${IMG}/Lcd Test.mp4`), x: W - M - vw, y: 1.95, w: vw, h: vw, cover: coverData("poster-lcd") });
-  T(s, "ویدیوی تست واقعی — ۳۹ ثانیه", { x: W - M - vw, y: 6.6, w: vw, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+  const vw = 2.98, vh = 5.3, vx = W - M - vw;
+  s.addShape("roundRect", { x: vx - 0.08, y: 1.67, w: vw + 0.16, h: vh + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
+  s.addMedia({ type: "video", path: silentVideo(`${IMG}/Lcd Test.mp4`, "scale=608:1080,setsar=1"), x: vx, y: 1.75, w: vw, h: vh, cover: coverData("poster-lcd") });
+  T(s, "ویدیوی تست واقعی — ۳۹ ثانیه", { x: vx - 0.3, y: 7.1, w: vw + 0.6, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
   const rows = [
     ["لمس و بازخورد فوری رابط", "جابه‌جایی بین صفحه‌ها، کلیدهای چراغ و فن و اسلایدر روشنایی — در حال پردازش هم‌زمان شبکه و رابط گرافیکی"],
     ["باز کردن درب با رمز و چهره", "کیبورد عددی روی نمایشگر و جریان تشخیص چهره از همان صفحه"],
     ["سنسورهای زنده", "دما، رطوبت و فشار BME280 به‌صورت لحظه‌ای روی کاشی‌های پایین صفحه"],
     ["چراغ‌های وضعیت روی برد", "LEDهای بالای قاب، روشن‌شدن هم‌زمان با فرمان چراغ را نشان می‌دهند"],
   ];
-  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.18, 7.35, { dy: 0.38, dh: 0.6, ds: 12.5 }));
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.18, 8.9, { dy: 0.38, dh: 0.6, ds: 12.5 }));
   pageNum(s, 26);
   s.addNotes("ویدیوی جاسازی‌شده — در ارائه کلیک و پخش. لمس صفحه‌های مختلف، رمز درب، سنسورها و پاسخ LEDها.");
 }
@@ -667,17 +661,17 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 {
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "اجرای واقعی — ویدیو ۲", "تست حضور و غیاب با چهره — انتها به انتها", 27);
-  const vw = 2.13, vh = 4.9, vx = W - M - vw;
-  s.addShape("roundRect", { x: vx - 0.08, y: 1.72, w: vw + 0.16, h: vh + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
-  s.addMedia({ type: "video", path: silentVideo(`${IMG}/Attendance test.mp4`), x: vx, y: 1.8, w: vw, h: vh, cover: coverData("poster-attendance") });
-  T(s, "ویدیوی تست واقعی — ۳۰ ثانیه", { x: vx - 0.2, y: 6.8, w: vw + 0.4, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+  const vw = 2.24, vh = 5.15, vx = W - M - vw - 0.09;
+  s.addShape("roundRect", { x: vx - 0.09, y: 1.57, w: vw + 0.18, h: vh + 0.18, rectRadius: 0.12, fill: { color: "101B2B" }, line: { color: "2E4A6E", width: 1 }, shadow: sh() });
+  s.addMedia({ type: "video", path: silentVideo(`${IMG}/Attendance test.mp4`), x: vx, y: 1.66, w: vw, h: vh, cover: coverData("poster-attendance") });
+  T(s, "ویدیوی تست واقعی — ۳۰ ثانیه", { x: vx - 0.4, y: 6.98, w: vw + 0.8, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
   const rows = [
     ["اسکن QR از روی LCD", "توکن ۱۰ دقیقه‌ای نمایشگر با دوربین گوشی خوانده می‌شود — بدون نصب هیچ اپی"],
     ["تطبیق چهره روی خود برد", "عکس از مرورگر گوشی → رمزگشایی JPEG سخت‌افزاری → استخراج بردار ویژگی → تطبیق با پایگاه چهره"],
     ["ثبت رکورد در سرور لوکال", "نوع ورود/خروج با زمان دقیق در FastAPI/SQLite"],
     ["بایگانی و اعلان — بلافاصله", "شیت جلالی + پیام ربات بله؛ در قطعی شبکه، رکورد در صف NVS می‌ماند و بعداً ارسال می‌شود"],
   ];
-  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.18, 9.85, { dy: 0.38, dh: 0.6, ds: 12.5 }));
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.18, 9.5, { dy: 0.38, dh: 0.6, ds: 12.5 }));
   pageNum(s, 27);
   s.addNotes("کل جریان در یک ویدیو: اسکن QR از LCD، دوربین و تطبیق چهره، ثبت ورود و بنر اعلان بله در پایان.");
 }
@@ -686,22 +680,22 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 {
   const s = pres.addSlide(); s.background = { color: BG };
   header(s, "اجرای واقعی — ویدیو ۳", "وب‌داشبورد و اپ Home Assistant روی گوشی", 27);
-  const vw = 2.13, vh = 4.9, vy = 1.8;
+  const vw = 2.24, vh = 5.15, vy = 1.66;
   const vids = [
-    { f: "Smart Home – Home Assistant_Mobile.mp4", p: "poster-ha", cap: "اپ Home Assistant — ۵۸ ثانیه", x: W - M - vw },
-    { f: "Web Dashboard test.mp4", p: "poster-webdash", cap: "وب‌داشبورد — ۴۳ ثانیه", x: W - M - vw - vw - 0.55 },
+    { f: "Smart Home – Home Assistant_Mobile.mp4", p: "poster-ha", cap: "اپ Home Assistant — ۵۸ ثانیه", x: W - M - vw - 0.09 },
+    { f: "Web Dashboard test.mp4", p: "poster-webdash", cap: "وب‌داشبورد — ۴۳ ثانیه", x: W - M - 2 * vw - 0.18 - 0.5 },
   ];
   vids.forEach(v => {
-    s.addShape("roundRect", { x: v.x - 0.08, y: vy - 0.08, w: vw + 0.16, h: vh + 0.16, rectRadius: 0.05, fill: { color: "FFFFFF" }, line: { color: HAIR, width: 1 }, shadow: sh() });
+    s.addShape("roundRect", { x: v.x - 0.09, y: vy - 0.09, w: vw + 0.18, h: vh + 0.18, rectRadius: 0.12, fill: { color: "101B2B" }, line: { color: "2E4A6E", width: 1 }, shadow: sh() });
     s.addMedia({ type: "video", path: silentVideo(`${IMG}/${v.f}`), x: v.x, y: vy, w: vw, h: vh, cover: coverData(v.p) });
-    T(s, v.cap, { x: v.x - 0.25, y: vy + vh + 0.1, w: vw + 0.5, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
+    T(s, v.cap, { x: v.x - 0.4, y: vy + vh + 0.16, w: vw + 0.8, h: 0.3, fontSize: 11.5, color: MUTED, align: "center" });
   });
   const rows = [
     ["وب‌داشبورد خودِ برد", "کلید چراغ و فن، قفل درب با رمز و تشخیص چهره، وضعیت زنده‌ی محیط و عامل ML"],
     ["اپ Home Assistant با ۱۳ موجودیت", "کشف خودکار MQTT؛ کنترل، اتوماسیون و اعلان — همه‌ی وضعیت‌ها دوطرفه"],
     ["یک منبع وضعیت", "تغییر از هر کانال، بی‌درنگ در بقیه‌ی کانال‌ها بازتاب می‌یابد"],
   ];
-  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.35, 7.4, { dy: 0.38, dh: 0.62, ds: 12.5 }));
+  rows.forEach(([t, d], i) => numRow(s, i + 1, t, d, M, 1.95 + i * 1.35, 6.6, { dy: 0.38, dh: 0.62, ds: 12.5 }));
   pageNum(s, 28);
   s.addNotes("دو ویدیو: اپ HA با اسکرول داشبورد و اتوماسیون‌ها؛ وب‌داشبورد با باز کردن درب و کلیدها.");
 }
@@ -739,7 +733,7 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   imgCard(s, `${IMG}/Docker.png`, W - M - 7.3, 1.9, 7.3, 3.88);
   imgCard(s, `${IMG}/Google Sheet.png`, 0.6, 1.9, 3.5, 3.73);
   const cards3 = [
-    "هفت کانتینر سبک: Mosquitto، Home Assistant، attendance و bale-bot",
+    "چهار کانتینر سبک: Mosquitto، Home Assistant، attendance و bale-bot",
     "بایگانی خودکار با تقویم جلالی — ستون‌های ورود و خروج روی شیت",
     "اعلان بله هم‌زمان با ثبت هر رکورد حضور و غیاب",
   ];
@@ -774,10 +768,10 @@ const fa = (n) => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   const next = [
     "یادگیری فدرال روی میکروکنترلرها — بدون خروج داده خام",
     "هوشمندسازی صوتی روی تراشه با ESP-SR (کانال پنجم)",
-    "شناسایی زنده‌بودن (liveness) برای مقاوم‌سازی چهره",
-    "به‌روزرسانی بی‌سیم فریمور (OTA)",
-    "امن‌سازی Mosquitto (auth + TLS) و مهاجرت به WebAuthn",
-    "سنسورهای واقعی حضور/نور، اثر انگشت دو-عاملی و برد اختصاصی (PCB)",
+    "شناسایی زنده‌بودن \u200F(liveness)\u200F برای مقاوم‌سازی چهره",
+    "به‌روزرسانی بی‌سیم فرمور \u200F(OTA)\u200F",
+    "امن‌سازی Mosquitto \u200F(auth + TLS)\u200F و مهاجرت به WebAuthn",
+    "سنسورهای واقعی حضور/نور، اثر انگشت دو-عاملی و برد اختصاصی \u200F(PCB)\u200F",
   ];
   next.forEach((t, i) => T(s, t, { x: M + 0.3, y: y0 + 0.8 + i * 0.68, w: cw - 0.6, h: 0.64, fontSize: 12.5, color: TEXT, lineSpacingMultiple: 1.15 }));
   pageNum(s, 31);
