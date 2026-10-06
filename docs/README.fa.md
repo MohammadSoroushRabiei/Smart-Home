@@ -21,6 +21,11 @@
 [![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white)](#)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-archive-34A853?logo=googlesheets&logoColor=white)](#)
 
+<img src="../presentation/Images/Board%20Image.jpg" width="480" alt="نمونه‌ی واقعی روی میز کار — برد ESP32-S3، داشبورد LVGL روی LCD و اپ Home Assistant روی گوشی"/>
+
+*نمونه‌ی واقعی روی میز کار — برد ESP32-S3 با داشبورد LVGL روی LCD، و اپ همراه
+Home Assistant به‌صورت زنده روی گوشی.*
+
 <img src="../report/figs/fig1_architecture.png" width="100%" alt="معماری سیستم — گوشی، گره لبه ESP32-S3، سرور خانگی و اینترنت اختیاری"/>
 
 *تمام هوشمندی روی گره‌ی لبه اجرا می‌شود — گوشی فقط دوربینش را قرض می‌دهد و سرورها لوکال می‌مانند.*

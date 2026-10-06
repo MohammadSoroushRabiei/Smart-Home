@@ -20,6 +20,10 @@
 [![Python](https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white)](#)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-archive-34A853?logo=googlesheets&logoColor=white)](#)
 
+<img src="../presentation/Images/Board%20Image.jpg" width="480" alt="工作台上的真实装置 — ESP32-S3 开发板、LCD 上的 LVGL 仪表盘与手机上的 Home Assistant 应用"/>
+
+*工作台上的真实装置：ESP32-S3 边缘节点，LCD 上运行着 LVGL 仪表盘，手机上实时运行着 Home Assistant 应用。*
+
 <img src="../report/figs/fig1_architecture.png" width="100%" alt="系统架构 — 手机、ESP32-S3 边缘节点、家庭服务器、可选互联网"/>
 
 *所有智能都在边缘节点上运行 — 手机只是出借它的摄像头，服务器保持本地。*
